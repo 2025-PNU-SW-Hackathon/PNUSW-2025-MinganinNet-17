@@ -21,6 +21,10 @@ module.exports = {
         projectId: "YOUR_EAS_PROJECT_ID" // EAS를 사용한다면 입력, 아니면 이 줄은 생략해도 됩니다.
       }
     },
+    // expo-router 플러그인 추가
+    plugins: [
+      "expo-router"
+    ],
     // ... (여기에 기존에 있던 다른 설정들도 그대로 두세요) ...
   },
 };
