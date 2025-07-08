@@ -1,5 +1,6 @@
-import AIResponseScreen from '@/components/AIResponseScreen';
+import React from 'react';
+import MainApp from '../../components/MainApp';
 
 export default function HomeScreen() {
-  return <AIResponseScreen />;
+  return <MainApp />;
 }
