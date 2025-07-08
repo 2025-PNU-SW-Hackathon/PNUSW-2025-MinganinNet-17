@@ -23,6 +23,7 @@
     "expo-haptics": "~14.1.4",
     "expo-image": "~2.3.2",
     "expo-linking": "~7.1.6",
+    "expo-notifications": "^0.31.4",
     "expo-router": "~5.1.2",
     "expo-splash-screen": "~0.30.9",
     "expo-status-bar": "~2.2.3",

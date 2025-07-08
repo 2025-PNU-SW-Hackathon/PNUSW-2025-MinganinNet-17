@@ -1,34 +1,21 @@
-import Constants from 'expo-constants';
-
 // Gemini API 설정 파일 (React Native 호환 버전)
 // 이 파일은 AI와 대화하기 위한 설정을 담고 있어요
-
-// 프롬프트 텍스트를 이곳에서 관리합니다.
-const PROMPTS = {
-  kind: `너는 내가 만든 습관 관리 서비스에서 제한된 앱에 접근했을 때 경고 메시지를 보내는 AI야. 메시지는 친절하고 다정한 말투와 내용이어야 해. 상대방을 배려하고 응원하는 느낌으로, 부드럽고 따뜻하게 1줄만 작성해줘.`,
-  aggressive: `너는 내가 만든 습관 관리 서비스에서 제한된 앱에 접근했을 때 경고 메시지를 보내는 AI야. 메시지는 공격적이고 매우 심각한 수준의, 비속어와 욕설이 섞인 자극적이고 거친 말투와 내용이어야 해. 
-  자기 행동에 경각심을 가질 수 있도록, 가족을 들먹이며 부끄럽지 않냐는 뉘앙스로 1줄만 작성해줘.`,
-  boyfriend: `너는 내가 만든 습관 관리 서비스에서 제한된 앱에 접근했을 때 경고 메시지를 보내는 AI야. 메시지는 남자친구가 여자친구에게 보내는 메시지처럼 친밀하고 센스 있는 반말 말투와 내용이어야 해. 
-  그러면서 약간 느끼하고 다정한 말투로 1줄만 작성해줘.`
-};
+import Constants from 'expo-constants';
 
 // API 키를 여기에 넣어주세요 (실제 사용할 때는 환경변수로 관리하는 것이 좋아요)
-const API_KEY = Constants.expoConfig.extra.geminiApiKey; // 이 줄이 정확한지 확인
-console.log('--- config/gemini.js에서 읽은 API_KEY:', API_KEY);
+const API_KEY = Constants.expoConfig.extra.geminiApiKey // 여기에 실제 API 키를 넣어주세요
 
 // Gemini API 엔드포인트 (작동하는 모델만 사용)
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 // 메시지를 보내는 함수 (React Native 호환)
-// promptType: 'kind' | 'aggressive' 등 프롬프트 성격 키워드만 받음
-export const sendMessage = async (promptType) => {
+// message: AI에게 전송할 메시지 문자열
+export const sendMessage = async (message) => {
   try {
     console.log('Gemini 1.5 Flash 모델 사용 중...');
     
-    // 프롬프트 텍스트를 내부에서 선택
-    const message = PROMPTS[promptType] || '';
     if (!message) {
-      throw new Error('유효하지 않은 프롬프트 타입입니다.');
+      throw new Error('전송할 메시지가 없습니다.');
     }
 
     // API 요청 데이터 준비
@@ -44,8 +31,8 @@ export const sendMessage = async (promptType) => {
         }
       ],
       generationConfig: {
-        maxOutputTokens: 100, // AI가 한 번에 최대 100글자까지 답할 수 있어요
-        temperature: 1.0, // 창의성 수준 (0.0 ~ 1.0)
+        maxOutputTokens: 400, // AI가 한 번에 최대 100글자까지 답할 수 있어요
+        temperature: 0.5, // 창의성 수준 (0.0 ~ 1.0)
       }
     };
 
@@ -94,4 +81,15 @@ export const sendMessage = async (promptType) => {
       return `죄송해요, 오류가 발생했어요. 인터넷 연결을 확인하고 다시 시도해주세요. (오류: ${error.message})`;
     }
   }
-}; 
+};
+
+// 사용 예시:
+// import { sendMessage } from './gemini.js';
+// import { getPrompt } from './prompts.js';
+//
+// // 고정된 프롬프트 사용
+// const kindPrompt = getPrompt('kind');
+// const response1 = await sendMessage(kindPrompt);
+//
+// // 직접 메시지 전송
+// const response2 = await sendMessage('안녕하세요!'); 
