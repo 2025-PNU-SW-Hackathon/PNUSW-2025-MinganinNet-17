@@ -1,110 +1,163 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import GrassCalendar from '@/components/GrassCalendar';
+import React, { useMemo, useState } from 'react';
+import { Button, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+interface RoutineItem {
+  description: string;
+  time: string;
+}
+
+function generateRandomGrassData(year: number, month: number) {
+  const data: Record<string, RoutineItem[]> = {};
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  for (let d = 1; d <= lastDay; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    // 0~3개의 루틴 랜덤 생성
+    const count = Math.floor(Math.random() * 4);
+    data[dateStr] = Array.from({ length: count }, (_, i) => ({
+      description: `루틴 ${i + 1}`,
+      time: `${String(8 + i)}:00-${String(8 + i + 1)}:00`,
+    }));
+  }
+  return data;
+}
 
 export default function TabTwoScreen() {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  // 날짜별 루틴 데이터
+  const routineData = useMemo(() => generateRandomGrassData(year, month), [year, month]);
+  // 날짜별 개수만 추출 (잔디밭 색상용)
+  const grassData = useMemo(() => {
+    const obj: Record<string, number> = {};
+    Object.entries(routineData).forEach(([date, arr]) => {
+      obj[date] = arr.length;
+    });
+    return obj;
+  }, [routineData]);
+
+  const goToPrevMonth = () => {
+    if (month === 0) {
+      setYear(y => y - 1);
+      setMonth(11);
+    } else {
+      setMonth(m => m - 1);
+    }
+  };
+  const goToNextMonth = () => {
+    if (month === 11) {
+      setYear(y => y + 1);
+      setMonth(0);
+    } else {
+      setMonth(m => m + 1);
+    }
+  };
+
+  // 날짜 셀 클릭 시
+  const handleDayPress = (date: string) => {
+    setSelectedDate(date);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedDate(null);
+  };
+
+  const routines = selectedDate ? routineData[selectedDate] || [] : [];
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 8, marginTop: 16 }}>
+        <Button title="이전 달" onPress={goToPrevMonth} />
+        <View style={{ width: 16 }} />
+        <Button title="다음 달" onPress={goToNextMonth} />
+      </View>
+      <GrassCalendar data={grassData} year={year} month={month} onDayPress={handleDayPress} />
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{selectedDate} 루틴 목록</Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {routines.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: '#888', marginTop: 16 }}>루틴 없음</Text>
+              ) : (
+                routines.map((item, idx) => (
+                  <View key={idx} style={styles.routineRow}>
+                    <TouchableOpacity style={styles.checkbox}>
+                      {/* 실제 체크박스 구현은 상태 추가 필요, 여기선 UI만 */}
+                      <View style={styles.checkboxBox} />
+                    </TouchableOpacity>
+                    <Text style={styles.routineDesc}>{item.description}</Text>
+                    <Text style={styles.routineTime}>{item.time}</Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <Button title="닫기" onPress={closeModal} />
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  titleContainer: {
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: 320,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  routineRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  checkbox: {
+    marginRight: 8,
+  },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1.5,
+    borderColor: '#888',
+    borderRadius: 4,
+    backgroundColor: '#fff',
+  },
+  routineDesc: {
+    flex: 1,
+    fontSize: 15,
+    color: '#222',
+  },
+  routineTime: {
+    marginLeft: 8,
+    color: '#1976d2',
+    fontWeight: 'bold',
   },
 });
