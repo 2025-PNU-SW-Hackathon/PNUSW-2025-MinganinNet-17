@@ -1,25 +1,10 @@
 import GrassCalendar from '@/components/GrassCalendar';
-import React, { useMemo, useState } from 'react';
-import { Button, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Button, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface RoutineItem {
   description: string;
   time: string;
-}
-
-function generateRandomGrassData(year: number, month: number) {
-  const data: Record<string, RoutineItem[]> = {};
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  for (let d = 1; d <= lastDay; d++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    // 0~3개의 루틴 랜덤 생성
-    const count = Math.floor(Math.random() * 4);
-    data[dateStr] = Array.from({ length: count }, (_, i) => ({
-      description: `루틴 ${i + 1}`,
-      time: `${String(8 + i)}:00-${String(8 + i + 1)}:00`,
-    }));
-  }
-  return data;
 }
 
 export default function TabTwoScreen() {
@@ -28,9 +13,21 @@ export default function TabTwoScreen() {
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [routineData, setRoutineData] = useState<Record<string, RoutineItem[]>>({});
+  const [loading, setLoading] = useState(true);
 
-  // 날짜별 루틴 데이터
-  const routineData = useMemo(() => generateRandomGrassData(year, month), [year, month]);
+  // JSON 파일 불러오기 (최초 1회)
+  useEffect(() => {
+    setLoading(true);
+    fetch(require('@/assets/sample-schedule.json'))
+      .then(res => res.json())
+      .then(json => {
+        setRoutineData(json);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
   // 날짜별 개수만 추출 (잔디밭 색상용)
   const grassData = useMemo(() => {
     const obj: Record<string, number> = {};
@@ -77,7 +74,11 @@ export default function TabTwoScreen() {
         <View style={{ width: 16 }} />
         <Button title="다음 달" onPress={goToNextMonth} />
       </View>
-      <GrassCalendar data={grassData} year={year} month={month} onDayPress={handleDayPress} />
+      {loading ? (
+        <ActivityIndicator size="large" color="#1976d2" style={{ marginTop: 40 }} />
+      ) : (
+        <GrassCalendar data={grassData} year={year} month={month} onDayPress={handleDayPress} />
+      )}
       <Modal
         visible={modalVisible}
         transparent
@@ -94,7 +95,6 @@ export default function TabTwoScreen() {
                 routines.map((item, idx) => (
                   <View key={idx} style={styles.routineRow}>
                     <TouchableOpacity style={styles.checkbox}>
-                      {/* 실제 체크박스 구현은 상태 추가 필요, 여기선 UI만 */}
                       <View style={styles.checkboxBox} />
                     </TouchableOpacity>
                     <Text style={styles.routineDesc}>{item.description}</Text>
