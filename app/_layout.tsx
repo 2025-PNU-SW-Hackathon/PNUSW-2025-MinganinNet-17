@@ -1,43 +1,43 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { AnimationConfig } from '../constants/AnimationConfig';
-import { useColorScheme } from '../hooks/useColorScheme';
+import { useEffect } from 'react';
+import { useColorScheme } from 'react-native';
+import { supabase } from '../backend/supabase/client';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
 
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
-  }
+  useEffect(() => {
+    // 인증 상태 변경 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth event:', event);
+      console.log('Session:', session);
+    });
 
-  // Custom transition animation that matches our screen transition system
-  const customTransition = AnimationConfig.ENABLE_SCREEN_TRANSITIONS ? {
-    animation: 'slide_from_right' as const,
-    gestureEnabled: true,
-    gestureDirection: 'horizontal' as const,
-  } : {};
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          ...customTransition,
-        }}
-      >
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack>
+      <Stack.Screen 
+        name="(tabs)" 
+        options={{ headerShown: false }} 
+      />
+      <Stack.Screen 
+        name="ui/login" 
+        options={{ 
+          title: '로그인',
+          headerShown: false 
+        }} 
+      />
+      <Stack.Screen 
+        name="ui/signup" 
+        options={{ 
+          title: '회원가입',
+          headerShown: false 
+        }} 
+      />
+    </Stack>
   );
 }

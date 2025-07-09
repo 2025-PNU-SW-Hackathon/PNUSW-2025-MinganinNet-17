@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
+import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
 
@@ -23,19 +25,40 @@ export default function GoalSettingStep1({
   onBack, 
   initialValue = '' 
 }: GoalSettingStep1Props) {
-  const [habitGoal, setHabitGoal] = useState(initialValue);
+  const [habitText, setHabitText] = useState(initialValue);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { setHabit } = useHabitStore();
 
-  const handleNext = () => {
-    if (!habitGoal.trim()) {
+  const handleHabitSubmit = async () => {
+    if (!habitText.trim()) {
       Alert.alert('오류', '습관 목표를 입력해주세요.');
       return;
     }
 
-    if (onNext) {
-      onNext(habitGoal);
-    } else {
-      console.log('Habit goal:', habitGoal);
-      Alert.alert('완료', '1단계가 완료되었습니다!');
+    setIsSubmitting(true);
+    try {
+      // 기본 데이터로 저장 (나머지 필드는 다음 단계에서 업데이트)
+      const habitData: HabitData = {
+        habit_name: habitText,
+        time_slot: '',
+        intensity: '',
+        difficulty: '',
+        ai_routine: ''
+      };
+      
+      await saveHabitToSupabase(habitData);
+      
+      // Zustand store에 저장
+      setHabit(habitText);
+
+      if (onNext) {
+        onNext(habitText);
+      }
+    } catch (error) {
+      console.error('목표 저장 중 오류:', error);
+      Alert.alert('오류', '목표 저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -52,8 +75,8 @@ export default function GoalSettingStep1({
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.habitInput}
-          value={habitGoal}
-          onChangeText={setHabitGoal}
+          value={habitText}
+          onChangeText={setHabitText}
           placeholder="예) 매일 아침 10분씩 책 읽기"
           placeholderTextColor="#a9a9c2"
           multiline
@@ -63,11 +86,16 @@ export default function GoalSettingStep1({
       </View>
 
       <TouchableOpacity
-        style={[styles.nextButton, !habitGoal.trim() && styles.nextButtonDisabled]}
-        onPress={handleNext}
-        disabled={!habitGoal.trim()}
+        style={[
+          styles.nextButton, 
+          (!habitText.trim() || isSubmitting) && styles.nextButtonDisabled
+        ]}
+        onPress={handleHabitSubmit}
+        disabled={!habitText.trim() || isSubmitting}
       >
-        <Text style={styles.nextButtonText}>다음</Text>
+        <Text style={styles.nextButtonText}>
+          {isSubmitting ? '저장 중...' : '저장하고 다음으로'}
+        </Text>
       </TouchableOpacity>
     </View>
   );

@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
+import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
 
@@ -34,15 +36,10 @@ export default function GoalSettingStep2({
   );
   const [customTime, setCustomTime] = useState(initialData?.customTime || '');
   const [notificationTime, setNotificationTime] = useState(initialData?.notificationTime || '오후 4:30');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { habit, setTime } = useHabitStore();
 
-  const timeSlotOptions = [
-    { key: 'morning', label: '아침' },
-    { key: 'lunch', label: '점심' },
-    { key: 'evening', label: '저녁' },
-    { key: 'custom', label: '직접 입력' },
-  ];
-
-  const handleNext = () => {
+  const handleTimeSubmit = async () => {
     if (selectedTimeSlot === 'custom' && !customTime.trim()) {
       Alert.alert('오류', '직접 입력 시간을 입력해주세요.');
       return;
@@ -53,17 +50,38 @@ export default function GoalSettingStep2({
       return;
     }
 
-    const data: GoalSettingStep2Data = {
-      timeSlot: selectedTimeSlot,
-      customTime,
-      notificationTime,
-    };
+    setIsSubmitting(true);
+    try {
+      const timeToSave = selectedTimeSlot === 'custom' ? customTime : `${selectedTimeSlot} 시간대`;
+      
+      // 기존 데이터를 업데이트
+      const habitData: HabitData = {
+        habit_name: habit,
+        time_slot: timeToSave,
+        intensity: '',  // 아직 설정되지 않음
+        difficulty: '', // 아직 설정되지 않음
+        ai_routine: ''  // 아직 생성되지 않음
+      };
 
-    if (onNext) {
-      onNext(data);
-    } else {
-      console.log('Step 2 data:', data);
-      Alert.alert('완료', '2단계가 완료되었습니다!');
+      await saveHabitToSupabase(habitData);
+      
+      // Zustand store에 저장
+      setTime(timeToSave);
+
+      const data: GoalSettingStep2Data = {
+        timeSlot: selectedTimeSlot,
+        customTime,
+        notificationTime,
+      };
+
+      if (onNext) {
+        onNext(data);
+      }
+    } catch (error) {
+      console.error('시간 정보 저장 중 오류:', error);
+      Alert.alert('오류', '시간 정보 저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -125,14 +143,27 @@ export default function GoalSettingStep2({
       </View>
 
       <TouchableOpacity
-        style={styles.nextButton}
-        onPress={handleNext}
+        style={[
+          styles.nextButton,
+          isSubmitting && styles.nextButtonDisabled
+        ]}
+        onPress={handleTimeSubmit}
+        disabled={isSubmitting}
       >
-        <Text style={styles.nextButtonText}>다음</Text>
+        <Text style={styles.nextButtonText}>
+          {isSubmitting ? '저장 중...' : '저장하고 다음으로'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
 }
+
+const timeSlotOptions = [
+  { key: 'morning', label: '아침' },
+  { key: 'lunch', label: '점심' },
+  { key: 'evening', label: '저녁' },
+  { key: 'custom', label: '직접 입력' },
+];
 
 const styles = StyleSheet.create({
   container: {
@@ -238,5 +269,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#a9a9c2',
+    opacity: 0.7,
   },
 }); 
