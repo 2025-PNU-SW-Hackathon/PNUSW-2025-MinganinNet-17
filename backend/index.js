@@ -15,7 +15,7 @@ app.use(express.json());
 
 // Basic route
 app.get('/', (req, res) => {
-  res.json({ message: 'Hello from Rooty Backend!' });
+  res.json({ message: 'Hello from Routy Backend!' });
 });
 
 // Health check endpoint

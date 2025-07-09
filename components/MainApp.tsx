@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import DailySchedulePopup from './DailySchedulePopup';
@@ -10,9 +11,11 @@ import HabitSetupScreen, { HabitData } from './HabitSetupScreen';
 import HomeScreen from './HomeScreen';
 import LoginScreen from './LoginScreen';
 import RoutineResultScreen from './RoutineResultScreen';
+import ScreenTransitionManager from './ScreenTransitionManager';
+import SplashScreen from './SplashScreen';
 import WelcomeScreen from './WelcomeScreen';
 
-type Screen = 'welcome' | 'login' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
+type Screen = 'splash' | 'welcome' | 'login' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
 
 interface Task {
   id: string;
@@ -30,7 +33,7 @@ interface AppData {
 }
 
 export default function MainApp() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
   const [showDailyPopup, setShowDailyPopup] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -42,6 +45,11 @@ export default function MainApp() {
     difficulty: '',
     habitData: null,
   });
+
+  // Splash Screen handlers
+  const handleSplashComplete = () => {
+    setCurrentScreen('welcome');
+  };
 
   // Welcome Screen handlers
   const handleGetStarted = () => {
@@ -100,9 +108,9 @@ export default function MainApp() {
     setCurrentScreen('goalStep3');
   };
 
-  // Goal Setup Complete handlers
+  // Goal Setup Complete handlers - Navigate to main app with tabs
   const handleGoHome = () => {
-    setCurrentScreen('home');
+    router.replace('/(tabs)');
   };
 
   // Habit Setup Screen handlers (for legacy flow)
@@ -118,25 +126,17 @@ export default function MainApp() {
   // Routine Result Screen handlers
   const handleStartRoutine = () => {
     console.log('Starting routine with complete data:', appData);
-    setCurrentScreen('home');
+    router.replace('/(tabs)');
   };
 
   const handleEditRoutine = () => {
     setCurrentScreen('habitSetup');
   };
 
-  // Home Screen handlers
+  // Home Screen handlers - Only used if somehow we're still in onboarding
   const handleDayPress = (day: number) => {
     setSelectedDate(`7월 ${day}일 (화)`);
     setShowDailyPopup(true);
-  };
-
-  const handleTabPress = (tab: string) => {
-    console.log('Tab pressed:', tab);
-    // For now, only home tab is implemented
-    if (tab === 'home') {
-      setCurrentScreen('home');
-    }
   };
 
   // Daily Schedule Popup handlers
@@ -154,6 +154,9 @@ export default function MainApp() {
 
   const renderScreen = () => {
     switch (currentScreen) {
+      case 'splash':
+        return <SplashScreen onLoadingComplete={handleSplashComplete} />;
+      
       case 'welcome':
         return <WelcomeScreen onGetStarted={handleGetStarted} />;
       
@@ -221,31 +224,24 @@ export default function MainApp() {
         );
       
       case 'routineGenerated':
-        return appData.habitData ? (
+        return (
           <RoutineResultScreen
-            habitData={appData.habitData}
+            habitData={appData.habitData || {
+              desiredHabit: appData.habitGoal || '매일 아침 10분 책 읽기',
+              availableTime: appData.timeData?.customTime || appData.timeData?.timeSlot || '오전 7시 - 8시',
+              difficulties: appData.difficulty || '의지 부족',
+              restrictedApps: 'YouTube, Instagram, TikTok'
+            }}
             onStartRoutine={handleStartRoutine}
             onEditRoutine={handleEditRoutine}
           />
-        ) : (
-          <WelcomeScreen onGetStarted={handleGetStarted} />
         );
       
       case 'home':
         return (
-          <>
-            <HomeScreen
-              onDayPress={handleDayPress}
-              onTabPress={handleTabPress}
-            />
-            <DailySchedulePopup
-              visible={showDailyPopup}
-              date={selectedDate}
-              onClose={handleClosePopup}
-              tasks={tasks}
-              onTaskToggle={handleTaskToggle}
-            />
-          </>
+          <HomeScreen
+            onDayPress={handleDayPress}
+          />
         );
       
       default:
@@ -253,7 +249,29 @@ export default function MainApp() {
     }
   };
 
-  return <View style={styles.container}>{renderScreen()}</View>;
+  return (
+    <View style={styles.container}>
+      <ScreenTransitionManager
+        screenKey={currentScreen}
+        onTransitionComplete={() => {
+          console.log('Screen transition completed for:', currentScreen);
+        }}
+      >
+        {renderScreen()}
+      </ScreenTransitionManager>
+      
+      {/* Daily Schedule Popup */}
+      {showDailyPopup && (
+        <DailySchedulePopup
+          visible={showDailyPopup}
+          date={selectedDate}
+          tasks={tasks}
+          onClose={handleClosePopup}
+          onTaskToggle={handleTaskToggle}
+        />
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

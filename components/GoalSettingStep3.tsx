@@ -29,7 +29,7 @@ export default function GoalSettingStep3({ onContinue, onBack }: GoalSettingStep
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>코칭 강도를 선택해주세요</Text>
-        <Text style={styles.subtitle}>Ruti가 당신을 어떻게 도와드릴지 알려주세요.</Text>
+        <Text style={styles.subtitle}>Routy가 당신을 어떻게 도와드릴지 알려주세요.</Text>
         
         <View style={styles.optionsContainer}>
           {intensityOptions.map((option) => (

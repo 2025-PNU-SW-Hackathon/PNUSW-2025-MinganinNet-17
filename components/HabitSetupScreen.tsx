@@ -70,7 +70,7 @@ export default function HabitSetupScreen({ onSetupComplete, onBack }: HabitSetup
         <View style={styles.contentContainer}>
           <Text style={styles.title}>습관 설정</Text>
           <Text style={styles.subtitle}>
-            AI 코치 'Ruti'가 당신만의 맞춤형 루틴을 만들어드릴게요
+            AI 코치 'Routy'가 당신만의 맞춤형 루틴을 만들어드릴게요
           </Text>
 
           <View style={styles.formContainer}>

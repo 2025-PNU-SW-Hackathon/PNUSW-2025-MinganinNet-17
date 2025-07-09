@@ -44,13 +44,13 @@ export default function AIWarningModal({
   const getCoachName = () => {
     switch (personality) {
       case 'friendly':
-        return 'Ruti (친근한 조언자)';
+        return 'Routy (친근한 조언자)';
       case 'strict':
-        return 'Ruti (엄격한 코치)';
+        return 'Routy (엄격한 코치)';
       case 'witty':
-        return 'Ruti (재치있는 친구)';
+        return 'Routy (재치있는 친구)';
       default:
-        return 'Ruti';
+        return 'Routy';
     }
   };
 

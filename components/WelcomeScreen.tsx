@@ -24,7 +24,7 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
           Routy에 오신 것을 환영해요!
         </Text>
         <Text style={styles.welcomeSubtitle}>
-          AI 코치 'Ruti'와 함께{'\n'}당신의 목표를 현실로 만들어보세요.
+          AI 코치 'Routy'와 함께{'\n'}당신의 목표를 현실로 만들어보세요.
         </Text>
         
         <TouchableOpacity 

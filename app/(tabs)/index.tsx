@@ -1,6 +1,13 @@
 import React from 'react';
-import MainApp from '../../components/MainApp';
+import HomeScreen from '../../components/HomeScreen';
 
-export default function HomeScreen() {
-  return <MainApp />;
+export default function HomeTab() {
+  const handleDayPress = (day: number) => {
+    console.log('Day pressed:', day);
+    // Handle day press in tab navigation context
+  };
+
+  return (
+    <HomeScreen onDayPress={handleDayPress} />
+  );
 }

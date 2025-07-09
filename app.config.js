@@ -5,8 +5,8 @@ require('dotenv').config();
 
 module.exports = {
   expo: {
-    name: "rooty", // 당신의 프로젝트 이름
-    slug: "rooty", // 프로젝트 slug (name과 같아도 됨)
+    name: "routy", // 당신의 프로젝트 이름
+    slug: "routy", // 프로젝트 slug (name과 같아도 됨)
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png", // 앱 아이콘 경로
