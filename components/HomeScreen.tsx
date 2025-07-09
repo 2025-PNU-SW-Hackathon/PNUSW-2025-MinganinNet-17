@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 
@@ -15,19 +15,78 @@ interface DayData {
   completionRate: number; // 0-1 scale
 }
 
+interface TodoItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  date: string;
+}
+
+// Sample todo data for different dates
+const generateTodoData = (): TodoItem[] => {
+  const today = new Date();
+  const todos: TodoItem[] = [];
+  
+  for (let i = 0; i < 15; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Generate 2-3 todos per day
+    const todoCount = Math.floor(Math.random() * 2) + 2;
+    for (let j = 0; j < todoCount; j++) {
+      const todoTemplates = [
+        '1챕터 초고 작성 (2,000자)',
+        '아이디어 노트 정리',
+        '참고 자료 조사',
+        '캐릭터 설정 다듬기',
+        '플롯 구성 검토',
+        '대화문 수정',
+        '배경 묘사 보완'
+      ];
+      
+      todos.push({
+        id: `${dateStr}-${j}`,
+        title: todoTemplates[Math.floor(Math.random() * todoTemplates.length)],
+        completed: Math.random() > 0.4,
+        date: dateStr
+      });
+    }
+  }
+  
+  return todos;
+};
+
+const mockTodoData: TodoItem[] = generateTodoData();
+
 // Sample streak data - this will come from backend
-const mockHabitData: DayData[] = [
-  { date: '2024-01-01', completed: true, completionRate: 1.0 },
-  { date: '2024-01-02', completed: true, completionRate: 0.8 },
-  { date: '2024-01-03', completed: false, completionRate: 0.2 },
-  { date: '2024-01-04', completed: true, completionRate: 1.0 },
-  { date: '2024-01-05', completed: true, completionRate: 0.9 },
-  { date: '2024-01-06', completed: true, completionRate: 0.7 },
-  { date: '2024-01-07', completed: false, completionRate: 0.1 },
-  { date: '2024-01-08', completed: true, completionRate: 1.0 },
-  { date: '2024-01-09', completed: true, completionRate: 0.8 },
-  { date: '2024-01-10', completed: true, completionRate: 0.6 },
-];
+const generateMockData = (): DayData[] => {
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  const mockData: DayData[] = [];
+  
+  // Generate data for the last 15 days
+  for (let i = 14; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Simulate varying completion rates
+    const completionRate = Math.random() > 0.3 ? Math.random() * 0.8 + 0.2 : Math.random() * 0.2;
+    const completed = completionRate >= 0.5;
+    
+    mockData.push({
+      date: dateStr,
+      completed,
+      completionRate: Math.round(completionRate * 10) / 10
+    });
+  }
+  
+  return mockData;
+};
+
+const mockHabitData: DayData[] = generateMockData();
 
 export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -35,11 +94,26 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const [habitData, setHabitData] = useState<DayData[]>(mockHabitData);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
+  const [todoData, setTodoData] = useState<TodoItem[]>(mockTodoData);
+  const [showTodoList, setShowTodoList] = useState(false);
 
   // Calculate streaks
   useEffect(() => {
     calculateStreaks();
   }, [habitData]);
+
+  // Get todos for selected date
+  const getSelectedDateTodos = (): TodoItem[] => {
+    return todoData.filter(todo => todo.date === selectedDate);
+  };
+
+  const handleTodoToggle = (todoId: string) => {
+    setTodoData(prev => 
+      prev.map(todo => 
+        todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
+      )
+    );
+  };
 
   const calculateStreaks = () => {
     const sortedData = [...habitData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -50,17 +124,23 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     
     // Calculate current streak (from today backwards)
     const today = new Date();
+    let streakBroken = false;
+    
     for (let i = 0; i < 30; i++) {
       const checkDate = new Date(today);
       checkDate.setDate(today.getDate() - i);
       const dateStr = checkDate.toISOString().split('T')[0];
       
       const dayData = habitData.find(d => d.date === dateStr);
-      if (dayData?.completed) {
-        if (i === 0) current++; // Start counting from today
-        else if (current > 0) current++; // Continue streak
-      } else {
-        break; // Break streak
+      
+      if (dayData?.completed && !streakBroken) {
+        current++;
+      } else if (dayData && !dayData.completed) {
+        streakBroken = true; // Stop counting once we hit an incomplete day
+      }
+      // If no data exists for a day, we assume it's incomplete and break the streak
+      else if (!dayData) {
+        streakBroken = true;
       }
     }
     
@@ -119,12 +199,22 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
 
   const handleDayPress = (day: DateData) => {
     setSelectedDate(day.dateString);
+    setShowTodoList(true);
     onDayPress(parseInt(day.dateString.split('-')[2]));
   };
 
   const handleTaskToggle = () => {
     setIsTaskCompleted(!isTaskCompleted);
     // TODO: Update backend with completion status
+  };
+
+  const formatSelectedDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    const weekday = weekdays[date.getDay()];
+    return `${month}월 ${day}일 (${weekday})`;
   };
 
   return (
@@ -200,6 +290,48 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
               />
             </View>
           </View>
+
+          {/* Selected Date Todo List */}
+          {showTodoList && (
+            <View style={styles.todoSection}>
+              <View style={styles.todoHeader}>
+                <Text style={styles.todoTitle}>
+                  {formatSelectedDate(selectedDate)} 할 일
+                </Text>
+                <TouchableOpacity
+                  style={styles.closeTodoButton}
+                  onPress={() => setShowTodoList(false)}
+                >
+                  <Text style={styles.closeTodoText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {getSelectedDateTodos().length > 0 ? (
+                getSelectedDateTodos().map((todo) => (
+                  <TouchableOpacity
+                    key={todo.id}
+                    style={styles.todoItem}
+                    onPress={() => handleTodoToggle(todo.id)}
+                  >
+                    <View style={[
+                      styles.todoCheckbox,
+                      todo.completed && styles.todoCheckedBox
+                    ]} />
+                    <Text style={[
+                      styles.todoText,
+                      todo.completed && styles.todoTextCompleted
+                    ]}>
+                      {todo.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyTodoContainer}>
+                  <Text style={styles.emptyTodoText}>이 날짜에는 할 일이 없습니다.</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -312,5 +444,71 @@ const styles = StyleSheet.create({
   },
   calendar: {
     backgroundColor: '#1c1c2e',
+  },
+  todoSection: {
+    backgroundColor: '#3a3a50',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+  },
+  todoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  todoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    fontFamily: 'Inter',
+  },
+  closeTodoButton: {
+    padding: 8,
+  },
+  closeTodoText: {
+    fontSize: 20,
+    color: '#a9a9c2',
+  },
+  todoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#4a4a60',
+  },
+  todoCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#a9a9c2',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todoCheckedBox: {
+    backgroundColor: '#6c63ff',
+    borderColor: '#6c63ff',
+  },
+  todoText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    flex: 1,
+    fontFamily: 'Inter',
+  },
+  todoTextCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#a9a9c2',
+  },
+  emptyTodoContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  emptyTodoText: {
+    fontSize: 16,
+    color: '#a9a9c2',
+    fontFamily: 'Inter',
   },
 }); 
