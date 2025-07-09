@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
 
@@ -10,6 +11,7 @@ interface GoalSettingStep3Props {
 
 export default function GoalSettingStep3({ onContinue, onBack }: GoalSettingStep3Props) {
   const [selectedIntensity, setSelectedIntensity] = useState<string>('보통');
+  const { setIntensity } = useHabitStore();
 
   const intensityOptions = [
     { id: '낮음', label: '낮음' },
@@ -19,7 +21,11 @@ export default function GoalSettingStep3({ onContinue, onBack }: GoalSettingStep
 
   const handleIntensitySelect = (intensity: string) => {
     setSelectedIntensity(intensity);
-    // Auto-continue after selection
+    
+    // Zustand store에 저장
+    setIntensity(intensity);
+
+    // 저장 후 다음 단계로
     setTimeout(() => {
       onContinue(intensity);
     }, 300);

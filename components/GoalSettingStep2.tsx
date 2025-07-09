@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     Alert,
     Dimensions,
@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
 
@@ -34,6 +35,7 @@ export default function GoalSettingStep2({
   );
   const [customTime, setCustomTime] = useState(initialData?.customTime || '');
   const [notificationTime, setNotificationTime] = useState(initialData?.notificationTime || '오후 4:30');
+  const { setTime } = useHabitStore();
 
   const timeSlotOptions = [
     { key: 'morning', label: '아침' },
@@ -42,7 +44,7 @@ export default function GoalSettingStep2({
     { key: 'custom', label: '직접 입력' },
   ];
 
-  const handleNext = () => {
+  const handleTimeSubmit = () => {
     if (selectedTimeSlot === 'custom' && !customTime.trim()) {
       Alert.alert('오류', '직접 입력 시간을 입력해주세요.');
       return;
@@ -53,6 +55,22 @@ export default function GoalSettingStep2({
       return;
     }
 
+    // 선택된 시간대와 커스텀 시간을 조합하여 저장
+    let timeToSave = '';
+    if (selectedTimeSlot === 'custom') {
+      timeToSave = customTime;
+    } else {
+      const timeMap = {
+        morning: '아침 시간대',
+        lunch: '점심 시간대',
+        evening: '저녁 시간대'
+      };
+      timeToSave = timeMap[selectedTimeSlot];
+    }
+
+    // Zustand store에 저장
+    setTime(timeToSave);
+
     const data: GoalSettingStep2Data = {
       timeSlot: selectedTimeSlot,
       customTime,
@@ -61,9 +79,6 @@ export default function GoalSettingStep2({
 
     if (onNext) {
       onNext(data);
-    } else {
-      console.log('Step 2 data:', data);
-      Alert.alert('완료', '2단계가 완료되었습니다!');
     }
   };
 
@@ -126,9 +141,9 @@ export default function GoalSettingStep2({
 
       <TouchableOpacity
         style={styles.nextButton}
-        onPress={handleNext}
+        onPress={handleTimeSubmit}
       >
-        <Text style={styles.nextButtonText}>다음</Text>
+        <Text style={styles.nextButtonText}>저장하고 다음으로</Text>
       </TouchableOpacity>
     </View>
   );
