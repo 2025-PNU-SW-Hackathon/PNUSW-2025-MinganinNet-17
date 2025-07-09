@@ -20,7 +20,7 @@ interface GoalSettingStep4Props {
 
 export default function GoalSettingStep4({ goalData, onComplete, onBack }: GoalSettingStep4Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, time, intensity, difficulty, setDifficulty } = useHabitStore();
+  const { habit, time, intensity, setDifficulty } = useHabitStore();
 
   const handleComplete = async () => {
     if (isSubmitting) return;
@@ -34,7 +34,7 @@ export default function GoalSettingStep4({ goalData, onComplete, onBack }: GoalS
       const habitEvents = await submitHabitData(habit, time, goalData.difficulty);
       console.log('AI 응답 결과:', habitEvents);
 
-      // 2. 데이터베이스 저장
+      // 2. 데이터베이스에 모든 데이터 저장
       const savedData = await saveHabitRoutine(
         habit,
         time,
@@ -50,22 +50,21 @@ export default function GoalSettingStep4({ goalData, onComplete, onBack }: GoalS
           const notificationResult = await scheduleAllHabitRoutines(habitEvents);
           if (!notificationResult.success) {
             console.warn('알림 설정 실패:', notificationResult.error);
+            Alert.alert('주의', '알림 설정에 실패했습니다. 나중에 다시 시도해주세요.');
           }
         } catch (notificationError) {
           console.error('알림 설정 중 오류:', notificationError);
+          Alert.alert('주의', '알림 설정에 실패했습니다. 나중에 다시 시도해주세요.');
         }
       }
 
-      // 4. 완료 처리 - 알림 설정 실패와 관계없이 진행
+      // 4. 완료 처리
       onComplete();
       Alert.alert('성공', '습관이 성공적으로 생성되었습니다!');
 
     } catch (error) {
       console.error('데이터 제출 중 오류 발생:', error);
-      Alert.alert('주의', '일부 데이터 저장에 실패했습니다. 계속 진행하시겠습니까?', [
-        { text: '취소', style: 'cancel' },
-        { text: '계속', onPress: onComplete }
-      ]);
+      Alert.alert('오류', '습관 생성에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
     }

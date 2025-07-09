@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
@@ -36,10 +35,9 @@ export default function GoalSettingStep2({
   );
   const [customTime, setCustomTime] = useState(initialData?.customTime || '');
   const [notificationTime, setNotificationTime] = useState(initialData?.notificationTime || '오후 4:30');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, setTime } = useHabitStore();
+  const { setTime } = useHabitStore();
 
-  const handleTimeSubmit = async () => {
+  const handleTimeSubmit = () => {
     if (selectedTimeSlot === 'custom' && !customTime.trim()) {
       Alert.alert('오류', '직접 입력 시간을 입력해주세요.');
       return;
@@ -50,38 +48,19 @@ export default function GoalSettingStep2({
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const timeToSave = selectedTimeSlot === 'custom' ? customTime : `${selectedTimeSlot} 시간대`;
-      
-      // 기존 데이터를 업데이트
-      const habitData: HabitData = {
-        habit_name: habit,
-        time_slot: timeToSave,
-        intensity: '',  // 아직 설정되지 않음
-        difficulty: '', // 아직 설정되지 않음
-        ai_routine: ''  // 아직 생성되지 않음
-      };
+    const timeToSave = selectedTimeSlot === 'custom' ? customTime : `${selectedTimeSlot} 시간대`;
+    
+    // Zustand store에만 저장
+    setTime(timeToSave);
 
-      await saveHabitToSupabase(habitData);
-      
-      // Zustand store에 저장
-      setTime(timeToSave);
+    const data: GoalSettingStep2Data = {
+      timeSlot: selectedTimeSlot,
+      customTime,
+      notificationTime,
+    };
 
-      const data: GoalSettingStep2Data = {
-        timeSlot: selectedTimeSlot,
-        customTime,
-        notificationTime,
-      };
-
-      if (onNext) {
-        onNext(data);
-      }
-    } catch (error) {
-      console.error('시간 정보 저장 중 오류:', error);
-      Alert.alert('오류', '시간 정보 저장에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setIsSubmitting(false);
+    if (onNext) {
+      onNext(data);
     }
   };
 
@@ -144,14 +123,12 @@ export default function GoalSettingStep2({
 
       <TouchableOpacity
         style={[
-          styles.nextButton,
-          isSubmitting && styles.nextButtonDisabled
+          styles.nextButton
         ]}
         onPress={handleTimeSubmit}
-        disabled={isSubmitting}
       >
         <Text style={styles.nextButtonText}>
-          {isSubmitting ? '저장 중...' : '저장하고 다음으로'}
+          저장하고 다음으로
         </Text>
       </TouchableOpacity>
     </View>

@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Alert, Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
+import { Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
@@ -12,8 +11,7 @@ interface GoalSettingStep3Props {
 
 export default function GoalSettingStep3({ onContinue, onBack }: GoalSettingStep3Props) {
   const [selectedIntensity, setSelectedIntensity] = useState<string>('보통');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, time, setIntensity } = useHabitStore();
+  const { setIntensity } = useHabitStore();
 
   const intensityOptions = [
     { id: '낮음', label: '낮음' },
@@ -21,35 +19,16 @@ export default function GoalSettingStep3({ onContinue, onBack }: GoalSettingStep
     { id: '높음', label: '높음' }
   ];
 
-  const handleIntensitySelect = async (intensity: string) => {
+  const handleIntensitySelect = (intensity: string) => {
     setSelectedIntensity(intensity);
-    setIsSubmitting(true);
+    
+    // Zustand store에만 저장
+    setIntensity(intensity);
 
-    try {
-      // 기존 데이터를 업데이트
-      const habitData: HabitData = {
-        habit_name: habit,
-        time_slot: time,
-        intensity: intensity,
-        difficulty: '',  // 아직 설정되지 않음
-        ai_routine: ''   // 아직 생성되지 않음
-      };
-
-      await saveHabitToSupabase(habitData);
-      
-      // Zustand store에 저장
-      setIntensity(intensity);
-
-      // 다음 단계로
-      setTimeout(() => {
-        onContinue(intensity);
-      }, 300);
-    } catch (error) {
-      console.error('코칭 강도 저장 중 오류:', error);
-      Alert.alert('오류', '코칭 강도 저장에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // 다음 단계로
+    setTimeout(() => {
+      onContinue(intensity);
+    }, 300);
   };
 
   return (
@@ -64,14 +43,12 @@ export default function GoalSettingStep3({ onContinue, onBack }: GoalSettingStep
               key={option.id}
               style={[
                 styles.optionCard,
-                selectedIntensity === option.id && styles.selectedCard,
-                isSubmitting && styles.optionCardDisabled
+                selectedIntensity === option.id && styles.selectedCard
               ]}
               onPress={() => handleIntensitySelect(option.id)}
-              disabled={isSubmitting}
             >
               <Text style={styles.optionText}>
-                {isSubmitting && selectedIntensity === option.id ? '저장 중...' : option.label}
+                {option.label}
               </Text>
             </TouchableOpacity>
           ))}
