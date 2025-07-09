@@ -1,10 +1,15 @@
+import sampleData from '@/assets/sample-schedule.json';
 import GrassCalendar from '@/components/GrassCalendar';
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Button, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Button, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface RoutineItem {
   description: string;
   time: string;
+}
+
+function getDateString(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 export default function TabTwoScreen() {
@@ -13,20 +18,7 @@ export default function TabTwoScreen() {
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [routineData, setRoutineData] = useState<Record<string, RoutineItem[]>>({});
-  const [loading, setLoading] = useState(true);
-
-  // JSON 파일 불러오기 (최초 1회)
-  useEffect(() => {
-    setLoading(true);
-    fetch(require('@/assets/sample-schedule.json'))
-      .then(res => res.json())
-      .then(json => {
-        setRoutineData(json);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+  const [routineData] = useState<Record<string, RoutineItem[]>>(sampleData);
 
   // 날짜별 개수만 추출 (잔디밭 색상용)
   const grassData = useMemo(() => {
@@ -54,9 +46,15 @@ export default function TabTwoScreen() {
     }
   };
 
-  // 날짜 셀 클릭 시
+  // 날짜 셀 클릭 시 (항상 YYYY-MM-DD 포맷으로 변환)
   const handleDayPress = (date: string) => {
-    setSelectedDate(date);
+    const parts = date.split('-');
+    const normalized = getDateString(
+      parseInt(parts[0], 10),
+      parseInt(parts[1], 10) - 1,
+      parseInt(parts[2], 10)
+    );
+    setSelectedDate(normalized);
     setModalVisible(true);
   };
 
@@ -65,7 +63,10 @@ export default function TabTwoScreen() {
     setSelectedDate(null);
   };
 
-  const routines = selectedDate ? routineData[selectedDate] || [] : [];
+  const routines = useMemo(() => {
+    if (!selectedDate) return [];
+    return routineData[selectedDate] || [];
+  }, [selectedDate, routineData]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -74,11 +75,7 @@ export default function TabTwoScreen() {
         <View style={{ width: 16 }} />
         <Button title="다음 달" onPress={goToNextMonth} />
       </View>
-      {loading ? (
-        <ActivityIndicator size="large" color="#1976d2" style={{ marginTop: 40 }} />
-      ) : (
-        <GrassCalendar data={grassData} year={year} month={month} onDayPress={handleDayPress} />
-      )}
+      <GrassCalendar data={grassData} year={year} month={month} onDayPress={handleDayPress} />
       <Modal
         visible={modalVisible}
         transparent
