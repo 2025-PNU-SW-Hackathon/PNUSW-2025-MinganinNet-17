@@ -9,7 +9,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { sendMessage } from '../backend/gemini';
+import { sendMessage } from '../backend/hwirang/gemini';
 
 export default function AIResponseScreen() {
   const [selectedStyle, setSelectedStyle] = useState<'kind' | 'aggressive' | 'boyfriend'>('kind');
