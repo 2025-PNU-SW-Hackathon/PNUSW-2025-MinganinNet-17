@@ -1,47 +1,40 @@
-const express = require('express');
-const cors = require('cors');
-const calendarRoutes = require('./routes/calendar');
+import cors from 'cors';
+import dotenv from 'dotenv';
+import express from 'express';
+import { sendMessage } from './gemini.js';
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// 미들웨어 설정
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// 기본 라우트
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Hello from Rooty Backend!',
-    version: '1.0.0',
-    endpoints: {
-      calendar: '/api/calendar'
+  res.json({ message: 'Hello from Routy Backend!' });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.post('/api/gemini', async (req, res) => {
+  try {
+    const { promptType } = req.body;
+    if (!promptType) {
+      return res.status(400).json({ error: 'promptType is required' });
     }
-  });
-});
-
-// 캘린더 API 라우트
-app.use('/api/calendar', calendarRoutes);
-
-// 404 핸들러
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    error: 'Endpoint not found' 
-  });
-});
-
-// 에러 핸들러
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    success: false, 
-    error: 'Something went wrong!' 
-  });
+    const response = await sendMessage(promptType);
+    res.json({ response });
+  } catch (error) {
+    console.error('Error in /api/gemini:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}/`);
-  console.log(`Calendar API available at http://localhost:${PORT}/api/calendar`);
+  console.log(`🚀 Server running at http://localhost:${PORT}/`);
+  console.log(`📱 Health check: http://localhost:${PORT}/health`);
+  console.log(`🤖 Gemini API: http://localhost:${PORT}/api/gemini`);
 }); 

@@ -1,6 +1,10 @@
-import Constants from 'expo-constants';
+import dotenv from 'dotenv';
+import fetch from 'node-fetch';
 
-// Gemini API 설정 파일 (React Native 호환 버전)
+// Load environment variables
+dotenv.config();
+
+// Gemini API 설정 파일 (Node.js 백엔드 버전)
 // 이 파일은 AI와 대화하기 위한 설정을 담고 있어요
 
 // 프롬프트 텍스트를 이곳에서 관리합니다.
@@ -12,18 +16,22 @@ const PROMPTS = {
   그러면서 약간 느끼하고 다정한 말투로 1줄만 작성해줘.`
 };
 
-// API 키를 여기에 넣어주세요 (실제 사용할 때는 환경변수로 관리하는 것이 좋아요)
-const API_KEY = Constants.expoConfig.extra.geminiApiKey; // 이 줄이 정확한지 확인
-console.log('--- config/gemini.js에서 읽은 API_KEY:', API_KEY);
+// API 키를 환경변수에서 가져옵니다
+const API_KEY = process.env.GEMINI_API_KEY;
+console.log('--- backend/gemini.js에서 읽은 API_KEY:', API_KEY ? 'API_KEY 로드됨' : 'API_KEY 없음');
 
 // Gemini API 엔드포인트 (작동하는 모델만 사용)
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
-// 메시지를 보내는 함수 (React Native 호환)
-// promptType: 'kind' | 'aggressive' 등 프롬프트 성격 키워드만 받음
+// 메시지를 보내는 함수 (Node.js 백엔드 버전)
+// promptType: 'kind' | 'aggressive' | 'boyfriend' 등 프롬프트 성격 키워드만 받음
 export const sendMessage = async (promptType) => {
   try {
     console.log('Gemini 1.5 Flash 모델 사용 중...');
+    
+    if (!API_KEY) {
+      throw new Error('API_KEY가 설정되지 않았습니다. .env 파일에서 GEMINI_API_KEY를 설정해주세요.');
+    }
     
     // 프롬프트 텍스트를 내부에서 선택
     const message = PROMPTS[promptType] || '';
@@ -85,7 +93,7 @@ export const sendMessage = async (promptType) => {
     
     // 구체적인 오류 메시지 제공
     if (error.message.includes('API_KEY')) {
-      return 'API 키가 설정되지 않았어요. config/gemini.js 파일에서 API 키를 설정해주세요.';
+      return 'API 키가 설정되지 않았어요. .env 파일에서 GEMINI_API_KEY를 설정해주세요.';
     } else if (error.message.includes('401')) {
       return 'API 키가 유효하지 않아요. 올바른 API 키를 설정해주세요.';
     } else if (error.message.includes('429')) {

@@ -1,6 +1,6 @@
 import sampleData from '@/assets/sample-schedule.json';
 import GrassCalendar from '@/components/GrassCalendar';
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface RoutineItem {
