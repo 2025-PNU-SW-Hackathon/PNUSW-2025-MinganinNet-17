@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import { Alert, Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 
-const { width } = Dimensions.get('window');
-
 interface GoalSettingStep4Props {
-  onContinue: (intensity: string) => void;
-  onBack: () => void;
+  onNext?: (intensity: string) => void;
+  onBack?: () => void;
+  initialValue?: string;
 }
 
-export default function GoalSettingStep4({ onContinue, onBack }: GoalSettingStep4Props) {
-  const [selectedIntensity, setSelectedIntensity] = useState<string>('보통');
+export default function GoalSettingStep4({
+  onNext,
+  onBack,
+  initialValue = ''
+}: GoalSettingStep4Props) {
+  const [selectedIntensity, setSelectedIntensity] = useState(initialValue || '보통');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { habit, time, setIntensity } = useHabitStore();
 
@@ -59,11 +62,13 @@ export default function GoalSettingStep4({ onContinue, onBack }: GoalSettingStep
       console.log('✅ Successfully saved to local store');
 
       // 다음 단계로
-      console.log('🚀 Calling onContinue handler...');
-      setTimeout(() => {
-        onContinue(intensity);
-        console.log('✅ onContinue called successfully');
-      }, 300);
+      console.log('🚀 Calling onNext handler...');
+      if (onNext) {
+        onNext(intensity);
+        console.log('✅ onNext called successfully');
+      } else {
+        console.warn('⚠️ onNext is undefined!');
+      }
       
     } catch (error) {
       console.error('💥 Unexpected error in handleIntensitySelect:', error);
@@ -75,42 +80,51 @@ export default function GoalSettingStep4({ onContinue, onBack }: GoalSettingStep
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.stepIndicator}>4 / 5 단계</Text>
-        
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={onBack}
-          disabled={isSubmitting}
-        >
-          <Text style={styles.backButtonText}>← 이전</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.title}>코칭 강도를 선택해주세요</Text>
-        <Text style={styles.subtitle}>Routy가 당신을 어떻게 도와드릴지 알려주세요.</Text>
-        
-        <View style={styles.optionsContainer}>
-          {intensityOptions.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={[
-                styles.optionCard,
-                selectedIntensity === option.id && styles.selectedCard,
-                isSubmitting && styles.optionCardDisabled
-              ]}
-              onPress={() => handleIntensitySelect(option.id)}
-              disabled={isSubmitting}
-            >
-              <Text style={styles.optionText}>
-                {isSubmitting && selectedIntensity === option.id ? '저장 중...' : option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+    <View style={styles.container}>
+      <Text style={styles.stepIndicator}>4 / 5 단계</Text>
+      
+      {/* Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={onBack}
+        disabled={isSubmitting}
+      >
+        <Text style={styles.backButtonText}>← 이전</Text>
+      </TouchableOpacity>
+      
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>
+          코칭 강도를{'\n'}선택해주세요
+        </Text>
+        <Text style={styles.subtitle}>
+          Routy가 당신을 어떻게 도와드릴지 알려주세요.
+        </Text>
       </View>
-    </SafeAreaView>
+
+      <View style={styles.optionsContainer}>
+        {intensityOptions.map((option) => (
+          <TouchableOpacity
+            key={option.id}
+            style={[
+              styles.optionButton,
+              selectedIntensity === option.id && styles.optionButtonSelected,
+              isSubmitting && styles.optionButtonDisabled
+            ]}
+            onPress={() => handleIntensitySelect(option.id)}
+            disabled={isSubmitting}
+          >
+            <Text
+              style={[
+                styles.optionButtonText,
+                selectedIntensity === option.id && styles.optionButtonTextSelected,
+              ]}
+            >
+              {isSubmitting && selectedIntensity === option.id ? '저장 중...' : option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -118,11 +132,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1c1c2e',
-  },
-  content: {
-    flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 100,
   },
   stepIndicator: {
     fontSize: 16,
@@ -130,50 +141,58 @@ const styles = StyleSheet.create({
     color: '#a9a9c2',
     textAlign: 'center',
     marginBottom: 40,
-    fontFamily: 'Inter',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  titleContainer: {
+    marginBottom: 60,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
+    lineHeight: 40,
     marginBottom: 16,
-    fontFamily: 'Inter',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   subtitle: {
     fontSize: 16,
     color: '#a9a9c2',
     textAlign: 'center',
-    marginBottom: 60,
-    fontFamily: 'Inter',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   optionsContainer: {
-    gap: 20,
+    marginBottom: 40,
   },
-  optionCard: {
+  optionButton: {
     backgroundColor: '#3a3a50',
     borderRadius: 16,
-    height: 110,
-    justifyContent: 'center',
+    paddingVertical: 20,
     paddingHorizontal: 20,
+    marginBottom: 16,
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  selectedCard: {
+  optionButtonSelected: {
     borderColor: '#6c63ff',
+    backgroundColor: '#3a3a50',
   },
-  optionText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    fontFamily: 'Inter',
-  },
-  optionCardDisabled: {
+  optionButtonDisabled: {
     opacity: 0.7,
+  },
+  optionButtonText: {
+    fontSize: 16,
+    color: '#ffffff',
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  optionButtonTextSelected: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
   backButton: {
     position: 'absolute',
-    top: 20,
+    top: 60,
     left: 24,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -184,6 +203,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#a9a9c2',
-    fontFamily: 'Inter',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

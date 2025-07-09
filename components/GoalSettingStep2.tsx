@@ -1,76 +1,52 @@
 import { useState } from 'react';
 import {
   Alert,
-  Dimensions,
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 
-const { width } = Dimensions.get('window');
-
 interface GoalSettingStep2Props {
-  onNext?: (difficulty: string) => void;
+  onNext?: (timeSlot: string) => void;
   onBack?: () => void;
   initialValue?: string;
 }
 
-export default function GoalSettingStep2({ 
-  onNext, 
-  onBack, 
-  initialValue = '' 
+export default function GoalSettingStep2({
+  onNext,
+  onBack,
+  initialValue = ''
 }: GoalSettingStep2Props) {
-  const [selectedDifficulty, setSelectedDifficulty] = useState(initialValue || '의지 부족');
-  const [customDifficulty, setCustomDifficulty] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(initialValue === '기타' || false);
-  const { setDifficulty } = useHabitStore();
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState(initialValue || '아침');
+  const { setTimeSlot } = useHabitStore();
 
-  const difficultyOptions = [
-    { key: '의지 부족', label: '의지 부족' },
-    { key: '시간 부족', label: '시간 부족' },
-    { key: '자꾸 잊어버림', label: '자꾸 잊어버림' },
-    { key: '성과가 보이지 않음', label: '성과가 보이지 않음' },
-    { key: '기타', label: '기타 (직접입력)' },
+  const timeSlotOptions = [
+    { key: '아침', label: '아침 (6시~10시)' },
+    { key: '점심', label: '점심 (11시~2시)' },
+    { key: '저녁', label: '저녁 (6시~10시)' },
+    { key: '자유롭게', label: '자유롭게' },
   ];
 
-  const handleDifficultySelect = (difficulty: string) => {
-    setSelectedDifficulty(difficulty);
-    if (difficulty === '기타') {
-      setShowCustomInput(true);
-    } else {
-      setShowCustomInput(false);
-      setCustomDifficulty('');
-    }
+  const handleTimeSlotSelect = (timeSlot: string) => {
+    console.log('🔄 Time slot selected:', timeSlot);
+    setSelectedTimeSlot(timeSlot);
   };
 
   const handleNext = () => {
-    console.log('🔄 Starting GoalSettingStep2 submission...', { selectedDifficulty, customDifficulty });
+    console.log('🔄 Starting time slot submission...', { selectedTimeSlot });
     
-    let finalDifficulty = selectedDifficulty;
-    
-    if (selectedDifficulty === '기타') {
-      if (!customDifficulty.trim()) {
-        Alert.alert('오류', '어려운 점을 직접 입력해주세요.');
-        return;
-      }
-      finalDifficulty = customDifficulty;
-    }
-
-    console.log('💾 Final difficulty selected:', finalDifficulty);
-
     try {
       // Save to habit store
       console.log('🏪 Saving to habit store...');
-      setDifficulty(finalDifficulty);
+      setTimeSlot(selectedTimeSlot);
       console.log('✅ Successfully saved to habit store');
 
       console.log('🚀 Calling onNext handler...');
       if (onNext) {
-        onNext(finalDifficulty);
+        onNext(selectedTimeSlot);
         console.log('✅ onNext called successfully');
       } else {
         console.warn('⚠️ onNext is undefined!');
@@ -95,24 +71,24 @@ export default function GoalSettingStep2({
       
       <View style={styles.titleContainer}>
         <Text style={styles.title}>
-          어떤 점이 가장{'\n'}어려우셨나요?
+          언제 습관을{'\n'}실천하시겠어요?
         </Text>
       </View>
 
       <View style={styles.optionsContainer}>
-        {difficultyOptions.map((option) => (
+        {timeSlotOptions.map((option) => (
           <TouchableOpacity
             key={option.key}
             style={[
               styles.optionButton,
-              selectedDifficulty === option.key && styles.optionButtonSelected,
+              selectedTimeSlot === option.key && styles.optionButtonSelected,
             ]}
-            onPress={() => handleDifficultySelect(option.key)}
+            onPress={() => handleTimeSlotSelect(option.key)}
           >
             <Text
               style={[
                 styles.optionButtonText,
-                selectedDifficulty === option.key && styles.optionButtonTextSelected,
+                selectedTimeSlot === option.key && styles.optionButtonTextSelected,
               ]}
             >
               {option.label}
@@ -121,28 +97,9 @@ export default function GoalSettingStep2({
         ))}
       </View>
 
-      {showCustomInput && (
-        <View style={styles.customInputContainer}>
-          <TextInput
-            style={styles.customInput}
-            value={customDifficulty}
-            onChangeText={setCustomDifficulty}
-            placeholder="어려운 점을 직접 입력해주세요"
-            placeholderTextColor="#a9a9c2"
-            multiline
-            textAlignVertical="top"
-            autoFocus
-          />
-        </View>
-      )}
-
       <TouchableOpacity
-        style={[
-          styles.nextButton,
-          (selectedDifficulty === '기타' && !customDifficulty.trim()) && styles.nextButtonDisabled
-        ]}
+        style={styles.nextButton}
         onPress={handleNext}
-        disabled={selectedDifficulty === '기타' && !customDifficulty.trim()}
       >
         <Text style={styles.nextButtonText}>다음</Text>
       </TouchableOpacity>
@@ -202,20 +159,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
-  customInputContainer: {
-    marginBottom: 40,
-  },
-  customInput: {
-    backgroundColor: '#3a3a50',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    fontSize: 16,
-    color: '#ffffff',
-    height: 100,
-    textAlignVertical: 'top',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
   nextButton: {
     backgroundColor: '#6c63ff',
     borderRadius: 28,
@@ -227,10 +170,6 @@ const styles = StyleSheet.create({
     bottom: 40,
     left: 24,
     right: 24,
-  },
-  nextButtonDisabled: {
-    backgroundColor: '#4a47cc',
-    opacity: 0.5,
   },
   nextButtonText: {
     fontSize: 18,
