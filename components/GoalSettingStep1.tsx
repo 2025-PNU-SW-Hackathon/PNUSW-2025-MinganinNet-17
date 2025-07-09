@@ -9,8 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
+import { saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
+import { HabitData } from '../types/habit';
 
 const { width } = Dimensions.get('window');
 
@@ -141,7 +142,7 @@ export default function GoalSettingStep1({
       <TouchableOpacity
         style={[
           styles.testButton,
-          !habitText.trim() && styles.testButtonDisabled
+          (!habitText.trim() || isSubmitting) && styles.testButtonDisabled
         ]}
         onPress={() => {
           console.log('🧪 TEST BUTTON: Bypassing database, calling onNext directly');
@@ -150,7 +151,7 @@ export default function GoalSettingStep1({
             onNext(habitText);
           }
         }}
-        disabled={!habitText.trim()}
+        disabled={!habitText.trim() || isSubmitting}
       >
         <Text style={styles.testButtonText}>테스트: 다음으로 (DB 건너뛰기)</Text>
       </TouchableOpacity>
@@ -242,15 +243,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 24,
     marginTop: 16,
+    position: 'absolute',
+    bottom: 120,
+    left: 0,
+    right: 0,
   },
   testButtonDisabled: {
-    backgroundColor: '#cccccc',
     opacity: 0.5,
   },
   testButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
     color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 
