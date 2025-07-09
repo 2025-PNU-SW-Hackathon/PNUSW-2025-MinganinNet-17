@@ -9,8 +9,36 @@ module.exports = {
     slug: "routy", // 프로젝트 slug (name과 같아도 됨)
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png", // 앱 아이콘 경로
-    // ... (여기에 기존에 있던 다른 설정들도 그대로 두세요) ...
+    icon: "./assets/images/icon.png", // 앱 아이콘 경로
+    userInterfaceStyle: "light",
+    
+    splash: {
+      image: "./assets/images/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#1c1c2e"
+    },
+
+    assetBundlePatterns: [
+      "**/*"
+    ],
+
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.routy.app"
+    },
+
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/adaptive-icon.png",
+        backgroundColor: "#1c1c2e"
+      },
+      package: "com.routy.app"
+    },
+
+    web: {
+      favicon: "./assets/images/favicon.png",
+      bundler: "metro"
+    },
 
     extra: {
       geminiApiKey: process.env.GEMINI_API_KEY,
@@ -19,6 +47,14 @@ module.exports = {
         projectId: "YOUR_EAS_PROJECT_ID"
       }
     },
-    // ... (여기에 기존에 있던 다른 설정들도 그대로 두세요) ...
+
+    plugins: [
+      "expo-router"
+    ],
+
+    scheme: "routy",
+    experiments: {
+      typedRoutes: true
+    }
   },
 };

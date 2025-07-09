@@ -1,124 +1,130 @@
 import { useState } from 'react';
-import { Alert, Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { submitHabitData } from '../backend/hwirang/habit';
-import { scheduleAllHabitRoutines } from '../backend/hwirang/routineNotifications';
-import { saveHabitRoutine } from '../backend/supabase/habits';
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 
-const { width } = Dimensions.get('window');
-
 interface GoalSettingStep4Props {
-  goalData: {
-    goal: string;
-    period: string;
-    coachingIntensity: string;
-    difficulty: string;
-  };
-  onComplete: () => void;
-  onBack: () => void;
+  onNext?: (intensity: string) => void;
+  onBack?: () => void;
+  initialValue?: string;
 }
 
-export default function GoalSettingStep4({ goalData, onComplete, onBack }: GoalSettingStep4Props) {
+export default function GoalSettingStep4({
+  onNext,
+  onBack,
+  initialValue = ''
+}: GoalSettingStep4Props) {
+  const [selectedIntensity, setSelectedIntensity] = useState(initialValue || '보통');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, time, intensity, setDifficulty } = useHabitStore();
+  const { habit, time, setIntensity } = useHabitStore();
 
-  const handleComplete = async () => {
-    if (isSubmitting) return;
+  const intensityOptions = [
+    { id: '낮음', label: '낮음' },
+    { id: '보통', label: '보통' },
+    { id: '높음', label: '높음' }
+  ];
+
+  const handleIntensitySelect = async (intensity: string) => {
+    setSelectedIntensity(intensity);
+    console.log('🔄 Starting GoalSettingStep4 submission...', { intensity });
     setIsSubmitting(true);
 
     try {
-      // 현재 difficulty 저장
-      setDifficulty(goalData.difficulty);
+      // 기존 데이터를 업데이트
+      const habitData: HabitData = {
+        habit_name: habit,
+        time_slot: time,
+        intensity: intensity,
+        difficulty: '',  // 아직 설정되지 않음
+        ai_routine: ''   // 아직 생성되지 않음
+      };
 
-      // 1. AI 루틴 생성
-      const habitEvents = await submitHabitData(habit, time, goalData.difficulty);
-      console.log('AI 응답 결과:', habitEvents);
-
-      // 2. 데이터베이스에 모든 데이터 저장
-      const savedData = await saveHabitRoutine(
-        habit,
-        time,
-        intensity,
-        goalData.difficulty,
-        habitEvents
-      );
-      console.log('저장된 데이터:', savedData);
-
-      // 3. 알림 설정
-      if (habitEvents) {
-        try {
-          const notificationResult = await scheduleAllHabitRoutines(habitEvents);
-          if (!notificationResult.success) {
-            console.warn('알림 설정 실패:', notificationResult.error);
-            Alert.alert('주의', '알림 설정에 실패했습니다. 나중에 다시 시도해주세요.');
-          }
-        } catch (notificationError) {
-          console.error('알림 설정 중 오류:', notificationError);
-          Alert.alert('주의', '알림 설정에 실패했습니다. 나중에 다시 시도해주세요.');
+      console.log('💾 Attempting to save to Supabase...', habitData);
+      
+      try {
+        await saveHabitToSupabase(habitData);
+        console.log('✅ Successfully saved to Supabase');
+      } catch (dbError) {
+        console.error('❌ Database save failed:', dbError);
+        
+        // 인증 오류인 경우 조용히 처리
+        if (dbError instanceof Error && dbError.message === 'AUTH_MISSING') {
+          console.log('🔓 No authentication - continuing with local storage only');
+        } else {
+          // 다른 오류는 알림 표시하지만 계속 진행
+          console.warn('⚠️ Database error, continuing with local storage:', dbError);
         }
       }
+      
+      // Zustand store에 저장 (항상 실행)
+      console.log('🏪 Saving to local store...');
+      setIntensity(intensity);
+      console.log('✅ Successfully saved to local store');
 
-      // 4. 완료 처리
-      onComplete();
-      Alert.alert('성공', '습관이 성공적으로 생성되었습니다!');
-
+      // 다음 단계로
+      console.log('🚀 Calling onNext handler...');
+      if (onNext) {
+        onNext(intensity);
+        console.log('✅ onNext called successfully');
+      } else {
+        console.warn('⚠️ onNext is undefined!');
+      }
+      
     } catch (error) {
-      console.error('데이터 제출 중 오류 발생:', error);
-      Alert.alert('오류', '습관 생성에 실패했습니다. 다시 시도해주세요.');
+      console.error('💥 Unexpected error in handleIntensitySelect:', error);
+      Alert.alert('오류', `예상치 못한 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     } finally {
       setIsSubmitting(false);
+      console.log('🏁 Finished GoalSettingStep4 submission');
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.progressText}>4 / 4 단계</Text>
-        
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>마지막으로</Text>
-          <Text style={styles.title}>확인해주세요</Text>
-        </View>
-        
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>나의 목표 설정</Text>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>내 목표</Text>
-            <Text style={styles.summaryValue}>{habit || '-'}</Text>
-          </View>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>실천 기간</Text>
-            <Text style={styles.summaryValue}>{time || '-'}</Text>
-          </View>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>코칭 강도</Text>
-            <Text style={styles.summaryValue}>{intensity || '-'}</Text>
-          </View>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>어려웠던 점</Text>
-            <Text style={styles.summaryValue}>{goalData.difficulty || '-'}</Text>
-          </View>
-        </View>
-        
-        <Text style={styles.encouragementText}>
-          좋은 시작이에요! '{goalData.difficulty}'을 이겨낼 수 있도록 제가 옆에서 든든하게 도와드릴게요. 함께 멋진 여정을 만들어봐요!
+    <View style={styles.container}>
+      <Text style={styles.stepIndicator}>4 / 5 단계</Text>
+      
+      {/* Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={onBack}
+        disabled={isSubmitting}
+      >
+        <Text style={styles.backButtonText}>← 이전</Text>
+      </TouchableOpacity>
+      
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>
+          코칭 강도를{'\n'}선택해주세요
         </Text>
-        
-        <TouchableOpacity 
-          style={[styles.completeButton, isSubmitting && styles.completeButtonDisabled]} 
-          onPress={handleComplete}
-          disabled={isSubmitting}
-        >
-          <Text style={styles.completeButtonText}>
-            {isSubmitting ? '처리 중...' : '완료하고 시작하기'}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.subtitle}>
+          Routy가 당신을 어떻게 도와드릴지 알려주세요.
+        </Text>
       </View>
-    </SafeAreaView>
+
+      <View style={styles.optionsContainer}>
+        {intensityOptions.map((option) => (
+          <TouchableOpacity
+            key={option.id}
+            style={[
+              styles.optionButton,
+              selectedIntensity === option.id && styles.optionButtonSelected,
+              isSubmitting && styles.optionButtonDisabled
+            ]}
+            onPress={() => handleIntensitySelect(option.id)}
+            disabled={isSubmitting}
+          >
+            <Text
+              style={[
+                styles.optionButtonText,
+                selectedIntensity === option.id && styles.optionButtonTextSelected,
+              ]}
+            >
+              {isSubmitting && selectedIntensity === option.id ? '저장 중...' : option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -126,22 +132,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1c1c2e',
-  },
-  content: {
-    flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 100,
   },
-  progressText: {
+  stepIndicator: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#a9a9c2',
     textAlign: 'center',
     marginBottom: 40,
-    fontFamily: 'Inter',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   titleContainer: {
-    marginBottom: 80,
+    marginBottom: 60,
   },
   title: {
     fontSize: 28,
@@ -149,66 +152,57 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
     lineHeight: 40,
-    fontFamily: 'Inter',
-  },
-  summaryCard: {
-    backgroundColor: '#3a3a50',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 40,
-    minHeight: 200,
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 24,
-    fontFamily: 'Inter',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  summaryLabel: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: 16,
     color: '#a9a9c2',
-    fontFamily: 'Inter',
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    textAlign: 'right',
-    flex: 1,
-    marginLeft: 20,
-    fontFamily: 'Inter',
+  optionsContainer: {
+    marginBottom: 40,
   },
-  encouragementText: {
-    fontSize: 14,
+  optionButton: {
+    backgroundColor: '#3a3a50',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  optionButtonSelected: {
+    borderColor: '#6c63ff',
+    backgroundColor: '#3a3a50',
+  },
+  optionButtonDisabled: {
+    opacity: 0.7,
+  },
+  optionButtonText: {
+    fontSize: 16,
     color: '#ffffff',
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 40,
-    paddingHorizontal: 8,
-    fontFamily: 'Inter',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  completeButton: {
-    backgroundColor: '#6c63ff',
-    borderRadius: 28,
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  completeButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  optionButtonTextSelected: {
     color: '#ffffff',
-    fontFamily: 'Inter',
+    fontWeight: '600',
   },
-  completeButtonDisabled: {
-    opacity: 0.7,
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a9a9c2',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

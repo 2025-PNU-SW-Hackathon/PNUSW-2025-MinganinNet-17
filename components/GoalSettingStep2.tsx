@@ -1,146 +1,111 @@
 import { useState } from 'react';
 import {
   Alert,
-  Dimensions,
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 
-const { width } = Dimensions.get('window');
-
-export interface GoalSettingStep2Data {
-  timeSlot: 'morning' | 'lunch' | 'evening' | 'custom';
-  customTime: string;
-  notificationTime: string;
-}
-
 interface GoalSettingStep2Props {
-  onNext?: (data: GoalSettingStep2Data) => void;
+  onNext?: (timeSlot: string) => void;
   onBack?: () => void;
-  initialData?: GoalSettingStep2Data;
+  initialValue?: string;
 }
 
-export default function GoalSettingStep2({ 
-  onNext, 
-  onBack, 
-  initialData 
+export default function GoalSettingStep2({
+  onNext,
+  onBack,
+  initialValue = ''
 }: GoalSettingStep2Props) {
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<'morning' | 'lunch' | 'evening' | 'custom'>(
-    initialData?.timeSlot || 'custom'
-  );
-  const [customTime, setCustomTime] = useState(initialData?.customTime || '');
-  const [notificationTime, setNotificationTime] = useState(initialData?.notificationTime || '오후 4:30');
-  const { setTime } = useHabitStore();
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState(initialValue || '아침');
+  const { setTimeSlot } = useHabitStore();
 
-  const handleTimeSubmit = () => {
-    if (selectedTimeSlot === 'custom' && !customTime.trim()) {
-      Alert.alert('오류', '직접 입력 시간을 입력해주세요.');
-      return;
-    }
+  const timeSlotOptions = [
+    { key: '아침', label: '아침 (6시~10시)' },
+    { key: '점심', label: '점심 (11시~2시)' },
+    { key: '저녁', label: '저녁 (6시~10시)' },
+    { key: '자유롭게', label: '자유롭게' },
+  ];
 
-    if (!notificationTime.trim()) {
-      Alert.alert('오류', '알림 시간을 입력해주세요.');
-      return;
-    }
+  const handleTimeSlotSelect = (timeSlot: string) => {
+    console.log('🔄 Time slot selected:', timeSlot);
+    setSelectedTimeSlot(timeSlot);
+  };
 
-    const timeToSave = selectedTimeSlot === 'custom' ? customTime : `${selectedTimeSlot} 시간대`;
+  const handleNext = () => {
+    console.log('🔄 Starting time slot submission...', { selectedTimeSlot });
     
-    // Zustand store에만 저장
-    setTime(timeToSave);
+    try {
+      // Save to habit store
+      console.log('🏪 Saving to habit store...');
+      setTimeSlot(selectedTimeSlot);
+      console.log('✅ Successfully saved to habit store');
 
-    const data: GoalSettingStep2Data = {
-      timeSlot: selectedTimeSlot,
-      customTime,
-      notificationTime,
-    };
-
-    if (onNext) {
-      onNext(data);
+      console.log('🚀 Calling onNext handler...');
+      if (onNext) {
+        onNext(selectedTimeSlot);
+        console.log('✅ onNext called successfully');
+      } else {
+        console.warn('⚠️ onNext is undefined!');
+      }
+    } catch (error) {
+      console.error('💥 Error in GoalSettingStep2:', error);
+      Alert.alert('오류', `오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.stepIndicator}>2 / 4 단계</Text>
+      <Text style={styles.stepIndicator}>2 / 5 단계</Text>
+      
+      {/* Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={onBack}
+      >
+        <Text style={styles.backButtonText}>← 이전</Text>
+      </TouchableOpacity>
       
       <View style={styles.titleContainer}>
         <Text style={styles.title}>
-          주로 언제를 활용해{'\n'}루틴을 실천할까요?
+          언제 습관을{'\n'}실천하시겠어요?
         </Text>
       </View>
 
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>실천 시간대</Text>
-        <View style={styles.timeSlotContainer}>
-          {timeSlotOptions.map((option) => (
-            <TouchableOpacity
-              key={option.key}
+      <View style={styles.optionsContainer}>
+        {timeSlotOptions.map((option) => (
+          <TouchableOpacity
+            key={option.key}
+            style={[
+              styles.optionButton,
+              selectedTimeSlot === option.key && styles.optionButtonSelected,
+            ]}
+            onPress={() => handleTimeSlotSelect(option.key)}
+          >
+            <Text
               style={[
-                styles.timeSlotButton,
-                selectedTimeSlot === option.key && styles.timeSlotButtonSelected,
-                option.key === 'custom' && styles.customTimeButton,
+                styles.optionButtonText,
+                selectedTimeSlot === option.key && styles.optionButtonTextSelected,
               ]}
-              onPress={() => setSelectedTimeSlot(option.key as any)}
             >
-              <Text
-                style={[
-                  styles.timeSlotButtonText,
-                  selectedTimeSlot === option.key && styles.timeSlotButtonTextSelected,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {selectedTimeSlot === 'custom' && (
-          <TextInput
-            style={styles.customTimeInput}
-            value={customTime}
-            onChangeText={setCustomTime}
-            placeholder="예: 오후 4시 30분"
-            placeholderTextColor="#a9a9c2"
-          />
-        )}
-      </View>
-
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>매일 알림 시간</Text>
-        <TextInput
-          style={styles.notificationInput}
-          value={notificationTime}
-          onChangeText={setNotificationTime}
-          placeholder="오후 4:30"
-          placeholderTextColor="#a9a9c2"
-        />
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <TouchableOpacity
-        style={[
-          styles.nextButton
-        ]}
-        onPress={handleTimeSubmit}
+        style={styles.nextButton}
+        onPress={handleNext}
       >
-        <Text style={styles.nextButtonText}>
-          저장하고 다음으로
-        </Text>
+        <Text style={styles.nextButtonText}>다음</Text>
       </TouchableOpacity>
     </View>
   );
 }
-
-const timeSlotOptions = [
-  { key: 'morning', label: '아침' },
-  { key: 'lunch', label: '점심' },
-  { key: 'evening', label: '저녁' },
-  { key: 'custom', label: '직접 입력' },
-];
 
 const styles = StyleSheet.create({
   container: {
@@ -168,66 +133,31 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  sectionContainer: {
+  optionsContainer: {
     marginBottom: 40,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 20,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  timeSlotContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  timeSlotButton: {
+  optionButton: {
     backgroundColor: '#3a3a50',
-    borderRadius: 20,
+    borderRadius: 16,
+    paddingVertical: 20,
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 66,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  customTimeButton: {
-    minWidth: 95,
-  },
-  timeSlotButtonSelected: {
-    backgroundColor: '#6c63ff',
-  },
-  timeSlotButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#a9a9c2',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  timeSlotButtonTextSelected: {
-    color: '#ffffff',
-  },
-  customTimeInput: {
+  optionButtonSelected: {
+    borderColor: '#6c63ff',
     backgroundColor: '#3a3a50',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+  },
+  optionButtonText: {
     fontSize: 16,
     color: '#ffffff',
-    height: 52,
+    textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  notificationInput: {
-    backgroundColor: '#3a3a50',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    fontSize: 16,
+  optionButtonTextSelected: {
     color: '#ffffff',
-    height: 52,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontWeight: '600',
   },
   nextButton: {
     backgroundColor: '#6c63ff',
@@ -247,8 +177,19 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  nextButtonDisabled: {
-    backgroundColor: '#a9a9c2',
-    opacity: 0.7,
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a9a9c2',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 
