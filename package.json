@@ -1,5 +1,5 @@
 {
-  "name": "rooty-app",
+  "name": "routy-app",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -32,6 +32,7 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
+    "react-native-calendars": "^1.1313.0",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
