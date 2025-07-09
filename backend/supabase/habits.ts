@@ -21,16 +21,14 @@ export async function saveHabitToSupabase(habitData: HabitData) {
   try {
     // 1. 사용자 인증 확인
     const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      console.error('사용자 인증 오류:', userError);
-      throw userError;
+    
+    if (userError || !userData.user) {
+      console.warn('🔓 No authenticated user found, skipping database save:', userError?.message || 'No user');
+      // 인증되지 않은 경우 로컬 저장소만 사용하고 성공으로 처리
+      throw new Error('AUTH_MISSING');
     }
 
-    if (!userData.user) {
-      throw new Error('로그인이 필요합니다.');
-    }
-
-    // 2. 데이터 저장
+    // 2. 데이터 저장 (인증된 사용자만)
     const { data, error } = await supabase
       .from('habits')
       .insert([
@@ -50,10 +48,16 @@ export async function saveHabitToSupabase(habitData: HabitData) {
       throw new Error('데이터 저장 후 응답이 없습니다.');
     }
 
-    console.log('습관 데이터 저장 성공:', data);
+    console.log('✅ 습관 데이터 저장 성공:', data);
     return data;
   } catch (error) {
     console.error('Error saving habit:', error);
+    
+    // 인증 오류는 특별히 처리
+    if (error instanceof Error && error.message === 'AUTH_MISSING') {
+      throw new Error('AUTH_MISSING');
+    }
+    
     if (error instanceof Error) {
       throw new Error(`습관 저장 중 오류 발생: ${error.message}`);
     }
@@ -78,8 +82,20 @@ export async function saveHabitRoutine(
       ai_routine: JSON.stringify(habitEvents)
     };
 
-    const savedData = await saveHabitToSupabase(habitData);
-    return savedData;
+    try {
+      const savedData = await saveHabitToSupabase(habitData);
+      console.log('✅ Full habit routine saved to database');
+      return savedData;
+    } catch (error) {
+      // 인증 오류인 경우 로컬 저장소만 사용
+      if (error instanceof Error && error.message === 'AUTH_MISSING') {
+        console.log('🔓 No authentication - routine saved locally only');
+        return { message: 'Saved locally only - no authentication' };
+      }
+      
+      // 다른 오류는 재발생
+      throw error;
+    }
   } catch (error) {
     console.error('습관 데이터 저장 중 오류 발생:', error);
     throw error;

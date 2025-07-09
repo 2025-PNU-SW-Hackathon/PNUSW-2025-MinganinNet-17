@@ -21,9 +21,17 @@ export async function submitHabitData(habit: string, availableTime: string, diff
   각 description은 실행 여부를 명확하게 판단할 수 있게 작성하고, 전체 루틴을 순차적 단계로 분리해줘.` ;
 
   try {
+    console.log('🤖 AI 루틴 생성 시도 중...');
+    
     // AI에게 요청을 보내고 JSON 응답 받기
     const aiResponse = await sendMessage(prompt);
     console.log('AI 원본 응답:', aiResponse);
+
+    // API 키 오류 또는 서비스 오류 감지
+    if (aiResponse.includes('API 키') || aiResponse.includes('API_KEY') || aiResponse.includes('401') || aiResponse.includes('400')) {
+      console.warn('🔑 API 키 오류 감지, 기본 루틴 사용');
+      throw new Error('API_KEY_ERROR');
+    }
 
     let jsonString = aiResponse;
 
@@ -61,8 +69,68 @@ export async function submitHabitData(habit: string, availableTime: string, diff
 
   } catch (error) {
     console.error('습관 데이터 처리 중 오류 발생:', error);
+    
+    // API 키 오류인 경우 기본 루틴 제공
+    if (error instanceof Error && error.message === 'API_KEY_ERROR') {
+      console.log('🔄 기본 루틴 생성 중...');
+      return createDefaultHabitEvents(habit, availableTime, difficulty);
+    }
+    
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
     console.error('오류 상세 정보:', errorMessage);
-    throw new Error(`AI 응답을 처리하는 중 오류가 발생했습니다: ${errorMessage}`);
+    
+    // 다른 오류의 경우에도 기본 루틴 제공
+    console.log('🔄 오류 발생, 기본 루틴으로 대체');
+    return createDefaultHabitEvents(habit, availableTime, difficulty);
   }
+}
+
+// 기본 루틴을 생성하는 함수
+function createDefaultHabitEvents(habit: string, availableTime: string, difficulty: string): HabitEvent[] {
+  const today = new Date();
+  const formatDate = (date: Date) => date.toISOString().split('T')[0];
+  
+  // 시간대에 따른 기본 시간 설정
+  let defaultTime = '09:00-09:30';
+  if (availableTime.includes('morning') || availableTime.includes('아침')) {
+    defaultTime = '07:00-07:30';
+  } else if (availableTime.includes('lunch') || availableTime.includes('점심')) {
+    defaultTime = '12:00-12:30';
+  } else if (availableTime.includes('evening') || availableTime.includes('저녁')) {
+    defaultTime = '18:00-18:30';
+  }
+
+  const defaultEvents: HabitEvent[] = [
+    {
+      startDate: formatDate(today),
+      description: `${habit} - 시작 단계 (5분간 가벼운 준비)`,
+      time: defaultTime,
+      repeat: 3,
+      score: 0
+    },
+    {
+      startDate: formatDate(new Date(today.getTime() + 4 * 24 * 60 * 60 * 1000)),
+      description: `${habit} - 기본 단계 (10분간 집중 실행)`,
+      time: defaultTime,
+      repeat: 7,
+      score: 0
+    },
+    {
+      startDate: formatDate(new Date(today.getTime() + 11 * 24 * 60 * 60 * 1000)),
+      description: `${habit} - 발전 단계 (15분간 심화 실행)`,
+      time: defaultTime,
+      repeat: 10,
+      score: 0
+    },
+    {
+      startDate: formatDate(new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000)),
+      description: `${habit} - 완성 단계 (20분간 완전한 습관 실행)`,
+      time: defaultTime,
+      repeat: 14,
+      score: 0
+    }
+  ];
+
+  console.log('✅ 기본 루틴 생성 완료:', defaultEvents);
+  return defaultEvents;
 }

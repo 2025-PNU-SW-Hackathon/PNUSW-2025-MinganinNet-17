@@ -1,21 +1,23 @@
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import DailySchedulePopup from './DailySchedulePopup';
 import GoalSettingStep1 from './GoalSettingStep1';
-import GoalSettingStep2, { GoalSettingStep2Data } from './GoalSettingStep2';
-import GoalSettingStep3 from './GoalSettingStep3';
+import GoalSettingStep2 from './GoalSettingStep2';
+import GoalSettingStep3, { GoalSettingStep3Data } from './GoalSettingStep3';
 import GoalSettingStep4 from './GoalSettingStep4';
+import GoalSettingStep5 from './GoalSettingStep5';
 import GoalSetupCompleteScreen from './GoalSetupCompleteScreen';
 import HabitSetupScreen, { HabitData } from './HabitSetupScreen';
 import HomeScreen from './HomeScreen';
 import LoginScreen from './LoginScreen';
 import RoutineResultScreen from './RoutineResultScreen';
 import ScreenTransitionManager from './ScreenTransitionManager';
+import SignUpScreen, { SignUpData } from './SignUpScreen';
 import SplashScreen from './SplashScreen';
 import WelcomeScreen from './WelcomeScreen';
 
-type Screen = 'splash' | 'welcome' | 'login' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
+type Screen = 'splash' | 'welcome' | 'login' | 'signup' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalStep5' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
 
 interface Task {
   id: string;
@@ -26,9 +28,9 @@ interface Task {
 
 interface AppData {
   habitGoal: string;
-  timeData: GoalSettingStep2Data | null;
-  coachingIntensity: string;
   difficulty: string;
+  timeData: GoalSettingStep3Data | null;
+  coachingIntensity: string;
   habitData: HabitData | null;
 }
 
@@ -40,9 +42,9 @@ export default function MainApp() {
   
   const [appData, setAppData] = useState<AppData>({
     habitGoal: '',
+    difficulty: '',
     timeData: null,
     coachingIntensity: '',
-    difficulty: '',
     habitData: null,
   });
 
@@ -62,36 +64,52 @@ export default function MainApp() {
   };
 
   const handleSignUpPress = () => {
+    setCurrentScreen('signup');
+  };
+
+  // SignUp Screen handlers
+  const handleSignUpComplete = (userData: SignUpData) => {
+    console.log('SignUp completed with data:', userData);
+    // Here you would typically save the user data to your backend
+    // For now, we'll just proceed to the goal setting flow
     setCurrentScreen('goalStep1');
+  };
+
+  const handleSignUpBack = () => {
+    setCurrentScreen('login');
   };
 
   // Goal Setting Step 1 handlers
   const handleGoalStep1Next = (habitGoal: string) => {
+    console.log('🎯 handleGoalStep1Next called with:', habitGoal);
+    console.log('📱 Current screen before update:', currentScreen);
     setAppData(prev => ({ ...prev, habitGoal }));
     setCurrentScreen('goalStep2');
+    console.log('📱 Screen should now be: goalStep2');
   };
 
   const handleGoalStep1Back = () => {
+    console.log('🔙 handleGoalStep1Back called');
     setCurrentScreen('login');
   };
 
-  // Goal Setting Step 2 handlers
-  const handleGoalStep2Next = (timeData: GoalSettingStep2Data) => {
-    setAppData(prev => ({ ...prev, timeData }));
+  // Goal Setting Step 2 handlers (NEW: Challenges)
+  const handleGoalStep2Next = (difficulty: string) => {
+    console.log('🎯 handleGoalStep2Next called with:', difficulty);
+    console.log('📱 Current screen before update:', currentScreen);
+    setAppData(prev => ({ ...prev, difficulty }));
     setCurrentScreen('goalStep3');
+    console.log('📱 Screen should now be: goalStep3');
   };
 
   const handleGoalStep2Back = () => {
+    console.log('🔙 handleGoalStep2Back called');
     setCurrentScreen('goalStep1');
   };
 
-  // Goal Setting Step 3 handlers (Coaching Intensity)
-  const handleGoalStep3Next = (intensity: string) => {
-    setAppData(prev => ({ 
-      ...prev, 
-      coachingIntensity: intensity, 
-      difficulty: '의지 부족' // Set default difficulty
-    }));
+  // Goal Setting Step 3 handlers (Time Selection)
+  const handleGoalStep3Next = (timeData: GoalSettingStep3Data) => {
+    setAppData(prev => ({ ...prev, timeData }));
     setCurrentScreen('goalStep4');
   };
 
@@ -99,13 +117,23 @@ export default function MainApp() {
     setCurrentScreen('goalStep2');
   };
 
-  // Goal Setting Step 4 handlers (Final Confirmation)
-  const handleGoalStep4Complete = () => {
-    setCurrentScreen('goalComplete');
+  // Goal Setting Step 4 handlers (Coaching Intensity)
+  const handleGoalStep4Next = (intensity: string) => {
+    setAppData(prev => ({ ...prev, coachingIntensity: intensity }));
+    setCurrentScreen('goalStep5');
   };
 
   const handleGoalStep4Back = () => {
     setCurrentScreen('goalStep3');
+  };
+
+  // Goal Setting Step 5 handlers (Final Confirmation)
+  const handleGoalStep5Complete = () => {
+    setCurrentScreen('goalComplete');
+  };
+
+  const handleGoalStep5Back = () => {
+    setCurrentScreen('goalStep4');
   };
 
   // Goal Setup Complete handlers - Navigate to main app with tabs
@@ -120,7 +148,7 @@ export default function MainApp() {
   };
 
   const handleHabitSetupBack = () => {
-    setCurrentScreen('goalStep2');
+    setCurrentScreen('goalStep3');
   };
 
   // Routine Result Screen handlers
@@ -168,6 +196,14 @@ export default function MainApp() {
           />
         );
       
+      case 'signup':
+        return (
+          <SignUpScreen
+            onSignUpComplete={handleSignUpComplete}
+            onBack={handleSignUpBack}
+          />
+        );
+      
       case 'goalStep1':
         return (
           <GoalSettingStep1
@@ -182,29 +218,38 @@ export default function MainApp() {
           <GoalSettingStep2
             onNext={handleGoalStep2Next}
             onBack={handleGoalStep2Back}
-            initialData={appData.timeData || undefined}
+            initialValue={appData.difficulty}
           />
         );
       
       case 'goalStep3':
         return (
           <GoalSettingStep3
-            onContinue={handleGoalStep3Next}
+            onNext={handleGoalStep3Next}
             onBack={handleGoalStep3Back}
+            initialData={appData.timeData || undefined}
           />
         );
       
       case 'goalStep4':
         return (
           <GoalSettingStep4
+            onContinue={handleGoalStep4Next}
+            onBack={handleGoalStep4Back}
+          />
+        );
+      
+      case 'goalStep5':
+        return (
+          <GoalSettingStep5
             goalData={{
               goal: appData.habitGoal || '매일 아침 10분 책 읽기',
               period: '90일',
               coachingIntensity: appData.coachingIntensity || '보통',
               difficulty: appData.difficulty || '의지 부족'
             }}
-            onComplete={handleGoalStep4Complete}
-            onBack={handleGoalStep4Back}
+            onComplete={handleGoalStep5Complete}
+            onBack={handleGoalStep5Back}
           />
         );
       

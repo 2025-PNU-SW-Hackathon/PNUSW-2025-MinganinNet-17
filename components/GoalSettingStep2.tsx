@@ -9,161 +9,146 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
 
-export interface GoalSettingStep2Data {
-  timeSlot: 'morning' | 'lunch' | 'evening' | 'custom';
-  customTime: string;
-  notificationTime: string;
-}
-
 interface GoalSettingStep2Props {
-  onNext?: (data: GoalSettingStep2Data) => void;
+  onNext?: (difficulty: string) => void;
   onBack?: () => void;
-  initialData?: GoalSettingStep2Data;
+  initialValue?: string;
 }
 
 export default function GoalSettingStep2({ 
   onNext, 
   onBack, 
-  initialData 
+  initialValue = '' 
 }: GoalSettingStep2Props) {
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<'morning' | 'lunch' | 'evening' | 'custom'>(
-    initialData?.timeSlot || 'custom'
-  );
-  const [customTime, setCustomTime] = useState(initialData?.customTime || '');
-  const [notificationTime, setNotificationTime] = useState(initialData?.notificationTime || '오후 4:30');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, setTime } = useHabitStore();
+  const [selectedDifficulty, setSelectedDifficulty] = useState(initialValue || '의지 부족');
+  const [customDifficulty, setCustomDifficulty] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(initialValue === '기타' || false);
+  const { setDifficulty } = useHabitStore();
 
-  const handleTimeSubmit = async () => {
-    if (selectedTimeSlot === 'custom' && !customTime.trim()) {
-      Alert.alert('오류', '직접 입력 시간을 입력해주세요.');
-      return;
+  const difficultyOptions = [
+    { key: '의지 부족', label: '의지 부족' },
+    { key: '시간 부족', label: '시간 부족' },
+    { key: '자꾸 잊어버림', label: '자꾸 잊어버림' },
+    { key: '성과가 보이지 않음', label: '성과가 보이지 않음' },
+    { key: '기타', label: '기타 (직접입력)' },
+  ];
+
+  const handleDifficultySelect = (difficulty: string) => {
+    setSelectedDifficulty(difficulty);
+    if (difficulty === '기타') {
+      setShowCustomInput(true);
+    } else {
+      setShowCustomInput(false);
+      setCustomDifficulty('');
+    }
+  };
+
+  const handleNext = () => {
+    console.log('🔄 Starting GoalSettingStep2 submission...', { selectedDifficulty, customDifficulty });
+    
+    let finalDifficulty = selectedDifficulty;
+    
+    if (selectedDifficulty === '기타') {
+      if (!customDifficulty.trim()) {
+        Alert.alert('오류', '어려운 점을 직접 입력해주세요.');
+        return;
+      }
+      finalDifficulty = customDifficulty;
     }
 
-    if (!notificationTime.trim()) {
-      Alert.alert('오류', '알림 시간을 입력해주세요.');
-      return;
-    }
+    console.log('💾 Final difficulty selected:', finalDifficulty);
 
-    setIsSubmitting(true);
     try {
-      const timeToSave = selectedTimeSlot === 'custom' ? customTime : `${selectedTimeSlot} 시간대`;
-      
-      // 기존 데이터를 업데이트
-      const habitData: HabitData = {
-        habit_name: habit,
-        time_slot: timeToSave,
-        intensity: '',  // 아직 설정되지 않음
-        difficulty: '', // 아직 설정되지 않음
-        ai_routine: ''  // 아직 생성되지 않음
-      };
+      // Save to habit store
+      console.log('🏪 Saving to habit store...');
+      setDifficulty(finalDifficulty);
+      console.log('✅ Successfully saved to habit store');
 
-      await saveHabitToSupabase(habitData);
-      
-      // Zustand store에 저장
-      setTime(timeToSave);
-
-      const data: GoalSettingStep2Data = {
-        timeSlot: selectedTimeSlot,
-        customTime,
-        notificationTime,
-      };
-
+      console.log('🚀 Calling onNext handler...');
       if (onNext) {
-        onNext(data);
+        onNext(finalDifficulty);
+        console.log('✅ onNext called successfully');
+      } else {
+        console.warn('⚠️ onNext is undefined!');
       }
     } catch (error) {
-      console.error('시간 정보 저장 중 오류:', error);
-      Alert.alert('오류', '시간 정보 저장에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setIsSubmitting(false);
+      console.error('💥 Error in GoalSettingStep2:', error);
+      Alert.alert('오류', `오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.stepIndicator}>2 / 4 단계</Text>
+      <Text style={styles.stepIndicator}>2 / 5 단계</Text>
+      
+      {/* Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={onBack}
+      >
+        <Text style={styles.backButtonText}>← 이전</Text>
+      </TouchableOpacity>
       
       <View style={styles.titleContainer}>
         <Text style={styles.title}>
-          주로 언제를 활용해{'\n'}루틴을 실천할까요?
+          어떤 점이 가장{'\n'}어려우셨나요?
         </Text>
       </View>
 
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>실천 시간대</Text>
-        <View style={styles.timeSlotContainer}>
-          {timeSlotOptions.map((option) => (
-            <TouchableOpacity
-              key={option.key}
+      <View style={styles.optionsContainer}>
+        {difficultyOptions.map((option) => (
+          <TouchableOpacity
+            key={option.key}
+            style={[
+              styles.optionButton,
+              selectedDifficulty === option.key && styles.optionButtonSelected,
+            ]}
+            onPress={() => handleDifficultySelect(option.key)}
+          >
+            <Text
               style={[
-                styles.timeSlotButton,
-                selectedTimeSlot === option.key && styles.timeSlotButtonSelected,
-                option.key === 'custom' && styles.customTimeButton,
+                styles.optionButtonText,
+                selectedDifficulty === option.key && styles.optionButtonTextSelected,
               ]}
-              onPress={() => setSelectedTimeSlot(option.key as any)}
             >
-              <Text
-                style={[
-                  styles.timeSlotButtonText,
-                  selectedTimeSlot === option.key && styles.timeSlotButtonTextSelected,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-        {selectedTimeSlot === 'custom' && (
+      {showCustomInput && (
+        <View style={styles.customInputContainer}>
           <TextInput
-            style={styles.customTimeInput}
-            value={customTime}
-            onChangeText={setCustomTime}
-            placeholder="예: 오후 4시 30분"
+            style={styles.customInput}
+            value={customDifficulty}
+            onChangeText={setCustomDifficulty}
+            placeholder="어려운 점을 직접 입력해주세요"
             placeholderTextColor="#a9a9c2"
+            multiline
+            textAlignVertical="top"
+            autoFocus
           />
-        )}
-      </View>
-
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>매일 알림 시간</Text>
-        <TextInput
-          style={styles.notificationInput}
-          value={notificationTime}
-          onChangeText={setNotificationTime}
-          placeholder="오후 4:30"
-          placeholderTextColor="#a9a9c2"
-        />
-      </View>
+        </View>
+      )}
 
       <TouchableOpacity
         style={[
           styles.nextButton,
-          isSubmitting && styles.nextButtonDisabled
+          (selectedDifficulty === '기타' && !customDifficulty.trim()) && styles.nextButtonDisabled
         ]}
-        onPress={handleTimeSubmit}
-        disabled={isSubmitting}
+        onPress={handleNext}
+        disabled={selectedDifficulty === '기타' && !customDifficulty.trim()}
       >
-        <Text style={styles.nextButtonText}>
-          {isSubmitting ? '저장 중...' : '저장하고 다음으로'}
-        </Text>
+        <Text style={styles.nextButtonText}>다음</Text>
       </TouchableOpacity>
     </View>
   );
 }
-
-const timeSlotOptions = [
-  { key: 'morning', label: '아침' },
-  { key: 'lunch', label: '점심' },
-  { key: 'evening', label: '저녁' },
-  { key: 'custom', label: '직접 입력' },
-];
 
 const styles = StyleSheet.create({
   container: {
@@ -191,65 +176,44 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  sectionContainer: {
+  optionsContainer: {
     marginBottom: 40,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 20,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  timeSlotContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  timeSlotButton: {
+  optionButton: {
     backgroundColor: '#3a3a50',
-    borderRadius: 20,
+    borderRadius: 16,
+    paddingVertical: 20,
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 66,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  customTimeButton: {
-    minWidth: 95,
-  },
-  timeSlotButtonSelected: {
-    backgroundColor: '#6c63ff',
-  },
-  timeSlotButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#a9a9c2',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  timeSlotButtonTextSelected: {
-    color: '#ffffff',
-  },
-  customTimeInput: {
+  optionButtonSelected: {
+    borderColor: '#6c63ff',
     backgroundColor: '#3a3a50',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+  },
+  optionButtonText: {
     fontSize: 16,
     color: '#ffffff',
-    height: 52,
+    textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  notificationInput: {
+  optionButtonTextSelected: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  customInputContainer: {
+    marginBottom: 40,
+  },
+  customInput: {
     backgroundColor: '#3a3a50',
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 20,
     fontSize: 16,
     color: '#ffffff',
-    height: 52,
+    height: 100,
+    textAlignVertical: 'top',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   nextButton: {
@@ -264,14 +228,29 @@ const styles = StyleSheet.create({
     left: 24,
     right: 24,
   },
+  nextButtonDisabled: {
+    backgroundColor: '#4a47cc',
+    opacity: 0.5,
+  },
   nextButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  nextButtonDisabled: {
-    backgroundColor: '#a9a9c2',
-    opacity: 0.7,
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a9a9c2',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 
