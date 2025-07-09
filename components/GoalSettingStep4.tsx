@@ -46,21 +46,26 @@ export default function GoalSettingStep4({ goalData, onComplete, onBack }: GoalS
 
       // 3. 알림 설정
       if (habitEvents) {
-        const notificationResult = await scheduleAllHabitRoutines(habitEvents);
-        if (!notificationResult.success) {
-          console.warn('알림 설정 실패:', notificationResult.error);
-          Alert.alert('주의', '습관은 저장되었지만 알림 설정에 실패했습니다.');
+        try {
+          const notificationResult = await scheduleAllHabitRoutines(habitEvents);
+          if (!notificationResult.success) {
+            console.warn('알림 설정 실패:', notificationResult.error);
+          }
+        } catch (notificationError) {
+          console.error('알림 설정 중 오류:', notificationError);
         }
       }
 
-      // 4. 완료 처리
-      Alert.alert('성공', '습관이 성공적으로 생성되었습니다!', [
-        { text: '확인', onPress: onComplete }
-      ]);
+      // 4. 완료 처리 - 알림 설정 실패와 관계없이 진행
+      onComplete();
+      Alert.alert('성공', '습관이 성공적으로 생성되었습니다!');
 
     } catch (error) {
       console.error('데이터 제출 중 오류 발생:', error);
-      Alert.alert('오류', '습관 생성 중 문제가 발생했습니다. 다시 시도해주세요.');
+      Alert.alert('주의', '일부 데이터 저장에 실패했습니다. 계속 진행하시겠습니까?', [
+        { text: '취소', style: 'cancel' },
+        { text: '계속', onPress: onComplete }
+      ]);
     } finally {
       setIsSubmitting(false);
     }
