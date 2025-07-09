@@ -1,0 +1,1 @@
+export function sendMessage(prompt: string): Promise<string>; 

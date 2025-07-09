@@ -1,48 +1,99 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { submitHabitData } from '../../backend/hwirang/habit';
-import { ThemedText } from '../../components/ThemedText';
-import { ThemedView } from '../../components/ThemedView';
+import { scheduleAllHabitRoutines } from '../../backend/hwirang/routineNotifications';
+import { HabitEvent, saveHabitRoutine } from '../../backend/supabase/habits';
+import { ThemedText } from '../../components/ThemedText.tsx';
+import { ThemedView } from '../../components/ThemedView.tsx';
 import { Colors } from '../../constants/Colors';
+import { useHabitStore } from '../../lib/habitStore';
 
 export default function HabitCreateScreen() {
   const [habitText, setHabitText] = useState('');
   const [timeText, setTimeText] = useState('');
   const [intensityText, setIntensityText] = useState('');
   const [difficultyText, setDifficultyText] = useState('');
+  const [createdHabitEvents, setCreatedHabitEvents] = useState<HabitEvent[] | null>(null);
+  const [notificationStatus, setNotificationStatus] = useState('');
+
+  // Zustand store에서 상태와 액션들을 가져옵니다
+  const { 
+    habit, 
+    time, 
+    intensity, 
+    difficulty,
+    setHabit,
+    setTime,
+    setIntensity,
+    setDifficulty
+  } = useHabitStore();
 
   const handleHabitSubmit = () => {
-    // TODO: Handle habit submission
-    console.log('Habit:', habitText);
+    setHabit(habitText);
   };
 
   const handleTimeSubmit = () => {
-    // TODO: Handle time submission
-    console.log('Time:', timeText);
+    setTime(timeText);
   };
 
   const handleIntensitySubmit = () => {
-    // TODO: Handle intensity submission
-    console.log('Intensity:', intensityText);
+    setIntensity(intensityText);
   };
 
   const handleDifficultySubmit = () => {
-    // TODO: Handle difficulty submission
-    console.log('Difficulty:', difficultyText);
+    setDifficulty(difficultyText);
   };
 
   const handleFinalSubmit = async () => {
     try {
-      if (!habitText || !timeText || !difficultyText) {
+      if (!habit || !time || !intensity || !difficulty) {
         console.log('모든 필수 항목을 입력해주세요.');
         return;
       }
 
       console.log('전체 데이터 제출 시작...');
-      const result = await submitHabitData(habitText, timeText, difficultyText);
-      console.log('AI 응답 결과:', result);
+      
+      // 1. AI 루틴 생성
+      const habitEvents = await submitHabitData(habit, time, difficulty);
+      console.log('AI 응답 결과:', habitEvents);
+
+      // 2. 데이터베이스 저장
+      const savedData = await saveHabitRoutine(
+        habit,
+        time,
+        intensity,
+        difficulty,
+        habitEvents
+      );
+      console.log('저장된 데이터:', savedData);
+
+      // 3. 생성된 habitEvents 저장
+      setCreatedHabitEvents(habitEvents);
+      setNotificationStatus('');
+
+      // TODO: 성공 메시지 표시 또는 다음 화면으로 이동
     } catch (error) {
       console.error('데이터 제출 중 오류 발생:', error);
+    }
+  };
+
+  const handleSetNotifications = async () => {
+    try {
+      if (!createdHabitEvents) {
+        setNotificationStatus('먼저 습관을 생성해주세요.');
+        return;
+      }
+
+      const result = await scheduleAllHabitRoutines(createdHabitEvents);
+      
+      if (result.success) {
+        setNotificationStatus('✅ ' + result.message);
+      } else {
+        setNotificationStatus('❌ ' + (result.error || '알림 설정 실패'));
+      }
+    } catch (error) {
+      setNotificationStatus('❌ 알림 설정 중 오류가 발생했습니다.');
+      console.error('알림 설정 중 오류:', error);
     }
   };
 
@@ -52,22 +103,22 @@ export default function HabitCreateScreen() {
       
       <View style={styles.previewItem}>
         <ThemedText style={styles.previewLabel}>습관:</ThemedText>
-        <ThemedText style={styles.previewText}>{habitText || '아직 입력되지 않음'}</ThemedText>
+        <ThemedText style={styles.previewText}>{habit || '아직 입력되지 않음'}</ThemedText>
       </View>
 
       <View style={styles.previewItem}>
         <ThemedText style={styles.previewLabel}>시간:</ThemedText>
-        <ThemedText style={styles.previewText}>{timeText || '아직 입력되지 않음'}</ThemedText>
+        <ThemedText style={styles.previewText}>{time || '아직 입력되지 않음'}</ThemedText>
       </View>
 
       <View style={styles.previewItem}>
         <ThemedText style={styles.previewLabel}>강도:</ThemedText>
-        <ThemedText style={styles.previewText}>{intensityText || '아직 입력되지 않음'}</ThemedText>
+        <ThemedText style={styles.previewText}>{intensity || '아직 입력되지 않음'}</ThemedText>
       </View>
 
       <View style={styles.previewItem}>
         <ThemedText style={styles.previewLabel}>어려운 점:</ThemedText>
-        <ThemedText style={styles.previewText}>{difficultyText || '아직 입력되지 않음'}</ThemedText>
+        <ThemedText style={styles.previewText}>{difficulty || '아직 입력되지 않음'}</ThemedText>
       </View>
 
       <Pressable 
@@ -79,6 +130,24 @@ export default function HabitCreateScreen() {
       >
         <ThemedText style={styles.finalButtonText}>전체 내용 저장</ThemedText>
       </Pressable>
+
+      <Pressable 
+        style={({pressed}) => [
+          styles.notificationButton,
+          pressed && styles.buttonPressed,
+          !createdHabitEvents && styles.buttonDisabled
+        ]}
+        onPress={handleSetNotifications}
+        disabled={!createdHabitEvents}
+      >
+        <ThemedText style={styles.finalButtonText}>알림 설정하기</ThemedText>
+      </Pressable>
+
+      {notificationStatus ? (
+        <ThemedText style={styles.notificationStatus}>
+          {notificationStatus}
+        </ThemedText>
+      ) : null}
     </ThemedView>
   );
 
@@ -307,5 +376,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  notificationButton: {
+    backgroundColor: Colors.light.tint,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  buttonDisabled: {
+    backgroundColor: Colors.light.text + '40',
+  },
+  notificationStatus: {
+    marginTop: 10,
+    textAlign: 'center',
+    fontSize: 14,
   },
 }); 

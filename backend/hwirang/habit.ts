@@ -1,13 +1,5 @@
+import { HabitEvent } from '../supabase/habits';
 import { sendMessage } from './gemini';
-
-// 습관 이벤트 타입 정의
-interface HabitEvent {
-  startDate: string;
-  description: string;
-  time: string;
-  repeat: number;
-  score: number;
-}
 
 // 습관 입력 정보를 바탕으로 프롬프트를 생성하고, AI에게 전송해 응답을 받아오는 함수
 export async function submitHabitData(habit: string, availableTime: string, difficulty: string): Promise<HabitEvent[]> {
