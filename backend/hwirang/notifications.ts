@@ -116,19 +116,6 @@ export const scheduleRoutineReminder = async (routineName: string, routineTime: 
       } as Notifications.NotificationTriggerInput,
     });
 
-    // // 예약된 알림 확인
-    // const scheduledNotifications = await checkScheduledNotifications();
-    // console.log('=== 현재 예약된 알림 목록 ===');
-    // console.log(`총 ${scheduledNotifications.count}개의 알림이 예약되어 있습니다.`);
-    // scheduledNotifications.notifications?.forEach((notification, index) => {
-    //   const trigger = notification.trigger as any;
-    //   console.log(`${index + 1}. 알림 ID: ${notification.identifier}`);
-    //   console.log(`   예약 시간: ${new Date(trigger.date).toLocaleString()}`);
-    //   console.log(`   제목: ${notification.content.title}`);
-    //   console.log('   ---');
-    // });
-    // console.log('==========================');
-
     return { 
       success: true, 
       message: `알림이 ${routineTime.toLocaleTimeString()}에 예약되었습니다!`,

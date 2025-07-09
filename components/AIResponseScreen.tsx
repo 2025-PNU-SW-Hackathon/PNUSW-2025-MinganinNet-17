@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { sendMessage } from '../backend/hwirang/gemini';
 
 export default function AIResponseScreen() {
+  const router = useRouter();
   const [selectedStyle, setSelectedStyle] = useState<'kind' | 'aggressive' | 'boyfriend'>('kind');
   const [aiResponse, setAiResponse] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +40,12 @@ export default function AIResponseScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>습관 관리 경고 메시지</Text>
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={() => router.push('/ui/login')}
+        >
+          <Text style={styles.loginButtonText}>로그인</Text>
+        </TouchableOpacity>
       </View>
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         <View style={styles.inputSection}>
@@ -113,11 +121,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     padding: 16,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
+  },
+  loginButton: {
+    backgroundColor: 'white',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'white',
+  },
+  loginButtonText: {
+    color: '#007AFF',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   content: {
     flex: 1,
