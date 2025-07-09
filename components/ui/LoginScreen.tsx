@@ -1,31 +1,52 @@
 import { Router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    Alert,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
     TextInput,
     TouchableOpacity
 } from 'react-native';
+import { supabase } from '../../backend/supabase/client';
 import { ThemedText } from '../ThemedText';
 import { ThemedView } from '../ThemedView';
 
 interface LoginScreenProps {
-  onLogin: (email: string, password: string) => void;
   onSignupPress: () => void;
   navigation: Router;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
-  onLogin,
   onSignupPress,
   navigation,
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    onLogin(email, password);
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        Alert.alert('로그인 오류', error.message);
+        return;
+      }
+
+      if (data?.user) {
+        // 로그인 성공 후 메인 화면으로 이동
+        navigation.replace('/(tabs)');
+      }
+    } catch (error) {
+      Alert.alert('오류', '로그인 중 문제가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,6 +73,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
+          editable={!loading}
         />
 
         <TextInput
@@ -62,18 +84,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           onChangeText={setPassword}
           secureTextEntry
           autoCapitalize="none"
+          editable={!loading}
         />
 
         <TouchableOpacity
-          style={styles.loginButton}
+          style={[styles.loginButton, loading && styles.disabledButton]}
           onPress={handleLogin}
+          disabled={loading}
         >
-          <ThemedText style={styles.buttonText}>로그인</ThemedText>
+          <ThemedText style={styles.buttonText}>
+            {loading ? '로그인 중...' : '로그인'}
+          </ThemedText>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.signupButton}
           onPress={onSignupPress}
+          disabled={loading}
         >
           <ThemedText style={styles.signupText}>
             계정이 없으신가요? 회원가입
@@ -116,6 +143,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',

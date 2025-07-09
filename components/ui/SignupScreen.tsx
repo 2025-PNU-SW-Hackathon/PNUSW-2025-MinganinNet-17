@@ -1,32 +1,76 @@
 import { Router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    Alert,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
     TextInput,
     TouchableOpacity,
 } from 'react-native';
+import { supabase } from '../../backend/supabase/client';
 import { ThemedText } from '../ThemedText';
 import { ThemedView } from '../ThemedView';
 
 interface SignupScreenProps {
-  onSignup: (email: string, username: string, password: string) => void;
   onLoginPress: () => void;
   navigation: Router;
 }
 
 export const SignupScreen: React.FC<SignupScreenProps> = ({
-  onSignup,
   onLoginPress,
   navigation,
 }) => {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = () => {
-    onSignup(email, username, password);
+  const handleSignup = async () => {
+    if (!email || !username || !password) {
+      Alert.alert('입력 오류', '모든 필드를 입력해주세요.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // 회원가입 요청
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username,
+          },
+        }
+      });
+
+      if (error) {
+        Alert.alert('회원가입 오류', error.message);
+        return;
+      }
+
+      // 회원가입 성공
+      Alert.alert(
+        '회원가입 성공',
+        '이메일로 인증 링크가 발송되었습니다. 이메일을 확인해주세요.',
+        [
+          {
+            text: '확인',
+            onPress: () => {
+              // 로그인 화면으로 이동
+              navigation.replace('ui/login');
+            }
+          }
+        ]
+      );
+
+    } catch (error) {
+      Alert.alert('오류', '회원가입 중 문제가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -53,6 +97,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
+          editable={!loading}
         />
 
         <TextInput
@@ -62,6 +107,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({
           value={username}
           onChangeText={setUsername}
           autoCapitalize="none"
+          editable={!loading}
         />
 
         <TextInput
@@ -72,18 +118,23 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({
           onChangeText={setPassword}
           secureTextEntry
           autoCapitalize="none"
+          editable={!loading}
         />
 
         <TouchableOpacity
-          style={styles.signupButton}
+          style={[styles.signupButton, loading && styles.disabledButton]}
           onPress={handleSignup}
+          disabled={loading}
         >
-          <ThemedText style={styles.buttonText}>회원가입</ThemedText>
+          <ThemedText style={styles.buttonText}>
+            {loading ? '가입 중...' : '회원가입'}
+          </ThemedText>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.loginButton}
           onPress={onLoginPress}
+          disabled={loading}
         >
           <ThemedText style={styles.loginText}>
             이미 계정이 있으신가요? 로그인
@@ -126,6 +177,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',
