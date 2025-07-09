@@ -1,5 +1,9 @@
-import React from 'react';
-import { Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { submitHabitData } from '../backend/hwirang/habit';
+import { scheduleAllHabitRoutines } from '../backend/hwirang/routineNotifications';
+import { saveHabitRoutine } from '../backend/supabase/habits';
+import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
 
@@ -15,6 +19,53 @@ interface GoalSettingStep4Props {
 }
 
 export default function GoalSettingStep4({ goalData, onComplete, onBack }: GoalSettingStep4Props) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { habit, time, intensity, difficulty, setDifficulty } = useHabitStore();
+
+  const handleComplete = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      // 현재 difficulty 저장
+      setDifficulty(goalData.difficulty);
+
+      // 1. AI 루틴 생성
+      const habitEvents = await submitHabitData(habit, time, goalData.difficulty);
+      console.log('AI 응답 결과:', habitEvents);
+
+      // 2. 데이터베이스 저장
+      const savedData = await saveHabitRoutine(
+        habit,
+        time,
+        intensity,
+        goalData.difficulty,
+        habitEvents
+      );
+      console.log('저장된 데이터:', savedData);
+
+      // 3. 알림 설정
+      if (habitEvents) {
+        const notificationResult = await scheduleAllHabitRoutines(habitEvents);
+        if (!notificationResult.success) {
+          console.warn('알림 설정 실패:', notificationResult.error);
+          Alert.alert('주의', '습관은 저장되었지만 알림 설정에 실패했습니다.');
+        }
+      }
+
+      // 4. 완료 처리
+      Alert.alert('성공', '습관이 성공적으로 생성되었습니다!', [
+        { text: '확인', onPress: onComplete }
+      ]);
+
+    } catch (error) {
+      console.error('데이터 제출 중 오류 발생:', error);
+      Alert.alert('오류', '습관 생성 중 문제가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -30,22 +81,22 @@ export default function GoalSettingStep4({ goalData, onComplete, onBack }: GoalS
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>내 목표</Text>
-            <Text style={styles.summaryValue}>{goalData.goal}</Text>
+            <Text style={styles.summaryValue}>{habit || '-'}</Text>
           </View>
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>실천 기간</Text>
-            <Text style={styles.summaryValue}>{goalData.period}</Text>
+            <Text style={styles.summaryValue}>{time || '-'}</Text>
           </View>
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>코칭 강도</Text>
-            <Text style={styles.summaryValue}>{goalData.coachingIntensity}</Text>
+            <Text style={styles.summaryValue}>{intensity || '-'}</Text>
           </View>
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>어려웠던 점</Text>
-            <Text style={styles.summaryValue}>{goalData.difficulty}</Text>
+            <Text style={styles.summaryValue}>{goalData.difficulty || '-'}</Text>
           </View>
         </View>
         
@@ -53,8 +104,14 @@ export default function GoalSettingStep4({ goalData, onComplete, onBack }: GoalS
           좋은 시작이에요! '{goalData.difficulty}'을 이겨낼 수 있도록 제가 옆에서 든든하게 도와드릴게요. 함께 멋진 여정을 만들어봐요!
         </Text>
         
-        <TouchableOpacity style={styles.completeButton} onPress={onComplete}>
-          <Text style={styles.completeButtonText}>완료하고 시작하기</Text>
+        <TouchableOpacity 
+          style={[styles.completeButton, isSubmitting && styles.completeButtonDisabled]} 
+          onPress={handleComplete}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.completeButtonText}>
+            {isSubmitting ? '처리 중...' : '완료하고 시작하기'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -146,5 +203,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     fontFamily: 'Inter',
+  },
+  completeButtonDisabled: {
+    opacity: 0.7,
   },
 }); 

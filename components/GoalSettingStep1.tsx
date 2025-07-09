@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 
 const { width } = Dimensions.get('window');
@@ -25,19 +26,39 @@ export default function GoalSettingStep1({
   initialValue = '' 
 }: GoalSettingStep1Props) {
   const [habitText, setHabitText] = useState(initialValue);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { setHabit } = useHabitStore();
 
-  const handleHabitSubmit = () => {
+  const handleHabitSubmit = async () => {
     if (!habitText.trim()) {
       Alert.alert('오류', '습관 목표를 입력해주세요.');
       return;
     }
 
-    // Zustand store에 저장
-    setHabit(habitText);
+    setIsSubmitting(true);
+    try {
+      // 기본 데이터로 저장 (나머지 필드는 다음 단계에서 업데이트)
+      const habitData: HabitData = {
+        habit_name: habitText,
+        time_slot: '',
+        intensity: '',
+        difficulty: '',
+        ai_routine: ''
+      };
+      
+      await saveHabitToSupabase(habitData);
+      
+      // Zustand store에 저장
+      setHabit(habitText);
 
-    if (onNext) {
-      onNext(habitText);
+      if (onNext) {
+        onNext(habitText);
+      }
+    } catch (error) {
+      console.error('목표 저장 중 오류:', error);
+      Alert.alert('오류', '목표 저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -65,11 +86,16 @@ export default function GoalSettingStep1({
       </View>
 
       <TouchableOpacity
-        style={[styles.nextButton, !habitText.trim() && styles.nextButtonDisabled]}
+        style={[
+          styles.nextButton, 
+          (!habitText.trim() || isSubmitting) && styles.nextButtonDisabled
+        ]}
         onPress={handleHabitSubmit}
-        disabled={!habitText.trim()}
+        disabled={!habitText.trim() || isSubmitting}
       >
-        <Text style={styles.nextButtonText}>저장하고 다음으로</Text>
+        <Text style={styles.nextButtonText}>
+          {isSubmitting ? '저장 중...' : '저장하고 다음으로'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
