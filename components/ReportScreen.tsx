@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
+import CreateDailyReportScreen from './CreateDailyReportScreen';
 
 type ReportView = 'daily' | 'weekly';
+type ScreenView = 'report' | 'create';
 
 interface DailyReportData {
   id: string;
@@ -32,14 +34,14 @@ const generateHistoricalReports = (): DailyReportData[] => {
     date.setDate(today.getDate() - i);
     const achievementScore = Math.floor(Math.random() * 11); // 0-10
     
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const weekday = date.toLocaleDateString('ko-KR', { weekday: 'short' });
+    
     reports.push({
       id: `report-${i}`,
       date: date.toISOString().split('T')[0],
-      displayDate: date.toLocaleDateString('ko-KR', { 
-        month: 'long', 
-        day: 'numeric',
-        weekday: 'short'
-      }),
+      displayDate: `${month}월 ${day}일 일간 리포트`,
       achievementScore,
       aiCoachFeedback: [
         "여기에는 리포트 내용이 표시됩니다.",
@@ -55,18 +57,18 @@ const generateHistoricalReports = (): DailyReportData[] => {
 // Generate today's report data
 const generateTodayReport = (): DailyReportData => {
   const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, '0'); // Add leading zero
+  const day = String(today.getDate()).padStart(2, '0'); // Add leading zero
+  
   return {
     id: 'today-report',
     date: today.toISOString().split('T')[0],
-    displayDate: today.toLocaleDateString('ko-KR', { 
-      month: 'long', 
-      day: 'numeric'
-    }) + ' 일간 리포트',
+    displayDate: `${month}월 ${day}일 일간 리포트`,
     achievementScore: 8, // Today's achievement score
     aiCoachFeedback: [
-      "오늘 목표 달성률이 높습니다. 훌륭해요!",
-      "아침 루틴을 잘 지키고 있습니다.",
-      "내일도 이 페이스를 유지해보세요."
+      "여기에는 리포트 내용이 표시됩니다.",
+      "주요 내용 2",
+      "주요 내용 3"
     ]
   };
 };
@@ -74,8 +76,25 @@ const generateTodayReport = (): DailyReportData => {
 export default function ReportScreen() {
   const colorScheme = useColorScheme();
   const [selectedView, setSelectedView] = useState<ReportView>('daily');
+  const [currentScreen, setCurrentScreen] = useState<ScreenView>('report');
+  const [todayReportExists, setTodayReportExists] = useState<boolean>(false); // Set to false to show create prompt
   const historicalReports = generateHistoricalReports();
   const todayReport = generateTodayReport();
+
+  // Handle navigation to create daily report screen
+  const handleCreateReport = () => {
+    setCurrentScreen('create');
+  };
+
+  // Handle back navigation from create screen
+  const handleBackToReport = () => {
+    setCurrentScreen('report');
+  };
+
+  // Show create daily report screen
+  if (currentScreen === 'create') {
+    return <CreateDailyReportScreen onBack={handleBackToReport} />;
+  }
 
   const ViewSelector = () => {
     return (
@@ -122,6 +141,33 @@ export default function ReportScreen() {
           </TouchableOpacity>
         </View>
       </View>
+    );
+  };
+
+  const CreateReportPrompt = () => {
+    return (
+      <TouchableOpacity 
+        style={[
+          styles.createReportCard,
+          { backgroundColor: Colors[colorScheme ?? 'light'].background }
+        ]}
+        onPress={handleCreateReport}
+        activeOpacity={0.7}
+      >
+        <View style={styles.createReportContent}>
+          {/* Semi-transparent Plus Icon */}
+          <View style={styles.createReportIconContainer}>
+            <Text style={[styles.createReportIcon, { color: Colors[colorScheme ?? 'light'].text }]}>
+              +
+            </Text>
+          </View>
+          
+          {/* Semi-transparent Text */}
+          <Text style={[styles.createReportText, { color: Colors[colorScheme ?? 'light'].text }]}>
+            하루가 끝나면, 오늘의 일간 리포트를 생성해보세요.
+          </Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -176,9 +222,13 @@ export default function ReportScreen() {
   const DailyReportContent = () => {
     return (
       <View style={styles.dailyReportContainer}>
-        {/* Sticky Today's Report Card */}
+        {/* Sticky Today's Report Card - Conditional Rendering */}
         <View style={styles.stickyHeaderContainer}>
-          <DailyReportCard data={todayReport} isToday={true} />
+          {todayReportExists ? (
+            <DailyReportCard data={todayReport} isToday={true} />
+          ) : (
+            <CreateReportPrompt />
+          )}
         </View>
 
         {/* Scrollable History Section */}
@@ -303,6 +353,36 @@ const styles = StyleSheet.create({
   },
   historyListContent: {
     paddingBottom: 100, // Extra padding for tab bar
+  },
+  // Create Report Prompt Styles
+  createReportCard: {
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderStyle: 'dashed',
+  },
+  createReportContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 80,
+  },
+  createReportIconContainer: {
+    marginRight: 16,
+  },
+  createReportIcon: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    opacity: 0.5, // Semi-transparent
+  },
+  createReportText: {
+    fontSize: 16,
+    fontWeight: '500',
+    opacity: 0.5, // Semi-transparent
+    flex: 1,
+    textAlign: 'center',
   },
   // Daily Report Card Styles
   reportCard: {
