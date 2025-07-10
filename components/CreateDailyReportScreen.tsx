@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useRef, useState } from 'react';
+import { Animated, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import CreateDailyReportStep2Screen from './CreateDailyReportStep2Screen';
+import ScreenTransitionManager from './ScreenTransitionManager';
 
 interface CreateDailyReportScreenProps {
   onBack: () => void;
@@ -14,6 +16,119 @@ interface TodoItem {
   completed: boolean;
   date: string;
 }
+
+// Animated Todo Item Component for CreateDailyReportScreen
+interface AnimatedTodoItemProps {
+  todo: TodoItem;
+  isCompleted: boolean;
+  onToggle: () => void;
+  colorScheme: string;
+}
+
+const AnimatedTodoItem = ({ todo, isCompleted, onToggle, colorScheme }: AnimatedTodoItemProps) => {
+  const scaleAnimation = useRef(new Animated.Value(1)).current;
+  const checkmarkScale = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
+  const textOpacity = useRef(new Animated.Value(isCompleted ? 0.6 : 1)).current;
+
+  const handlePress = () => {
+    // Haptic feedback
+    if (!isCompleted) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    // Scale animation for the whole item
+    Animated.sequence([
+      Animated.spring(scaleAnimation, {
+        toValue: 1.05,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+      Animated.spring(scaleAnimation, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      })
+    ]).start();
+
+    // Checkmark and text animations
+    if (!isCompleted) {
+      // Completing task
+      Animated.parallel([
+        Animated.spring(checkmarkScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 6,
+        }),
+        Animated.timing(textOpacity, {
+          toValue: 0.6,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start();
+    } else {
+      // Uncompleting task
+      Animated.parallel([
+        Animated.spring(checkmarkScale, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 6,
+        }),
+        Animated.timing(textOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+
+    onToggle();
+  };
+
+  return (
+    <Animated.View style={[{ transform: [{ scale: scaleAnimation }] }]}>
+      <TouchableOpacity
+        style={styles.todoItem}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <View style={[
+          styles.todoCheckbox,
+          isCompleted && [styles.todoCheckedBox, { backgroundColor: Colors[colorScheme as keyof typeof Colors].tint }]
+        ]}>
+          <Animated.Text 
+            style={[
+              styles.checkmark,
+              { 
+                transform: [{ scale: checkmarkScale }],
+                opacity: checkmarkScale
+              }
+            ]}
+          >
+            ✓
+          </Animated.Text>
+        </View>
+        <Animated.Text 
+          style={[
+            styles.todoText,
+            { color: Colors[colorScheme as keyof typeof Colors].text },
+            isCompleted && styles.todoTextCompleted,
+            { opacity: textOpacity }
+          ]}
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {todo.title}
+        </Animated.Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 // Achievement score color mapping (same as calendar logic)
 const getAchievementColor = (score: number): string => {
@@ -82,10 +197,57 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
     setCurrentStep('step1');
   };
 
-  // Show step 2 screen
-  if (currentStep === 'step2') {
-    return <CreateDailyReportStep2Screen onBack={handleBackFromStep2} achievementScore={achievementRate} />;
-  }
+  // Render function for step content
+  const renderStep = () => {
+    switch (currentStep) {
+      case 'step2':
+        return <CreateDailyReportStep2Screen onBack={handleBackFromStep2} achievementScore={achievementRate} />;
+      case 'step1':
+      default:
+        return <CreateDailyReportStep1Content />;
+    }
+  };
+
+  // Step 1 Content Component
+  const CreateDailyReportStep1Content = () => (
+    <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
+            ← 뒤로
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header Question */}
+        <View style={styles.questionContainer}>
+          <Text style={[styles.questionText, { color: Colors[colorScheme ?? 'light'].text }]}>
+            오늘의 당신은 얼마만큼 힘냈나요?
+          </Text>
+        </View>
+
+        {/* TodoList Context */}
+        <TodoList />
+
+        {/* Achievement Rate Slider */}
+        <AchievementRateSlider />
+      </ScrollView>
+
+      {/* Next Button */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.nextButton}
+          onPress={handleNext}
+        >
+          <Text style={styles.nextButtonText}>
+            Next
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
 
   const TodoList = () => {
     return (
@@ -95,29 +257,13 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
         </Text>
         <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
           {todoData.map((todo) => (
-            <TouchableOpacity
+            <AnimatedTodoItem
               key={todo.id}
-              style={styles.todoItem}
-              onPress={() => handleTodoToggle(todo.id)}
-            >
-              <View style={[
-                styles.todoCheckbox,
-                todo.completed && [styles.todoCheckedBox, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]
-              ]}>
-                {todo.completed && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-              <Text 
-                style={[
-                  styles.todoText,
-                  { color: Colors[colorScheme ?? 'light'].text },
-                  todo.completed && styles.todoTextCompleted
-                ]}
-                numberOfLines={2}
-                ellipsizeMode="tail"
-              >
-                {todo.title}
-              </Text>
-            </TouchableOpacity>
+              todo={todo}
+              isCompleted={todo.completed}
+              onToggle={() => handleTodoToggle(todo.id)}
+              colorScheme={colorScheme ?? 'light'}
+            />
           ))}
         </ScrollView>
       </View>
@@ -166,43 +312,15 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
-            ← 뒤로
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header Question */}
-        <View style={styles.questionContainer}>
-          <Text style={[styles.questionText, { color: Colors[colorScheme ?? 'light'].text }]}>
-            오늘의 당신은 얼마만큼 힘냈나요?
-          </Text>
-        </View>
-
-        {/* TodoList Context */}
-        <TodoList />
-
-        {/* Achievement Rate Slider */}
-        <AchievementRateSlider />
-      </ScrollView>
-
-      {/* Next Button */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.nextButton}
-          onPress={handleNext}
-        >
-          <Text style={styles.nextButtonText}>
-            Next
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+    <ScreenTransitionManager
+      screenKey={currentStep}
+      direction={currentStep === 'step2' ? 'forward' : 'backward'}
+      onTransitionComplete={() => {
+        console.log('Daily report step transition completed:', currentStep);
+      }}
+    >
+      {renderStep()}
+    </ScreenTransitionManager>
   );
 }
 

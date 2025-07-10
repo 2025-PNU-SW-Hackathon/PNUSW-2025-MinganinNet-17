@@ -11,9 +11,12 @@ import { AnimationConfig } from '../constants/AnimationConfig';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+export type TransitionDirection = 'forward' | 'backward';
+
 interface ScreenTransitionManagerProps {
   children: React.ReactNode;
   screenKey: string;
+  direction?: TransitionDirection;
   onTransitionComplete?: () => void;
 }
 
@@ -21,11 +24,13 @@ interface ScreenState {
   key: string;
   component: React.ReactNode;
   isExiting: boolean;
+  direction: TransitionDirection;
 }
 
 export default function ScreenTransitionManager({
   children,
   screenKey,
+  direction = 'forward',
   onTransitionComplete,
 }: ScreenTransitionManagerProps) {
   const [screens, setScreens] = useState<ScreenState[]>([]);
@@ -53,6 +58,7 @@ export default function ScreenTransitionManager({
           key: screenKey,
           component: children,
           isExiting: false,
+          direction,
         };
         
         return [...updatedScreens, newScreen];
@@ -76,19 +82,20 @@ export default function ScreenTransitionManager({
             key: screenKey,
             component: children,
             isExiting: false,
+            direction,
           }];
         }
         
         return prevScreens.map(screen => 
           screen.key === screenKey 
-            ? { ...screen, component: children }
+            ? { ...screen, component: children, direction }
             : screen
         );
       });
     }
     
     prevScreenKey.current = screenKey;
-  }, [screenKey, children]);
+  }, [screenKey, children, direction]);
 
   const handleAnimationComplete = () => {
     animationCount.current++;
@@ -106,6 +113,7 @@ export default function ScreenTransitionManager({
           key={screen.key}
           screenKey={screen.key}
           isExiting={screen.isExiting}
+          direction={screen.direction}
           onAnimationComplete={handleAnimationComplete}
         >
           {screen.component}
@@ -119,6 +127,7 @@ interface AnimatedScreenProps {
   children: React.ReactNode;
   screenKey: string;
   isExiting: boolean;
+  direction: TransitionDirection;
   onAnimationComplete: () => void;
 }
 
@@ -126,16 +135,28 @@ function AnimatedScreen({
   children,
   screenKey,
   isExiting,
+  direction,
   onAnimationComplete,
 }: AnimatedScreenProps) {
-  const translateX = useSharedValue(isExiting ? 0 : SCREEN_WIDTH);
+  // Calculate initial and target positions based on direction
+  const getInitialPosition = () => {
+    if (isExiting) return 0; // Exiting screen starts at center
+    return direction === 'forward' ? SCREEN_WIDTH : -SCREEN_WIDTH; // Forward: from right, Backward: from left
+  };
+  
+  const getTargetPosition = () => {
+    if (!isExiting) return 0; // Entering screen ends at center
+    return direction === 'forward' ? -SCREEN_WIDTH : SCREEN_WIDTH; // Forward: to left, Backward: to right
+  };
+
+  const translateX = useSharedValue(getInitialPosition());
   const opacity = useSharedValue(isExiting ? 1 : AnimationConfig.FADE_OPACITY);
 
   useEffect(() => {
     if (isExiting) {
-      // Screen is exiting - slide out to left
+      // Screen is exiting
       translateX.value = withTiming(
-        -SCREEN_WIDTH,
+        getTargetPosition(),
         {
           duration: AnimationConfig.TRANSITION_DURATION,
           easing: Easing.bezier(0.55, 0.06, 0.68, 0.19), // easeInQuad
@@ -152,7 +173,7 @@ function AnimatedScreen({
         easing: Easing.in(Easing.quad),
       });
     } else {
-      // Screen is entering - slide in from right
+      // Screen is entering
       translateX.value = withTiming(
         0,
         {
@@ -171,7 +192,7 @@ function AnimatedScreen({
         easing: Easing.out(Easing.quad),
       });
     }
-  }, [isExiting]);
+  }, [isExiting, direction]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {

@@ -3,6 +3,7 @@ import { FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import CreateDailyReportScreen from './CreateDailyReportScreen';
+import ScreenTransitionManager from './ScreenTransitionManager';
 
 type ReportView = 'daily' | 'weekly';
 type ScreenView = 'report' | 'create';
@@ -91,10 +92,27 @@ export default function ReportScreen() {
     setCurrentScreen('report');
   };
 
-  // Show create daily report screen
-  if (currentScreen === 'create') {
-    return <CreateDailyReportScreen onBack={handleBackToReport} />;
-  }
+  // Render function for screen content
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case 'create':
+        return <CreateDailyReportScreen onBack={handleBackToReport} />;
+      case 'report':
+      default:
+        return <ReportScreenContent />;
+    }
+  };
+
+  // Main Report Screen Content Component
+  const ReportScreenContent = () => (
+    <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+      {/* View Selector */}
+      <ViewSelector />
+
+      {/* Content based on selected view */}
+      {selectedView === 'daily' ? <DailyReportContent /> : <WeeklyReportContent />}
+    </SafeAreaView>
+  );
 
   const ViewSelector = () => {
     return (
@@ -266,13 +284,15 @@ export default function ReportScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-      {/* View Selector */}
-      <ViewSelector />
-
-      {/* Content based on selected view */}
-      {selectedView === 'daily' ? <DailyReportContent /> : <WeeklyReportContent />}
-    </SafeAreaView>
+    <ScreenTransitionManager
+      screenKey={currentScreen}
+      direction={currentScreen === 'create' ? 'forward' : 'backward'}
+      onTransitionComplete={() => {
+        console.log('Report screen transition completed:', currentScreen);
+      }}
+    >
+      {renderScreen()}
+    </ScreenTransitionManager>
   );
 }
 
