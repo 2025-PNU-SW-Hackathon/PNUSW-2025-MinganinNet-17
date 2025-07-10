@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getLatestHabitPlan } from '../backend/supabase/habits';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
@@ -14,6 +15,119 @@ interface TodoItem extends DailyTodo {
   id: string; // Add a unique ID for list rendering
   completed: boolean;
 }
+
+// Animated Todo Item Component for CreateDailyReportScreen
+interface AnimatedTodoItemProps {
+  todo: TodoItem;
+  isCompleted: boolean;
+  onToggle: () => void;
+  colorScheme: string;
+}
+
+const AnimatedTodoItem = ({ todo, isCompleted, onToggle, colorScheme }: AnimatedTodoItemProps) => {
+  const scaleAnimation = useRef(new Animated.Value(1)).current;
+  const checkmarkScale = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
+  const textOpacity = useRef(new Animated.Value(isCompleted ? 0.6 : 1)).current;
+
+  const handlePress = () => {
+    // Haptic feedback
+    if (!isCompleted) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    // Scale animation for the whole item
+    Animated.sequence([
+      Animated.spring(scaleAnimation, {
+        toValue: 1.05,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+      Animated.spring(scaleAnimation, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      })
+    ]).start();
+
+    // Checkmark and text animations
+    if (!isCompleted) {
+      // Completing task
+      Animated.parallel([
+        Animated.spring(checkmarkScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 6,
+        }),
+        Animated.timing(textOpacity, {
+          toValue: 0.6,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start();
+    } else {
+      // Uncompleting task
+      Animated.parallel([
+        Animated.spring(checkmarkScale, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 6,
+        }),
+        Animated.timing(textOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+
+    onToggle();
+  };
+
+  return (
+    <Animated.View style={[{ transform: [{ scale: scaleAnimation }] }]}>
+      <TouchableOpacity
+        style={styles.todoItem}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <View style={[
+          styles.todoCheckbox,
+          isCompleted && [styles.todoCheckedBox, { backgroundColor: Colors[colorScheme as keyof typeof Colors].tint }]
+        ]}>
+          <Animated.Text 
+            style={[
+              styles.checkmark,
+              { 
+                transform: [{ scale: checkmarkScale }],
+                opacity: checkmarkScale
+              }
+            ]}
+          >
+            ✓
+          </Animated.Text>
+        </View>
+        <Animated.Text 
+          style={[
+            styles.todoText,
+            { color: Colors[colorScheme as keyof typeof Colors].text },
+            isCompleted && styles.todoTextCompleted,
+            { opacity: textOpacity }
+          ]}
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {todo.description}
+        </Animated.Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 // Helper function to parse duration strings into days (from HomeScreen)
 const parseDurationToDays = (duration: string): number => {
@@ -31,8 +145,6 @@ const parseDurationToDays = (duration: string): number => {
   }
   return 0;
 };
-
-
 // Achievement score color mapping (same as calendar logic)
 const getAchievementColor = (score: number): string => {
   if (score >= 9) return '#4CAF50';        // Green (90%+)
@@ -151,29 +263,13 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
         </Text>
         <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
           {todos.map((todo) => (
-            <TouchableOpacity
+            <AnimatedTodoItem
               key={todo.id}
-              style={styles.todoItem}
-              onPress={() => handleTodoToggle(todo.id)}
-            >
-              <View style={[
-                styles.todoCheckbox,
-                todo.completed && [styles.todoCheckedBox, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]
-              ]}>
-                {todo.completed && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-              <Text 
-                style={[
-                  styles.todoText,
-                  { color: Colors[colorScheme ?? 'light'].text },
-                  todo.completed && styles.todoTextCompleted
-                ]}
-                numberOfLines={2}
-                ellipsizeMode="tail"
-              >
-                {todo.description}
-              </Text>
-            </TouchableOpacity>
+              todo={todo}
+              isCompleted={todo.completed}
+              onToggle={() => handleTodoToggle(todo.id)}
+              colorScheme={colorScheme ?? 'light'}
+            />
           ))}
         </ScrollView>
       </View>

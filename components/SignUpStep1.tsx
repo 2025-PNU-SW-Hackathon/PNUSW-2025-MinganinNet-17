@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import {
-    ActivityIndicator,
     Alert,
     Dimensions,
-    Platform,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
+import { AnimatedButton } from './AnimatedButton';
 
 const { width } = Dimensions.get('window');
 
@@ -29,6 +28,14 @@ export default function SignUpStep1({
   isLoading = false
 }: SignUpStep1Props) {
   const [password, setPassword] = useState(initialValue);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isPasswordValid, setIsPasswordValid] = useState(false);
+  const [isConfirmPasswordValid, setIsConfirmPasswordValid] = useState(false);
+
+  const validatePassword = (password: string) => {
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    return passwordRegex.test(password);
+  };
 
   const handleNext = () => {
     if (!password.trim()) {
@@ -36,8 +43,13 @@ export default function SignUpStep1({
       return;
     }
 
-    if (password.length < 8) {
-      Alert.alert('오류', '비밀번호는 8자 이상이어야 합니다.');
+    if (!validatePassword(password)) {
+      Alert.alert('오류', '비밀번호는 8자 이상이어야 하며, 대문자, 소문자, 숫자, 특수문자를 포함해야 합니다.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('오류', '비밀번호가 일치하지 않습니다.');
       return;
     }
 
@@ -46,70 +58,72 @@ export default function SignUpStep1({
     }
   };
 
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
+    setIsPasswordValid(validatePassword(text));
+  };
+
+  const handleConfirmPasswordChange = (text: string) => {
+    setConfirmPassword(text);
+    setIsConfirmPasswordValid(text === password && text.length > 0);
+  };
+
   return (
     <View style={styles.container}>
+      <Text style={styles.stepIndicator}>회원가입 2/2</Text>
+      
       <TouchableOpacity style={styles.backButton} onPress={onBack} disabled={isLoading}>
-        <Text style={styles.backArrow}>←</Text>
+        <Text style={styles.backButtonText}>← 이전</Text>
       </TouchableOpacity>
-      
-      <View style={styles.progressBar}>
-        <View style={[styles.progressStep, styles.progressStepActive]} />
-        <View style={[styles.progressStep, styles.progressStepActive]} />
-        <View style={styles.progressStep} />
-        <View style={styles.progressStep} />
-      </View>
-      
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>
-          로그인에 사용할{'\n'}비밀번호를 입력해주세요.
-        </Text>
-      </View>
+
+      <Text style={styles.title}>안전한 비밀번호를{'\n'}설정해주세요</Text>
+      <Text style={styles.subtitle}>선택한 이메일: {email}</Text>
 
       <View style={styles.inputContainer}>
+        <Text style={styles.label}>비밀번호</Text>
         <TextInput
-          style={styles.passwordInput}
+          style={[styles.input, isPasswordValid && styles.validInput]}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={handlePasswordChange}
           placeholder="비밀번호 입력"
           placeholderTextColor="#a9a9c2"
           secureTextEntry
-          autoComplete="new-password"
-          autoFocus
           editable={!isLoading}
         />
-        <View style={styles.requirementContainer}>
-          <Text style={styles.requirementText}>영문포함</Text>
-          <Text style={styles.requirementText}>숫자포함</Text>
-          <Text style={styles.requirementText}>8-20자 이내</Text>
-        </View>
+        {password.length > 0 && (
+          <Text style={[styles.validationText, isPasswordValid && styles.validText]}>
+            {isPasswordValid ? '✓ 안전한 비밀번호입니다' : '8자 이상, 대소문자, 숫자, 특수문자 포함'}
+          </Text>
+        )}
       </View>
 
       <View style={styles.confirmContainer}>
+        <Text style={styles.label}>비밀번호 확인</Text>
         <TextInput
-          style={styles.confirmInput}
+          style={[styles.input, isConfirmPasswordValid && styles.validInput]}
+          value={confirmPassword}
+          onChangeText={handleConfirmPasswordChange}
           placeholder="비밀번호 확인"
           placeholderTextColor="#a9a9c2"
           secureTextEntry
           editable={!isLoading}
         />
-        <Text style={styles.confirmText}>비밀번호 일치</Text>
+        {confirmPassword.length > 0 && (
+          <Text style={[styles.validationText, isConfirmPasswordValid && styles.validText]}>
+            {isConfirmPasswordValid ? '✓ 비밀번호가 일치합니다' : '비밀번호가 일치하지 않습니다'}
+          </Text>
+        )}
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.nextButton, 
-          !password.trim() && styles.nextButtonDisabled,
-          isLoading && styles.nextButtonDisabled
-        ]}
+      {/* Enhanced Next Button */}
+      <AnimatedButton
+        title="회원가입 완료"
         onPress={handleNext}
-        disabled={!password.trim() || isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.nextButtonText}>다음</Text>
-        )}
-      </TouchableOpacity>
+        isLoading={isLoading}
+        disabled={!isPasswordValid || !isConfirmPasswordValid || isLoading}
+        style={styles.nextButton}
+        loadingText="가입 중..."
+      />
     </View>
   );
 }
@@ -121,108 +135,74 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
   },
+  stepIndicator: {
+    fontSize: 14,
+    color: '#a9a9c2',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Inter',
+  },
   backButton: {
-    position: 'absolute',
-    top: 60,
-    left: 24,
-    zIndex: 10,
+    alignSelf: 'flex-start',
+    marginBottom: 20,
   },
-  backArrow: {
-    fontSize: 24,
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
-  progressBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 60,
-  },
-  progressStep: {
-    width: 60,
-    height: 4,
-    backgroundColor: '#3a3a50',
-    marginHorizontal: 4,
-    borderRadius: 2,
-  },
-  progressStepActive: {
-    backgroundColor: '#ffffff',
-  },
-  titleContainer: {
-    marginBottom: 60,
+  backButtonText: {
+    fontSize: 16,
+    color: '#6c63ff',
+    fontWeight: '600',
+    fontFamily: 'Inter',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
-    textAlign: 'left',
-    lineHeight: 40,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontFamily: 'Inter',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#a9a9c2',
+    textAlign: 'center',
+    marginBottom: 40,
+    fontFamily: 'Inter',
   },
   inputContainer: {
-    marginBottom: 30,
-  },
-  passwordInput: {
-    backgroundColor: '#3a3a50',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: '#ffffff',
-    height: 52,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-    marginBottom: 16,
-  },
-  requirementContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
-  requirementText: {
-    fontSize: 12,
-    color: '#a9a9c2',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    marginBottom: 24,
   },
   confirmContainer: {
-    marginBottom: 160,
+    marginBottom: 40,
   },
-  confirmInput: {
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+    fontFamily: 'Inter',
+  },
+  input: {
     backgroundColor: '#3a3a50',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
     color: '#ffffff',
-    height: 52,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    fontFamily: 'Inter',
   },
-  confirmText: {
+  validInput: {
+    borderColor: '#4CAF50',
+  },
+  validationText: {
     fontSize: 12,
-    color: '#a9a9c2',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    color: '#ff4757',
+    marginTop: 4,
+    fontFamily: 'Inter',
+  },
+  validText: {
+    color: '#4CAF50',
   },
   nextButton: {
-    backgroundColor: '#6c63ff',
-    borderRadius: 28,
-    paddingVertical: 19,
-    alignItems: 'center',
-    height: 56,
-    justifyContent: 'center',
-    position: 'absolute',
-    bottom: 40,
-    left: 24,
-    right: 24,
-  },
-  nextButtonDisabled: {
-    backgroundColor: '#4a47cc',
-    opacity: 0.5,
-  },
-  nextButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    marginTop: 20,
   },
 }); 

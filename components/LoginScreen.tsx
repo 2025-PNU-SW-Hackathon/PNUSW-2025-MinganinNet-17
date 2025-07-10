@@ -1,23 +1,12 @@
 import { useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { signIn } from '../backend/supabase/auth';
+import { AnimatedButton } from './AnimatedButton';
 import DebugNextButton from './DebugNextButton';
 
-const { width } = Dimensions.get('window');
-
 interface LoginScreenProps {
-  onLoginSuccess?: () => void;
-  onSignUpPress?: () => void;
+  onLoginSuccess: () => void;
+  onSignUpPress: () => void;
 }
 
 export default function LoginScreen({ 
@@ -125,24 +114,25 @@ export default function LoginScreen({
         />
       </View>
 
-      <TouchableOpacity
-        style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+      {/* Enhanced Login Button */}
+      <AnimatedButton
+        title="로그인"
         onPress={handleLogin}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.loginButtonText}>로그인</Text>
-        )}
-      </TouchableOpacity>
+        isLoading={isLoading}
+        disabled={!email.trim() || !password.trim() || isLoading}
+        style={styles.loginButton}
+        loadingText="로그인 중..."
+      />
 
-      <TouchableOpacity onPress={handleSignUp} disabled={isLoading}>
-        <Text style={[styles.signUpText, isLoading && styles.textDisabled]}>
-          계정이 없으신가요? 회원가입
-        </Text>
-      </TouchableOpacity>
-      
+      {/* Enhanced Sign Up Button */}
+      <AnimatedButton
+        title="회원가입"
+        onPress={handleSignUp}
+        disabled={isLoading}
+        variant="secondary"
+        style={styles.signUpButton}
+      />
+
       {/* Floating Debug Button - does not interfere with layout */}
       <DebugNextButton
         to="Goal Setting"
@@ -159,73 +149,51 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1c1c2e',
     paddingHorizontal: 24,
-    paddingTop: 120,
+    paddingTop: 80,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    marginBottom: 8,
+    fontFamily: 'Inter',
   },
   subtitle: {
     fontSize: 16,
     color: '#a9a9c2',
     textAlign: 'center',
-    marginBottom: 58,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    marginBottom: 40,
+    fontFamily: 'Inter',
   },
   formContainer: {
-    marginBottom: 90,
+    marginBottom: 32,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '600',
     color: '#ffffff',
     marginBottom: 8,
-    marginTop: 25,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    marginTop: 16,
+    fontFamily: 'Inter',
   },
   input: {
     backgroundColor: '#3a3a50',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
     color: '#ffffff',
-    height: 52,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    fontFamily: 'Inter',
   },
   inputError: {
-    borderColor: '#ff4444',
-    borderWidth: 1,
+    borderColor: '#ff4757',
   },
   loginButton: {
-    backgroundColor: '#6c63ff',
-    borderRadius: 28,
-    paddingVertical: 19,
-    alignItems: 'center',
+    marginBottom: 16,
+  },
+  signUpButton: {
     marginBottom: 20,
-    height: 56,
-    justifyContent: 'center',
-  },
-  loginButtonDisabled: {
-    backgroundColor: '#4a47cc',
-    opacity: 0.7,
-  },
-  loginButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  signUpText: {
-    fontSize: 14,
-    color: '#a9a9c2',
-    textAlign: 'center',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  textDisabled: {
-    opacity: 0.7,
   },
 }); 

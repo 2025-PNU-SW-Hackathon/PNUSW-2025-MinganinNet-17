@@ -1,11 +1,13 @@
+import { useEffect, useRef, useState } from 'react';
 import {
-    Dimensions,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -29,6 +31,11 @@ export default function DailyReportResultScreen({
   aiReportText
 }: DailyReportResultScreenProps) {
   
+  // Animation values
+  const animatedScore = useRef(new Animated.Value(0)).current;
+  const animatedProgress = useRef(new Animated.Value(0)).current;
+  const [displayScore, setDisplayScore] = useState(0);
+  
   const getCoachStatus = (): CoachStatus => {
     const rate = achievementScore / 10;
     if (rate >= 0.9) return { emoji: '🥳', message: '완벽한 하루!', color: '#4CAF50' };
@@ -39,6 +46,33 @@ export default function DailyReportResultScreen({
   };
 
   const coachStatus = getCoachStatus();
+  
+  // Start animation when component mounts
+  useEffect(() => {
+    // Add listener to update display score
+    const listener = animatedScore.addListener(({ value }) => {
+      setDisplayScore(Math.round(value));
+    });
+    
+    // Animate score counter
+    Animated.timing(animatedScore, {
+      toValue: achievementScore,
+      duration: 1500, // 1.5 seconds
+      useNativeDriver: false, // We need to interpolate for text
+    }).start();
+    
+    // Animate progress bar
+    Animated.timing(animatedProgress, {
+      toValue: achievementScore / 10,
+      duration: 1500, // 1.5 seconds
+      useNativeDriver: false, // We need to interpolate for width
+    }).start();
+    
+    // Cleanup listener on unmount
+    return () => {
+      animatedScore.removeListener(listener);
+    };
+  }, [achievementScore]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -72,15 +106,20 @@ export default function DailyReportResultScreen({
             <View style={styles.achievementCard}>
               <Text style={styles.cardTitle}>Achievement Score</Text>
               <View style={styles.achievementContent}>
-                <Text style={styles.achievementScore}>{achievementScore}</Text>
+                <Text style={styles.achievementScore}>
+                  {displayScore}
+                </Text>
                 <Text style={styles.achievementTotal}>/10</Text>
               </View>
               <View style={styles.achievementBar}>
-                <View 
+                <Animated.View 
                   style={[
                     styles.achievementProgress, 
                     { 
-                      width: `${(achievementScore / 10) * 100}%`,
+                      width: animatedProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                      }),
                       backgroundColor: coachStatus.color
                     }
                   ]} 

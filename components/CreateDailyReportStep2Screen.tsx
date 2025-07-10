@@ -57,12 +57,14 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
            />;
   }
 
-  return (
+  // Step 2 Content Component
+  const CreateDailyReportStep2Content = () => (
     <KeyboardAvoidingView 
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
@@ -72,51 +74,59 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Header Text */}
-          <View style={styles.headerTextContainer}>
-            <Text style={[styles.headerText, { color: Colors[colorScheme ?? 'light'].text }]}>
-              좋아요. 더 나은 내일을 위해, 오늘 하루를 보낸 당신의 솔직한 소감을 들려주세요.
+          {/* Header Question */}
+          <View style={styles.questionContainer}>
+            <Text style={[styles.questionText, { color: Colors[colorScheme ?? 'light'].text }]}>
+              오늘 하루를 간단히 요약해 주세요
             </Text>
           </View>
 
-          {/* User Input Field */}
+          {/* User Summary Input */}
           <View style={styles.inputContainer}>
+            <Text style={[styles.inputLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+              오늘 하루 요약 (선택사항)
+            </Text>
             <TextInput
               style={[
-                styles.summaryInput,
+                styles.textInput,
                 { 
-                  backgroundColor: Colors[colorScheme ?? 'light'].background,
                   color: Colors[colorScheme ?? 'light'].text,
-                  borderColor: Colors[colorScheme ?? 'light'].icon + '30'
+                  borderColor: Colors[colorScheme ?? 'light'].icon,
+                  backgroundColor: Colors[colorScheme ?? 'light'].background
                 }
               ]}
-              placeholder="오늘 하루는 어떠셨나요? 솔직한 생각을 적어주세요..."
+              placeholder="오늘의 경험, 느낀 점, 배운 것들을 자유롭게 적어주세요..."
               placeholderTextColor={Colors[colorScheme ?? 'light'].icon}
               value={userSummary}
               onChangeText={setUserSummary}
-              multiline={true}
-              numberOfLines={4}
+              multiline
+              numberOfLines={6}
               textAlignVertical="top"
-              maxLength={200}
             />
-            <Text style={[styles.characterCount, { color: Colors[colorScheme ?? 'light'].icon }]}>
-              {userSummary.length}/200
+          </View>
+
+          {/* Summary Tips */}
+          <View style={styles.tipsContainer}>
+            <Text style={[styles.tipsTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+              💡 작성 팁
+            </Text>
+            <Text style={[styles.tipsText, { color: Colors[colorScheme ?? 'light'].icon }]}>
+              • 오늘 가장 기억에 남는 순간{'\n'}
+              • 성취한 일이나 도전한 것들{'\n'}
+              • 느낀 점이나 배운 것들{'\n'}
+              • 내일 개선하고 싶은 점들
             </Text>
           </View>
         </ScrollView>
 
-        {/* Final Action Button */}
+        {/* Submit Button */}
         <View style={styles.buttonContainer}>
           {isLoading ? (
             <ActivityIndicator size="large" color={Colors.dark.tint} />
           ) : (
             <TouchableOpacity
-              style={[
-                styles.submitButton,
-                !userSummary.trim() && styles.submitButtonDisabled
-              ]}
+              style={styles.submitButton}
               onPress={handleSubmit}
-              disabled={!userSummary.trim()}
             >
               <Text style={styles.submitButtonText}>
                 하루에 대한 피드백 받기
@@ -127,6 +137,10 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
         </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
+  );
+
+  return (
+    <CreateDailyReportStep2Content />
   );
 }
 
@@ -149,11 +163,11 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  headerTextContainer: {
+  questionContainer: {
     paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingBottom: 20,
   },
-  headerText: {
+  questionText: {
     fontSize: 20,
     fontWeight: '600',
     textAlign: 'center',
@@ -163,7 +177,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 40,
   },
-  summaryInput: {
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  textInput: {
     borderWidth: 2,
     borderRadius: 16,
     padding: 20,
@@ -172,10 +191,18 @@ const styles = StyleSheet.create({
     minHeight: 120,
     maxHeight: 200,
   },
-  characterCount: {
+  tipsContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 40,
+  },
+  tipsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  tipsText: {
     fontSize: 14,
-    textAlign: 'right',
-    marginTop: 8,
+    lineHeight: 22,
   },
   errorText: {
     color: 'red',
@@ -197,7 +224,7 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: {
     backgroundColor: '#cccccc',
-    opacity: 0.6,
+    opacity: 0.5,
   },
   submitButtonText: {
     fontSize: 18,

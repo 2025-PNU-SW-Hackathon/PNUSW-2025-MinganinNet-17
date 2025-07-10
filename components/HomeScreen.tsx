@@ -1,19 +1,21 @@
-import { useEffect, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import CalendarScreen from '../backend/calendar/calendar';
 import { getLatestHabitPlan } from '../backend/supabase/habits';
 import { DailyTodo, Plan } from '../types/habit';
 import AppSettingsScreen from './AppSettingsScreen';
+import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
 import CalendarOutlineIcon from './ui/CalendarOutlineIcon';
 
 const { width } = Dimensions.get('window');
@@ -46,6 +48,107 @@ interface CoachStatus {
   color: string;
 }
 
+// Animated Todo Item Component
+interface AnimatedTodoItemProps {
+  todo: DailyTodo;
+  isCompleted: boolean;
+  onToggle: () => void;
+}
+
+const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps) => {
+  const scaleAnimation = useRef(new Animated.Value(1)).current;
+  const checkmarkScale = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
+  const textOpacity = useRef(new Animated.Value(isCompleted ? 0.6 : 1)).current;
+
+  const handlePress = () => {
+    // Scale animation for the whole item
+    Animated.sequence([
+      Animated.spring(scaleAnimation, {
+        toValue: 1.05,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+      Animated.spring(scaleAnimation, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      })
+    ]).start();
+
+    // Checkmark and text animations
+    if (!isCompleted) {
+      // Completing task
+      Animated.parallel([
+        Animated.spring(checkmarkScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 6,
+        }),
+        Animated.timing(textOpacity, {
+          toValue: 0.6,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start();
+    } else {
+      // Uncompleting task
+      Animated.parallel([
+        Animated.spring(checkmarkScale, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 6,
+        }),
+        Animated.timing(textOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+
+    onToggle();
+  };
+
+  return (
+    <Animated.View style={[{ transform: [{ scale: scaleAnimation }] }]}>
+      <TouchableOpacity
+        style={styles.todoItem}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.todoCheckbox, isCompleted && styles.todoCheckedBox]}>
+          <Animated.Text 
+            style={[
+              styles.checkmarkText,
+              { 
+                transform: [{ scale: checkmarkScale }],
+                opacity: checkmarkScale
+              }
+            ]}
+          >
+            ✓
+          </Animated.Text>
+        </View>
+        <Animated.Text 
+          style={[
+            styles.todoText, 
+            isCompleted && styles.todoTextCompleted,
+            { opacity: textOpacity }
+          ]} 
+          numberOfLines={2} 
+          ellipsizeMode="tail"
+        >
+          {todo.description}
+        </Animated.Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -55,6 +158,15 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
   const [effectiveStartDate, setEffectiveStartDate] = useState<string | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
+  
+  // Animation for coach status
+  const coachScaleAnimation = useRef(new Animated.Value(1)).current;
+  const [previousCoachStatus, setPreviousCoachStatus] = useState<CoachStatus | null>(null);
+  
+  // Animations for smooth content loading
+  const goalFadeAnimation = useRef(new Animated.Value(0)).current;
+  const todoFadeAnimation = useRef(new Animated.Value(0)).current;
+  const coachFadeAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -160,6 +272,15 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
 
   const handleTodoToggle = (todoIndex: number, milestoneTitle: string): void => {
     const todoKey = `${milestoneTitle}-${todoIndex}`;
+    const willBeCompleted = !todoCompletion[todoKey];
+    
+    // Haptic feedback for satisfying feel
+    if (willBeCompleted) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
     setTodoCompletion(prev => ({ ...prev, [todoKey]: !prev[todoKey] }));
   };
   
@@ -189,6 +310,52 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const calendarDates = getCalendarDates();
   const todosForSelectedDate = getTodosForSelectedDate();
 
+  // Animate coach when status changes
+  useEffect(() => {
+    if (previousCoachStatus && previousCoachStatus.emoji !== coachStatus.emoji) {
+      // Coach status changed! Trigger bounce animation
+      Animated.sequence([
+        Animated.spring(coachScaleAnimation, {
+          toValue: 1.2,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 8,
+        }),
+        Animated.spring(coachScaleAnimation, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 8,
+        })
+      ]).start();
+    }
+    setPreviousCoachStatus(coachStatus);
+  }, [coachStatus.emoji, coachStatus.message]);
+
+  // Animate content when loading completes
+  useEffect(() => {
+    if (!loading) {
+      // Stagger the animations for a more polished feel
+      Animated.stagger(150, [
+        Animated.timing(goalFadeAnimation, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(coachFadeAnimation, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(todoFadeAnimation, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [loading]);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -209,12 +376,19 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
           </View>
 
           <Text style={styles.greetingText}>{getGreeting()}</Text>
+          
+          {/* Enhanced Goal Text Loading */}
           {loading ? (
-            <ActivityIndicator color="#fff" style={{alignSelf: 'flex-start', marginBottom: 20}} />
+            <View style={styles.goalLoadingContainer}>
+              <SkeletonText width="90%" height={18} style={styles.goalSkeletonLine1} />
+              <SkeletonText width="60%" height={18} style={styles.goalSkeletonLine2} />
+            </View>
           ) : (
-            <Text style={styles.goalText}>
-              {plan?.primary_goal || '진행 중인 목표가 없습니다.'}
-            </Text>
+            <Animated.View style={{ opacity: goalFadeAnimation }}>
+              <Text style={styles.goalText}>
+                {plan?.primary_goal || '진행 중인 목표가 없습니다.'}
+              </Text>
+            </Animated.View>
           )}
 
           <ScrollView 
@@ -241,43 +415,51 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
         </View>
 
         <View style={styles.mainContent}>
-          <View style={styles.coachCard}>
-            <Text style={styles.cardTitle}>Coach's Status</Text>
-            <View style={styles.coachContent}>
-              <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
-              <Text style={styles.coachMessage}>{coachStatus.message}</Text>
-              <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
-            </View>
-          </View>
+          {/* Enhanced Coach Card Loading */}
+          {loading ? (
+            <SkeletonCard type="coach" />
+          ) : (
+            <Animated.View style={[styles.coachCard, { opacity: coachFadeAnimation }]}>
+              <Text style={styles.cardTitle}>Coach's Status</Text>
+              <View style={styles.coachContent}>
+                <Animated.View style={{ transform: [{ scale: coachScaleAnimation }] }}>
+                  <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
+                </Animated.View>
+                <Text style={styles.coachMessage}>{coachStatus.message}</Text>
+                <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
+              </View>
+            </Animated.View>
+          )}
 
+          {/* Enhanced Todo Card Loading */}
           <View style={styles.todoCard}>
             <Text style={styles.cardTitle}>Today's To-Do</Text>
             <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
-              {loading ? <ActivityIndicator color="#fff" />
-              : error ? <Text style={styles.emptyTodoText}>{error}</Text>
-              : todosForSelectedDate.length > 0 ? (
-                todosForSelectedDate.map((todo, index) => {
-                  const milestone = plan?.milestones.find(m => m.daily_todos.includes(todo));
-                  if (!milestone) return null;
-                  const todoKey = `${milestone.title}-${index}`;
-                  const isCompleted = todoCompletion[todoKey];
-                  return (
-                    <TouchableOpacity
-                      key={todoKey}
-                      style={styles.todoItem}
-                      onPress={() => handleTodoToggle(index, milestone.title)}
-                    >
-                      <View style={[styles.todoCheckbox, isCompleted && styles.todoCheckedBox]} />
-                      <Text style={[styles.todoText, isCompleted && styles.todoTextCompleted]} numberOfLines={2} ellipsizeMode="tail">
-                        {todo.description}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
+              {loading ? (
+                <SkeletonTodoList count={3} />
+              ) : error ? (
+                <Text style={styles.emptyTodoText}>{error}</Text>
+              ) : todosForSelectedDate.length > 0 ? (
+                <Animated.View style={{ opacity: todoFadeAnimation }}>
+                  {todosForSelectedDate.map((todo, index) => {
+                    const milestone = plan?.milestones.find(m => m.daily_todos.includes(todo));
+                    if (!milestone) return null;
+                    const todoKey = `${milestone.title}-${index}`;
+                    const isCompleted = todoCompletion[todoKey];
+                    return (
+                      <AnimatedTodoItem
+                        key={todoKey}
+                        todo={todo}
+                        isCompleted={isCompleted}
+                        onToggle={() => handleTodoToggle(index, milestone.title)}
+                      />
+                    );
+                  })}
+                </Animated.View>
               ) : (
-                <View style={styles.emptyTodoContainer}>
+                <Animated.View style={[styles.emptyTodoContainer, { opacity: todoFadeAnimation }]}>
                   <Text style={styles.emptyTodoText}>오늘의 할 일이 없습니다.</Text>
-                </View>
+                </Animated.View>
               )}
             </ScrollView>
           </View>
@@ -336,8 +518,9 @@ const styles = StyleSheet.create({
   todoCard: { flex: 1, backgroundColor: '#3a3a50', borderRadius: 16, padding: 20, marginLeft: 10, minHeight: 250 },
   todoScrollView: { flex: 1 },
   todoItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#4a4a60' },
-  todoCheckbox: { width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: '#a9a9c2', marginRight: 10 },
+  todoCheckbox: { width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: '#a9a9c2', marginRight: 10, justifyContent: 'center', alignItems: 'center' },
   todoCheckedBox: { backgroundColor: '#6c63ff', borderColor: '#6c63ff' },
+  checkmarkText: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
   todoText: { fontSize: 14, fontWeight: '500', color: '#ffffff', flex: 1, fontFamily: 'Inter' },
   todoTextCompleted: { textDecorationLine: 'line-through', color: '#a9a9c2' },
   emptyTodoContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -347,4 +530,13 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: '#1c1c2e', borderRadius: 20, padding: 20, elevation: 5, minWidth: 350, maxWidth: '90%', maxHeight: '90%' },
   closeButton: { marginTop: 16, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20, backgroundColor: '#6c63ff', borderRadius: 20 },
   closeButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  goalLoadingContainer: {
+    marginBottom: 20,
+  },
+  goalSkeletonLine1: {
+    marginBottom: 8,
+  },
+  goalSkeletonLine2: {
+    marginBottom: 0,
+  },
 }); 
