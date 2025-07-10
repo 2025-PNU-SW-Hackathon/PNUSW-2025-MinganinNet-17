@@ -16,17 +16,54 @@ export default function GoalSettingStep5({
   onBack
 }: GoalSettingStep5Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, time, intensity, difficulty, goalPeriod } = useHabitStore();
+  const { habit, time, intensity, difficulty, goalPeriod, setPlan } =
+    useHabitStore();
+
+  // camelCase를 snake_case로 변환하는 헬퍼 함수들
+  const toSnakeCase = (str: string) =>
+    str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+
+  const convertKeysToSnakeCase = (obj: any): any => {
+    if (Array.isArray(obj)) {
+      return obj.map((v) => convertKeysToSnakeCase(v));
+    } else if (obj !== null && obj.constructor === Object) {
+      return Object.keys(obj).reduce((acc, key) => {
+        const newKey = toSnakeCase(key);
+        acc[newKey] = convertKeysToSnakeCase(obj[key]);
+        return acc;
+      }, {} as { [key: string]: any });
+    }
+    return obj;
+  };
 
   const handleSubmit = async () => {
-    console.log('🔄 Starting final submission...', { habit, time, intensity, difficulty, goalPeriod });
+    console.log('🔄 Starting final submission...', {
+      habit,
+      time,
+      intensity,
+      difficulty,
+      goalPeriod,
+    });
     setIsSubmitting(true);
 
     try {
       // 1. AI 루틴 생성
       console.log('🤖 Generating AI routine...');
-      const aiPlan = await submitHabitData(habit, time, difficulty, intensity, goalPeriod);
-      console.log('✅ AI routine generated:', aiPlan);
+      const aiPlan = await submitHabitData(
+        habit,
+        time,
+        difficulty,
+        intensity,
+        goalPeriod
+      );
+      console.log('✅ AI routine generated (camelCase):', aiPlan);
+
+      // AI가 생성한 계획(camelCase)을 snake_case로 변환
+      const snakeCasePlan = convertKeysToSnakeCase(aiPlan);
+      console.log('🔄 Converted to snake_case for store:', snakeCasePlan);
+
+      // 변환된 계획을 스토어에 저장
+      setPlan(snakeCasePlan);
 
       // 2. 데이터베이스에 모든 데이터 저장
       const habitData: HabitData = {
