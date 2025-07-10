@@ -6,6 +6,7 @@ import GoalSettingStep2 from './GoalSettingStep2';
 import GoalSettingStep3 from './GoalSettingStep3';
 import GoalSettingStep4 from './GoalSettingStep4';
 import GoalSettingStep5 from './GoalSettingStep5';
+import GoalSettingStep6 from './GoalSettingStep6';
 import GoalSetupCompleteScreen from './GoalSetupCompleteScreen';
 import HabitSetupScreen, { HabitData } from './HabitSetupScreen';
 import HomeScreen from './HomeScreen';
@@ -16,7 +17,7 @@ import SignUpScreen, { SignUpData } from './SignUpScreen';
 import SplashScreen from './SplashScreen';
 import WelcomeScreen from './WelcomeScreen';
 
-type Screen = 'splash' | 'welcome' | 'login' | 'signup' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalStep5' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
+type Screen = 'splash' | 'welcome' | 'login' | 'signup' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalStep5' | 'goalStep6' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
 
 // Task interface removed since HomeScreen now manages its own todo interactions
 
@@ -25,6 +26,7 @@ interface AppData {
   duration: string;
   timeWindow: string;
   difficulty: string;
+  timeData: any; // Changed to any to avoid type errors
   coachingIntensity: string;
   habitData: HabitData | null;
 }
@@ -38,6 +40,7 @@ export default function MainApp() {
     duration: '',
     timeWindow: '',
     difficulty: '',
+    timeData: null,
     coachingIntensity: '',
     habitData: null,
   });
@@ -101,9 +104,9 @@ export default function MainApp() {
     setCurrentScreen('goalStep1');
   };
 
-  // Goal Setting Step 3 handlers (Challenges/Difficulty)
-  const handleGoalStep3Next = (difficulty: string) => {
-    setAppData(prev => ({ ...prev, difficulty }));
+  // Goal Setting Step 3 handlers (Time Selection)
+  const handleGoalStep3Next = (timeData: any) => { // Changed to any
+    setAppData(prev => ({ ...prev, timeData }));
     setCurrentScreen('goalStep4');
   };
 
@@ -123,11 +126,20 @@ export default function MainApp() {
 
   // Goal Setting Step 5 handlers (Final Confirmation)
   const handleGoalStep5Complete = () => {
-    setCurrentScreen('goalComplete');
+    setCurrentScreen('goalStep6');
   };
 
   const handleGoalStep5Back = () => {
     setCurrentScreen('goalStep4');
+  };
+
+  // Goal Setting Step 6 handlers
+  const handleGoalStep6Complete = () => {
+    setCurrentScreen('goalComplete');
+  };
+
+  const handleGoalStep6Back = () => {
+    setCurrentScreen('goalStep5');
   };
 
   // Goal Setup Complete handlers - Navigate to main app with tabs
@@ -207,7 +219,7 @@ export default function MainApp() {
           <GoalSettingStep3
             onNext={handleGoalStep3Next}
             onBack={handleGoalStep3Back}
-            initialValue={appData.difficulty}
+            initialValue={appData.timeData}
           />
         );
       
@@ -228,6 +240,14 @@ export default function MainApp() {
           />
         );
       
+      case 'goalStep6':
+        return (
+          <GoalSettingStep6
+            onComplete={handleGoalStep6Complete}
+            onBack={handleGoalStep6Back}
+          />
+        );
+
       case 'goalComplete':
         return (
           <GoalSetupCompleteScreen
@@ -244,7 +264,7 @@ export default function MainApp() {
         );
       
       case 'routineGenerated':
-        return (
+        return appData.habitData ? (
           <RoutineResultScreen
             habitData={appData.habitData || {
               desiredHabit: appData.habitGoal || '매일 아침 10분 책 읽기',
@@ -255,7 +275,7 @@ export default function MainApp() {
             onStartRoutine={handleStartRoutine}
             onEditRoutine={handleEditRoutine}
           />
-        );
+        ) : null;
       
       case 'home':
         return (
@@ -263,7 +283,9 @@ export default function MainApp() {
         );
       
       default:
-        return <WelcomeScreen onGetStarted={handleGetStarted} />;
+        // Ensures exhaustiveness; should not be reached.
+        const exhaustiveCheck: never = currentScreen;
+        return null;
     }
   };
 

@@ -6,13 +6,13 @@ import Constants from 'expo-constants';
 const API_KEY = Constants.expoConfig.extra.geminiApiKey // 여기에 실제 API 키를 넣어주세요
 
 // Gemini API 엔드포인트 (작동하는 모델만 사용)
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent';
 
 // 메시지를 보내는 함수 (React Native 호환)
 // message: AI에게 전송할 메시지 문자열
 export const sendMessage = async (message) => {
   try {
-    console.log('Gemini 1.5 Flash 모델 사용 중...');
+    console.log('Gemini 2.5 Pro 모델 사용 중...');
     
     if (!message) {
       throw new Error('전송할 메시지가 없습니다.');
@@ -31,7 +31,7 @@ export const sendMessage = async (message) => {
         }
       ],
       generationConfig: {
-        maxOutputTokens: 400, // AI가 한 번에 최대 100글자까지 답할 수 있어요
+        maxOutputTokens: 8192, // AI가 한 번에 최대 8192글자까지 답할 수 있어요
         temperature: 0.5, // 창의성 수준 (0.0 ~ 1.0)
       }
     };
@@ -54,11 +54,12 @@ export const sendMessage = async (message) => {
 
     // 응답 데이터 파싱
     const data = await response.json();
-    console.log('Gemini 1.5 Flash 응답 성공!');
+    console.log('Gemini 2.5 Pro 응답 전문:', JSON.stringify(data, null, 2));
+    console.log('Gemini 2.5 Pro 응답 성공!');
     
     // AI 응답 추출
     let aiResponse = '';
-    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text) {
       aiResponse = data.candidates[0].content.parts[0].text;
     } else {
       console.error('응답 형식 오류:', data);
