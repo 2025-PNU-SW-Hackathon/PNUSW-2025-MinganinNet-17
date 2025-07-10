@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 
@@ -37,7 +37,7 @@ export default function GoalSettingStep2({
   const [showTimePickerTo, setShowTimePickerTo] = useState(false);
   const [tempTime, setTempTime] = useState({ hours: 19, minutes: 0 });
 
-  const { setTimeSlot } = useHabitStore();
+  const { setTime, setGoalPeriod } = useHabitStore();
 
   // Generate hours (00-23) and minutes (00, 15, 30, 45)
   const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -121,7 +121,7 @@ export default function GoalSettingStep2({
       const match = selectedDuration.match(/(\d+)개월/);
       if (match) {
         const num = match[1];
-        finalDuration = `${num} Month${parseInt(num) > 1 ? 's' : ''}`;
+        finalDuration = `${num}개월`;
       }
     } else {
       // Convert Korean preset durations to English for backend
@@ -133,14 +133,15 @@ export default function GoalSettingStep2({
       finalDuration = durationMap[selectedDuration] || selectedDuration;
     }
 
-    const timeWindow = `${formatTime(startTime.hours, startTime.minutes)} - ${formatTime(endTime.hours, endTime.minutes)}`;
+    const timeWindow = `${formatTime(startTime.hours, startTime.minutes)}-${formatTime(endTime.hours, endTime.minutes)}`;
     
     console.log('🔄 Starting data submission...', { duration: finalDuration, timeWindow });
     
     try {
       // Save to habit store (using existing structure)
       console.log('🏪 Saving to habit store...');
-      setTimeSlot(timeWindow);
+      setTime(timeWindow);
+      setGoalPeriod(finalDuration);
       console.log('✅ Successfully saved to habit store');
 
       const data = {
