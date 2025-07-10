@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Dimensions,
   Modal,
   SafeAreaView,
@@ -8,14 +7,29 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import CalendarScreen from '../backend/calendar/calendar';
 import { getLatestHabitPlan } from '../backend/supabase/habits';
 import { DailyTodo, Plan } from '../types/habit';
 import AppSettingsScreen from './AppSettingsScreen';
+import CalendarOutlineIcon from './ui/CalendarOutlineIcon';
 
 const { width } = Dimensions.get('window');
+
+// 인터페이스 정의
+interface DayData {
+  date: string;
+  completionRate: number;
+  tasks: string[];
+}
+
+interface TodoItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  date: string;
+}
 
 // Helper function to parse duration strings into days
 const parseDurationToDays = (duration: string): number => {
@@ -32,6 +46,60 @@ const parseDurationToDays = (duration: string): number => {
     return isNaN(days) ? 0 : days;
   }
   return 0;
+};
+
+// Mock data generation functions
+const generateMockData = (): DayData[] => {
+  const data: DayData[] = [];
+  const today = new Date();
+  
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today.getTime());
+    date.setDate(today.getDate() - i);
+    
+    data.push({
+      date: date.toISOString().split('T')[0],
+      completionRate: Math.random() * 100,
+      tasks: ['Task 1', 'Task 2', 'Task 3']
+    });
+  }
+  
+  return data;
+};
+
+const generateTodoData = (): TodoItem[] => {
+  const todos: TodoItem[] = [];
+  const todoTemplates = [
+    '오전 10분 독서',
+    '1챕터 초고 작성하기',
+    '팀 회의',
+    '운동하기',
+    '명상하기',
+    '일기 쓰기',
+    '영어 공부',
+    '정리정돈'
+  ];
+  
+  const today = new Date();
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today.getTime());
+    date.setDate(today.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    
+    const todoCount = Math.floor(Math.random() * 4) + 1; // 1-4개
+    
+    for (let j = 0; j < todoCount; j++) {
+      todos.push({
+        id: `${dateStr}-${j}`,
+        title: todoTemplates[Math.floor(Math.random() * todoTemplates.length)],
+        completed: Math.random() > 0.4,
+        date: dateStr
+      });
+    }
+  }
+  
+  return todos;
 };
 
 interface HomeScreenProps {
@@ -198,6 +266,22 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     setTodoCompletion(prev => ({ ...prev, [todoKey]: !prev[todoKey] }));
   };
 
+  const getTodayTodos = (): TodoItem[] => {
+    const today = new Date().toISOString().split('T')[0];
+    return todoData.filter(todo => todo.date === today);
+  };
+
+  const handleTodoToggleLocal = (todoId: string): void => {
+    setTodoData(prev => 
+      prev.map(todo => 
+        todo.id === todoId 
+          ? { ...todo, completed: !todo.completed }
+          : todo
+      )
+    );
+  };
+
+  // Format date for calendar
   const formatCalendarDate = (date: Date) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return {
@@ -208,71 +292,98 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     };
   };
 
+  // Handle calendar date press
   const handleCalendarDatePress = (dateString: string): void => {
     setSelectedDate(dateString);
+    // Extract day number and call onDayPress if provided
     const day = parseInt(dateString.split('-')[2], 10);
-    if (onDayPress) onDayPress(day);
+    if (onDayPress) {
+      onDayPress(day);
+    }
   };
 
   if (currentScreen === 'settings') {
-    return <AppSettingsScreen onBack={() => setCurrentScreen('home')} />;
+    return (
+      <AppSettingsScreen 
+        onBack={() => setCurrentScreen('home')}
+      />
+    );
   }
 
   const coachStatus = getCoachStatus();
   const calendarDates = getCalendarDates();
-  const todosForSelectedDate = getTodosForSelectedDate();
+  const todayTodos = getTodayTodos();
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header Area */}
         <View style={styles.headerArea}>
+          {/* Profile and Greeting */}
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>🌱</Text>
+              <Text style={styles.logoSubtext}>0</Text>
+              {/* 숫자 바로 오른쪽에 정사각형 버튼 */}
+              <TouchableOpacity style={styles.squareButton} onPress={() => setCalendarVisible(true)}>
+                <CalendarOutlineIcon size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
             <TouchableOpacity 
               style={styles.profileButton}
               onPress={() => setCurrentScreen('settings')}
             >
-              <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
+              <View style={styles.profileIcon}>
+                <Text style={styles.profileIconText}>👤</Text>
+              </View>
             </TouchableOpacity>
           </View>
 
+          {/* Greeting and Goal */}
           <Text style={styles.greetingText}>{getGreeting()}</Text>
+          <Text style={styles.goalText}>
+            {plan?.primary_goal || '목표를 설정해주세요'}
+          </Text>
 
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : plan ? (
-            <Text style={styles.goalText}>{plan.primary_goal}</Text>
-          ) : (
-            <Text style={styles.goalText}>진행 중인 목표가 없습니다.</Text>
-          )}
-
+          {/* Calendar Scroll */}
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
             style={styles.calendarScroll}
             contentContainerStyle={styles.calendarContainer}
           >
-            {calendarDates.map((date) => {
+            {calendarDates.map((date, index) => {
               const dateInfo = formatCalendarDate(date);
-              const isSelected = dateInfo.dateString === selectedDate;
+              const isSelected = selectedDate === dateInfo.dateString;
+              
               return (
                 <TouchableOpacity
-                  key={dateInfo.dateString}
-                  style={[styles.calendarDate, dateInfo.isToday && styles.calendarDateToday, isSelected && styles.calendarDateSelected]}
+                  key={index}
+                  style={[
+                    styles.calendarDate,
+                    dateInfo.isToday && styles.calendarDateToday,
+                    isSelected && styles.calendarDateSelected
+                  ]}
                   onPress={() => handleCalendarDatePress(dateInfo.dateString)}
                 >
-                  <Text style={[styles.calendarDayName, (dateInfo.isToday || isSelected) && styles.calendarTextActive]}>{dateInfo.dayName}</Text>
-
-                  <Text style={[styles.calendarDayNumber, (dateInfo.isToday || isSelected) && styles.calendarTextActive]}>{dateInfo.dayNumber}</Text>
+                  <Text style={styles.calendarDayName}>
+                    {dateInfo.dayName}
+                  </Text>
+                  <Text style={[
+                    styles.calendarDayNumber,
+                    (dateInfo.isToday || isSelected) && styles.calendarTextActive
+                  ]}>
+                    {dateInfo.dayNumber}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
 
+        {/* Main Content Area - Two Column Layout */}
         <View style={styles.mainContent}>
+          {/* Left Card - Coach's Status */}
           <View style={styles.coachCard}>
             <Text style={styles.cardTitle}>Coach's Status</Text>
             <View style={styles.coachContent}>
@@ -282,41 +393,39 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
             </View>
           </View>
 
+          {/* Right Card - Today's To-Do List */}
           <View style={styles.todoCard}>
             <Text style={styles.cardTitle}>Today's To-Do</Text>
-            <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : error ? (
-                <Text style={styles.emptyTodoText}>{error}</Text>
-              ) : todosForSelectedDate.length > 0 ? (
-                todosForSelectedDate.map((todo, index) => {
-                  const milestone = plan?.milestones.find(m => m.daily_todos.includes(todo));
-                  
-                  if (!milestone) {
-                    console.warn("Could not find a milestone for todo:", todo);
-                    return null;
-                  }
-
-                  const todoKey = `${milestone.title}-${index}`;
-                  const isCompleted = todoCompletion[todoKey];
-
-                  return (
-                    <TouchableOpacity
-                      key={todoKey}
-                      style={styles.todoItem}
-                      onPress={() => handleTodoToggle(index, milestone.title)}
+            <ScrollView 
+              style={styles.todoScrollView}
+              showsVerticalScrollIndicator={false}
+            >
+              {todayTodos.length > 0 ? (
+                todayTodos.map((todo) => (
+                  <TouchableOpacity
+                    key={todo.id}
+                    style={styles.todoItem}
+                    onPress={() => handleTodoToggleLocal(todo.id)}
+                  >
+                    <View style={[
+                      styles.todoCheckbox,
+                      todo.completed && styles.todoCheckedBox
+                    ]} />
+                    <Text 
+                      style={[
+                        styles.todoText,
+                        todo.completed && styles.todoTextCompleted
+                      ]}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
                     >
-                      <View style={[styles.todoCheckbox, isCompleted && styles.todoCheckedBox]} />
-                      <Text style={[styles.todoText, isCompleted && styles.todoTextCompleted]} numberOfLines={2} ellipsizeMode="tail">
-                        {todo.description}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
+                      {todo.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))
               ) : (
                 <View style={styles.emptyTodoContainer}>
-                  <Text style={styles.emptyTodoText}>오늘의 할 일이 없습니다.</Text>
+                  <Text style={styles.emptyTodoText}>오늘은 할 일이 없습니다</Text>
                 </View>
               )}
             </ScrollView>
@@ -346,9 +455,11 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
             maxHeight: '90%',
           }}>
             <CalendarScreen />
-            {/* 닫기 버튼 */}
-            <TouchableOpacity onPress={() => setCalendarVisible(false)} style={{marginTop: 16, alignSelf: 'center'}}>
-              <Text style={{color: '#6c63ff', fontWeight: 'bold', fontSize: 16}}>닫기</Text>
+            <TouchableOpacity 
+              style={{ marginTop: 16, alignSelf: 'center' }} 
+              onPress={() => setCalendarVisible(false)}
+            >
+              <Text style={{ color: '#fff', fontSize: 16 }}>닫기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -385,6 +496,11 @@ const styles = StyleSheet.create({
     fontSize: 36,
     color: '#6c63ff',
     fontWeight: 'bold',
+  },
+  logoSubtext: {
+    fontSize: 18,
+    color: '#a9a9c2',
+    marginLeft: 8,
   },
   profileButton: {
     padding: 8,
