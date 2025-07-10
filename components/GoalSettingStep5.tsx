@@ -4,6 +4,7 @@ import { submitHabitData } from '../backend/hwirang/habit';
 import { scheduleAllHabitRoutines } from '../backend/hwirang/routineNotifications';
 import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
+import DebugNextButton from './DebugNextButton';
 
 interface GoalSettingStep5Props {
   onComplete: () => void;
@@ -88,6 +89,13 @@ export default function GoalSettingStep5({
     }
   };
 
+  // Debug navigation handler - bypasses all backend calls
+  const handleDebugComplete = () => {
+    // Only call completion callback - no backend calls
+    console.log('🐛 DEBUG: Bypassing AI routine generation, DB save, and notifications');
+    onComplete();
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.stepIndicator}>5 / 5 단계</Text>
@@ -122,6 +130,14 @@ export default function GoalSettingStep5({
           {isSubmitting ? '생성 중...' : 'AI 루틴 생성하기'}
         </Text>
       </TouchableOpacity>
+      
+      {/* Floating Debug Button - does not interfere with layout */}
+      <DebugNextButton
+        to="Home Screen"
+        onPress={handleDebugComplete}
+        label="Debug: Skip AI Generation"
+        disabled={isSubmitting}
+      />
     </View>
   );
 }

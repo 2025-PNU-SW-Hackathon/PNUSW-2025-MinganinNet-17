@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
-  Alert,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 
@@ -96,7 +96,10 @@ export default function GoalSettingStep3({
         </Text>
       </View>
 
-      <View style={styles.optionsContainer}>
+      <View style={[
+        styles.optionsContainer,
+        showCustomInput && styles.optionsContainerWithInput
+      ]}>
         {difficultyOptions.map((option) => (
           <TouchableOpacity
             key={option.key}
@@ -176,6 +179,9 @@ const styles = StyleSheet.create({
   optionsContainer: {
     marginBottom: 40,
   },
+  optionsContainerWithInput: {
+    marginBottom: 20, // Reduced when custom input is shown
+  },
   optionButton: {
     backgroundColor: '#3a3a50',
     borderRadius: 16,
@@ -200,7 +206,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   customInputContainer: {
-    marginBottom: 40,
+    marginBottom: 120, // Increased to provide more space from next button
   },
   customInput: {
     backgroundColor: '#3a3a50',

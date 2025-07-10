@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { signIn } from '../backend/supabase/auth';
+import DebugNextButton from './DebugNextButton';
 
 const { width } = Dimensions.get('window');
 
@@ -84,6 +85,14 @@ export default function LoginScreen({
     }
   };
 
+  // Debug navigation handler - bypasses backend signin call
+  const handleDebugLogin = () => {
+    // Only call success callback - no backend calls
+    if (onLoginSuccess) {
+      onLoginSuccess();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>다시 오신 것을 환영해요!</Text>
@@ -133,6 +142,14 @@ export default function LoginScreen({
           계정이 없으신가요? 회원가입
         </Text>
       </TouchableOpacity>
+      
+      {/* Floating Debug Button - does not interfere with layout */}
+      <DebugNextButton
+        to="Goal Setting"
+        onPress={handleDebugLogin}
+        label="Debug: Skip Login"
+        disabled={isLoading}
+      />
     </View>
   );
 }

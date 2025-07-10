@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 import { HabitData } from '../types/habit';
+import DebugNextButton from './DebugNextButton';
 
 const { width } = Dimensions.get('window');
 
@@ -93,6 +94,17 @@ export default function GoalSettingStep1({
     }
   };
 
+  // Debug navigation handler - bypasses backend calls
+  const handleDebugNext = () => {
+    if (habitText.trim()) {
+      // Only call local store and navigation - no backend calls
+      setHabit(habitText);
+      if (onNext) {
+        onNext(habitText);
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.stepIndicator}>1 / 5 단계</Text>
@@ -138,23 +150,13 @@ export default function GoalSettingStep1({
         </Text>
       </TouchableOpacity>
       
-      {/* 임시 테스트 버튼 - 디버깅용 */}
-      <TouchableOpacity
-        style={[
-          styles.testButton,
-          (!habitText.trim() || isSubmitting) && styles.testButtonDisabled
-        ]}
-        onPress={() => {
-          console.log('🧪 TEST BUTTON: Bypassing database, calling onNext directly');
-          if (habitText.trim() && onNext) {
-            setHabit(habitText);
-            onNext(habitText);
-          }
-        }}
+      {/* Floating Debug Button - does not interfere with layout */}
+      <DebugNextButton
+        to="Goal Step 2"
+        onPress={handleDebugNext}
+        label="Debug: Skip DB Save"
         disabled={!habitText.trim() || isSubmitting}
-      >
-        <Text style={styles.testButtonText}>테스트: 다음으로 (DB 건너뛰기)</Text>
-      </TouchableOpacity>
+      />
     </View>
   );
 }
@@ -234,27 +236,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#a9a9c2',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  testButton: {
-    backgroundColor: '#ff6b6b',
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginHorizontal: 24,
-    marginTop: 16,
-    position: 'absolute',
-    bottom: 120,
-    left: 0,
-    right: 0,
-  },
-  testButtonDisabled: {
-    opacity: 0.5,
-  },
-  testButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

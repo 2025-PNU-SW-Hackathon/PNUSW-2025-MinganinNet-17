@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import DailySchedulePopup from './DailySchedulePopup';
 import GoalSettingStep1 from './GoalSettingStep1';
 import GoalSettingStep2 from './GoalSettingStep2';
 import GoalSettingStep3, { GoalSettingStep3Data } from './GoalSettingStep3';
@@ -19,12 +18,7 @@ import WelcomeScreen from './WelcomeScreen';
 
 type Screen = 'splash' | 'welcome' | 'login' | 'signup' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalStep5' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
 
-interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-  type: 'normal' | 'special';
-}
+// Task interface removed since HomeScreen now manages its own todo interactions
 
 interface AppData {
   habitGoal: string;
@@ -36,9 +30,7 @@ interface AppData {
 
 export default function MainApp() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
-  const [showDailyPopup, setShowDailyPopup] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [tasks, setTasks] = useState<Task[]>([]);
+  // Note: DailySchedulePopup functionality removed since HomeScreen now manages its own interactions
   
   const [appData, setAppData] = useState<AppData>({
     habitGoal: '',
@@ -162,23 +154,9 @@ export default function MainApp() {
   };
 
   // Home Screen handlers - Only used if somehow we're still in onboarding
-  const handleDayPress = (day: number) => {
-    setSelectedDate(`7월 ${day}일 (화)`);
-    setShowDailyPopup(true);
-  };
+  // Note: handleDayPress removed since HomeScreen now manages its own date selection
 
-  // Daily Schedule Popup handlers
-  const handleClosePopup = () => {
-    setShowDailyPopup(false);
-  };
-
-  const handleTaskToggle = (taskId: string) => {
-    setTasks(prev => 
-      prev.map(task => 
-        task.id === taskId ? { ...task, completed: !task.completed } : task
-      )
-    );
-  };
+  // Daily Schedule Popup handlers - Removed since HomeScreen now manages its own interactions
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -234,7 +212,7 @@ export default function MainApp() {
       case 'goalStep4':
         return (
           <GoalSettingStep4
-            onContinue={handleGoalStep4Next}
+            onNext={handleGoalStep4Next}
             onBack={handleGoalStep4Back}
           />
         );
@@ -284,9 +262,7 @@ export default function MainApp() {
       
       case 'home':
         return (
-          <HomeScreen
-            onDayPress={handleDayPress}
-          />
+          <HomeScreen />
         );
       
       default:
@@ -305,16 +281,7 @@ export default function MainApp() {
         {renderScreen()}
       </ScreenTransitionManager>
       
-      {/* Daily Schedule Popup */}
-      {showDailyPopup && (
-        <DailySchedulePopup
-          visible={showDailyPopup}
-          date={selectedDate}
-          tasks={tasks}
-          onClose={handleClosePopup}
-          onTaskToggle={handleTaskToggle}
-        />
-      )}
+      {/* Daily Schedule Popup - Removed since HomeScreen now manages its own interactions */}
     </View>
   );
 }
