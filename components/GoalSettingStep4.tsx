@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-    Alert,
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
@@ -22,19 +15,30 @@ export default function GoalSettingStep4({
   onBack,
   initialValue = ''
 }: GoalSettingStep4Props) {
-  const [selectedIntensity, setSelectedIntensity] = useState(initialValue || '보통');
+  const [selectedIntensity, setSelectedIntensity] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { habit, time, setIntensity } = useHabitStore();
 
   const intensityOptions = [
-    { id: '낮음', label: '낮음' },
-    { id: '보통', label: '보통' },
-    { id: '높음', label: '높음' }
+    { id: '높음', label: '높음 - 강하게 동기부여하고 꾸준히 체크해주세요' },
+    { id: '보통', label: '보통 - 적절한 수준으로 관리해주세요' },
+    { id: '낮음', label: '낮음 - 부담없이 가볍게 도와주세요' },
   ];
 
-  const handleIntensitySelect = async (intensity: string) => {
+  // Handle intensity selection (just selection, not navigation)
+  const handleIntensitySelect = (intensity: string) => {
+    console.log('🔄 Intensity selected:', intensity);
     setSelectedIntensity(intensity);
-    console.log('🔄 Starting GoalSettingStep4 submission...', { intensity });
+  };
+
+  // Handle Next button (with backend save)
+  const handleNext = async () => {
+    if (!selectedIntensity) {
+      Alert.alert('선택 필요', '코칭 강도를 선택해주세요.');
+      return;
+    }
+
+    console.log('🔄 Starting GoalSettingStep4 submission...', { selectedIntensity });
     setIsSubmitting(true);
 
     try {
@@ -42,7 +46,7 @@ export default function GoalSettingStep4({
       const habitData: HabitData = {
         habit_name: habit,
         time_slot: time,
-        intensity: intensity,
+        intensity: selectedIntensity,
         difficulty: '',  // 아직 설정되지 않음
         ai_routine: ''   // 아직 생성되지 않음
       };
@@ -66,20 +70,20 @@ export default function GoalSettingStep4({
       
       // Zustand store에 저장 (항상 실행)
       console.log('🏪 Saving to local store...');
-      setIntensity(intensity);
+      setIntensity(selectedIntensity);
       console.log('✅ Successfully saved to local store');
 
       // 다음 단계로
       console.log('🚀 Calling onNext handler...');
       if (onNext) {
-        onNext(intensity);
+        onNext(selectedIntensity);
         console.log('✅ onNext called successfully');
       } else {
         console.warn('⚠️ onNext is undefined!');
       }
       
     } catch (error) {
-      console.error('💥 Unexpected error in handleIntensitySelect:', error);
+      console.error('💥 Unexpected error in handleNext:', error);
       Alert.alert('오류', `예상치 못한 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     } finally {
       setIsSubmitting(false);
@@ -89,12 +93,24 @@ export default function GoalSettingStep4({
 
   // Debug navigation handler - bypasses backend calls
   const handleDebugNext = () => {
-    if (selectedIntensity) {
-      // Only call local store and navigation - no backend calls
-      setIntensity(selectedIntensity);
-      if (onNext) {
-        onNext(selectedIntensity);
-      }
+    console.log('🐛 DEBUG: Skip DB button clicked');
+    console.log('🐛 DEBUG: selectedIntensity:', selectedIntensity);
+    console.log('🐛 DEBUG: onNext function exists:', !!onNext);
+    
+    // For debug mode, auto-select default intensity if none selected
+    const intensityToUse = selectedIntensity || '보통';
+    
+    console.log('🐛 DEBUG: Using intensity:', intensityToUse);
+    
+    // Only call local store and navigation - no backend calls
+    setIntensity(intensityToUse);
+    
+    if (onNext) {
+      console.log('🐛 DEBUG: Calling onNext with:', intensityToUse);
+      onNext(intensityToUse);
+      console.log('🐛 DEBUG: onNext called successfully');
+    } else {
+      console.error('🐛 DEBUG: onNext is undefined!');
     }
   };
 
@@ -127,7 +143,6 @@ export default function GoalSettingStep4({
             style={[
               styles.optionButton,
               selectedIntensity === option.id && styles.optionButtonSelected,
-              isSubmitting && styles.optionButtonDisabled
             ]}
             onPress={() => handleIntensitySelect(option.id)}
             disabled={isSubmitting}
@@ -138,19 +153,32 @@ export default function GoalSettingStep4({
                 selectedIntensity === option.id && styles.optionButtonTextSelected,
               ]}
             >
-              {isSubmitting && selectedIntensity === option.id ? '저장 중...' : option.label}
+              {option.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Standard Next Button - now properly visible */}
+      <TouchableOpacity
+        style={[
+          styles.nextButton,
+          (!selectedIntensity || isSubmitting) && styles.nextButtonDisabled
+        ]}
+        onPress={handleNext}
+        disabled={!selectedIntensity || isSubmitting}
+      >
+        <Text style={styles.nextButtonText}>
+          {isSubmitting ? '저장 중...' : '다음'}
+        </Text>
+      </TouchableOpacity>
       
-      {/* Debug Navigation Button */}
+      {/* Floating Debug Button - does not interfere with layout */}
       <DebugNextButton
         to="Goal Step 5"
         onPress={handleDebugNext}
-        label="Debug: Skip DB Save (DB 건너뛰기)"
-        disabled={isSubmitting}
-        style={styles.debugButton}
+        label="Debug: Skip DB Save"
+        disabled={isSubmitting} // Removed dependency on selectedIntensity
       />
     </View>
   );
@@ -190,7 +218,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   optionsContainer: {
-    marginBottom: 40,
+    marginBottom: 160, // Increased to make room for next button
   },
   optionButton: {
     backgroundColor: '#3a3a50',
@@ -205,9 +233,6 @@ const styles = StyleSheet.create({
     borderColor: '#6c63ff',
     backgroundColor: '#3a3a50',
   },
-  optionButtonDisabled: {
-    opacity: 0.7,
-  },
   optionButtonText: {
     fontSize: 16,
     color: '#ffffff',
@@ -217,6 +242,28 @@ const styles = StyleSheet.create({
   optionButtonTextSelected: {
     color: '#ffffff',
     fontWeight: '600',
+  },
+  nextButton: {
+    backgroundColor: '#6c63ff',
+    borderRadius: 28,
+    paddingVertical: 19,
+    alignItems: 'center',
+    height: 56,
+    justifyContent: 'center',
+    position: 'absolute',
+    bottom: 40,
+    left: 24,
+    right: 24,
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#4a47cc',
+    opacity: 0.5,
+  },
+  nextButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   backButton: {
     position: 'absolute',
@@ -232,11 +279,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#a9a9c2',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  debugButton: {
-    position: 'absolute',
-    bottom: 40,
-    left: 24,
-    right: 24,
   },
 }); 

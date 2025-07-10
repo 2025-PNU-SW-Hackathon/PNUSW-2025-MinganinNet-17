@@ -212,7 +212,7 @@ export default function MainApp() {
       case 'goalStep4':
         return (
           <GoalSettingStep4
-            onContinue={handleGoalStep4Next}
+            onNext={handleGoalStep4Next}
             onBack={handleGoalStep4Back}
           />
         );

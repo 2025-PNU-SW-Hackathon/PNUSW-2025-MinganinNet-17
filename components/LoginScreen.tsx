@@ -143,13 +143,12 @@ export default function LoginScreen({
         </Text>
       </TouchableOpacity>
       
-      {/* Debug Navigation Button */}
+      {/* Floating Debug Button - does not interfere with layout */}
       <DebugNextButton
         to="Goal Setting"
         onPress={handleDebugLogin}
-        label="Debug: Skip Login (Auth 건너뛰기)"
+        label="Debug: Skip Login"
         disabled={isLoading}
-        style={styles.debugButton}
       />
     </View>
   );
@@ -228,11 +227,5 @@ const styles = StyleSheet.create({
   },
   textDisabled: {
     opacity: 0.7,
-  },
-  debugButton: {
-    position: 'absolute',
-    bottom: 60,
-    left: 24,
-    right: 24,
   },
 }); 

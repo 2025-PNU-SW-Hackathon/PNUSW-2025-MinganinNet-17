@@ -92,7 +92,7 @@ export default function SignUpScreen({
       
       case 'step1':
         return (
-          <View style={styles.stepContainer}>
+          <>
             <SignUpStep1
               onNext={handleStep1Next}
               onBack={handleStep1Back}
@@ -101,15 +101,14 @@ export default function SignUpScreen({
               isLoading={isLoading}
             />
             
-            {/* Debug Navigation Button */}
+            {/* Floating Debug Button - does not interfere with layout */}
             <DebugNextButton
               to="Goal Setting"
               onPress={handleDebugSkipSignup}
-              label="Debug: Skip Signup (Backend 건너뛰기)"
+              label="Debug: Skip Signup"
               disabled={!signUpData.email || !signUpData.password || isLoading}
-              style={styles.debugButton}
             />
-          </View>
+          </>
         );
       
       default:
@@ -133,14 +132,5 @@ export default function SignUpScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  stepContainer: {
-    flex: 1,
-  },
-  debugButton: {
-    position: 'absolute',
-    bottom: 120,
-    left: 24,
-    right: 24,
   },
 }); 

@@ -131,13 +131,12 @@ export default function GoalSettingStep5({
         </Text>
       </TouchableOpacity>
       
-      {/* Debug Navigation Button */}
+      {/* Floating Debug Button - does not interfere with layout */}
       <DebugNextButton
         to="Home Screen"
         onPress={handleDebugComplete}
-        label="Debug: Skip AI Generation (전체 건너뛰기)"
+        label="Debug: Skip AI Generation"
         disabled={isSubmitting}
-        style={styles.debugButton}
       />
     </View>
   );
@@ -213,11 +212,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#a9a9c2',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  debugButton: {
-    position: 'absolute',
-    bottom: 120,
-    left: 24,
-    right: 24,
   },
 }); 

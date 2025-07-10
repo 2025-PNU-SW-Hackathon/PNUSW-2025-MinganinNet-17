@@ -150,13 +150,12 @@ export default function GoalSettingStep1({
         </Text>
       </TouchableOpacity>
       
-      {/* Debug Navigation Button */}
+      {/* Floating Debug Button - does not interfere with layout */}
       <DebugNextButton
         to="Goal Step 2"
         onPress={handleDebugNext}
-        label="Debug: Skip DB Save (DB 건너뛰기)"
+        label="Debug: Skip DB Save"
         disabled={!habitText.trim() || isSubmitting}
-        style={styles.debugButton}
       />
     </View>
   );
@@ -238,11 +237,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#a9a9c2',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  debugButton: {
-    position: 'absolute',
-    bottom: 120,
-    left: 24,
-    right: 24,
   },
 }); 

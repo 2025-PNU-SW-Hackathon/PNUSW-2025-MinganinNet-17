@@ -1,28 +1,14 @@
-import { StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
-import { DEBUG_FEATURES, debugNavigation } from '../src/config/debug';
+import { Platform, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
+import { IS_DEBUG_MODE_ENABLED } from '../src/config/debug';
 
 interface DebugNextButtonProps {
-  /** The name of the screen or step we're navigating to (for logging) */
   to: string;
-  /** The navigation callback to execute - must be strictly independent of business logic */
   onPress: () => void;
-  /** Optional label override - defaults to "Debug: Skip to {to}" */
-  label?: string;
-  /** Whether the button should be disabled */
+  label: string;
   disabled?: boolean;
-  /** Optional custom styling */
   style?: ViewStyle;
 }
 
-/**
- * DebugNextButton - Standardized debug navigation component
- * 
- * This component provides a consistent way to bypass backend dependencies
- * during development. It is automatically hidden in production builds.
- * 
- * IMPORTANT: The onPress callback must ONLY contain navigation logic.
- * It must NOT trigger any data submission, state updates, or API calls.
- */
 export default function DebugNextButton({
   to,
   onPress,
@@ -30,52 +16,79 @@ export default function DebugNextButton({
   disabled = false,
   style,
 }: DebugNextButtonProps) {
-  // Don't render anything if debug mode is disabled
-  if (!DEBUG_FEATURES.ENABLE_DEBUG_NAVIGATION) {
+  // Only show in debug mode
+  if (!IS_DEBUG_MODE_ENABLED) {
     return null;
   }
 
   const handlePress = () => {
-    debugNavigation(to);
-    onPress();
+    // Enhanced event handling for web compatibility
+    try {
+      console.log('🐛 DEBUG: Navigating to', to);
+      onPress();
+    } catch (error) {
+      console.error('🐛 DEBUG: Navigation error:', error);
+    }
   };
-
-  const displayLabel = label || `Debug: Skip to ${to}`;
 
   return (
     <TouchableOpacity
       style={[
-        styles.debugButton,
-        disabled && styles.debugButtonDisabled,
-        style,
+        styles.floatingButton,
+        Platform.OS === 'web' && styles.floatingButtonWeb,
+        disabled && styles.disabled,
+        style
       ]}
       onPress={handlePress}
       disabled={disabled}
+      activeOpacity={0.7}
     >
-      <Text style={styles.debugButtonText}>{displayLabel}</Text>
+      <Text style={[styles.buttonText, disabled && styles.disabledText]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  debugButton: {
+  floatingButton: {
+    position: 'absolute',
+    bottom: 120,
+    right: 16,
     backgroundColor: '#ff6b6b',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    marginVertical: 8,
-    borderWidth: 2,
-    borderColor: '#ff5252',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: 200,
+    zIndex: 9999,
+    // Enhanced shadow for better visibility
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  debugButtonDisabled: {
-    opacity: 0.5,
-    backgroundColor: '#ffcdd2',
+  floatingButtonWeb: {
+    // Web-specific styles
+    position: 'fixed' as any,
+    cursor: 'pointer',
+    userSelect: 'none' as any,
+    // Enhanced web shadow
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+    // Ensure proper layering on web
+    zIndex: 10000,
   },
-  debugButtonText: {
+  buttonText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '600',
     textAlign: 'center',
+    lineHeight: 12,
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: '#cccccc',
   },
 }); 
