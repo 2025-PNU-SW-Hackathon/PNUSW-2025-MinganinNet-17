@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Modal,
   SafeAreaView,
@@ -7,7 +8,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import CalendarScreen from '../backend/calendar/calendar';
 import { getLatestHabitPlan } from '../backend/supabase/habits';
@@ -16,20 +17,6 @@ import AppSettingsScreen from './AppSettingsScreen';
 import CalendarOutlineIcon from './ui/CalendarOutlineIcon';
 
 const { width } = Dimensions.get('window');
-
-// 인터페이스 정의
-interface DayData {
-  date: string;
-  completionRate: number;
-  tasks: string[];
-}
-
-interface TodoItem {
-  id: string;
-  title: string;
-  completed: boolean;
-  date: string;
-}
 
 // Helper function to parse duration strings into days
 const parseDurationToDays = (duration: string): number => {
@@ -48,60 +35,6 @@ const parseDurationToDays = (duration: string): number => {
   return 0;
 };
 
-// Mock data generation functions
-const generateMockData = (): DayData[] => {
-  const data: DayData[] = [];
-  const today = new Date();
-  
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today.getTime());
-    date.setDate(today.getDate() - i);
-    
-    data.push({
-      date: date.toISOString().split('T')[0],
-      completionRate: Math.random() * 100,
-      tasks: ['Task 1', 'Task 2', 'Task 3']
-    });
-  }
-  
-  return data;
-};
-
-const generateTodoData = (): TodoItem[] => {
-  const todos: TodoItem[] = [];
-  const todoTemplates = [
-    '오전 10분 독서',
-    '1챕터 초고 작성하기',
-    '팀 회의',
-    '운동하기',
-    '명상하기',
-    '일기 쓰기',
-    '영어 공부',
-    '정리정돈'
-  ];
-  
-  const today = new Date();
-  
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today.getTime());
-    date.setDate(today.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    const todoCount = Math.floor(Math.random() * 4) + 1; // 1-4개
-    
-    for (let j = 0; j < todoCount; j++) {
-      todos.push({
-        id: `${dateStr}-${j}`,
-        title: todoTemplates[Math.floor(Math.random() * todoTemplates.length)],
-        completed: Math.random() > 0.4,
-        date: dateStr
-      });
-    }
-  }
-  
-  return todos;
-};
-
 interface HomeScreenProps {
   onDayPress?: (day: number) => void;
 }
@@ -116,25 +49,12 @@ interface CoachStatus {
 export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [habitData] = useState<DayData[]>(generateMockData());
-  const [todoData, setTodoData] = useState<TodoItem[]>(generateTodoData());
-  const [calendarVisible, setCalendarVisible] = useState(false);
-
-  // Calculate average achievement rate for coach status
-  const calculateAverageAchievementRate = (): number => {
-    const recentData = habitData.slice(-7); // Last 7 days
-    if (recentData.length === 0) return 0;
-    
-    const totalRate = recentData.reduce((sum: number, day: DayData) => sum + day.completionRate, 0);
-    return totalRate / recentData.length;
-  };
-
-  // Get coach status based on achievement rate
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
   const [effectiveStartDate, setEffectiveStartDate] = useState<string | null>(null);
+  const [calendarVisible, setCalendarVisible] = useState(false);
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -144,16 +64,14 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
         setPlan(fetchedPlan);
 
         if (fetchedPlan) {
-          // Determine the effective start date
           const now = new Date();
           const planCreationDate = new Date(fetchedPlan.start_date);
           let effectiveDate = new Date(planCreationDate);
           
-          // Only adjust start date if the plan is created today
           if (planCreationDate.toDateString() === now.toDateString()) {
             const timeSlotMatch = fetchedPlan.primary_goal.match(/\(가능 시간: (.*?)\)/);
             if (timeSlotMatch && timeSlotMatch[1]) {
-              const startTimeStr = timeSlotMatch[1].split('-')[0]; // "20:00"
+              const startTimeStr = timeSlotMatch[1].split('-')[0];
               const [hours, minutes] = startTimeStr.split(':').map(Number);
               
               const slotStartTime = new Date(planCreationDate);
@@ -166,13 +84,11 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
           }
           setEffectiveStartDate(effectiveDate.toISOString().split('T')[0]);
 
-          // Initialize todo completion state
           const initialCompletion: { [key: string]: boolean } = {};
           fetchedPlan.milestones.forEach(m => {
             m.daily_todos.forEach((_todo, index) => {
-              // Create a unique key for each todo
               const todoKey = `${m.title}-${index}`;
-              initialCompletion[todoKey] = false; // Default to not completed
+              initialCompletion[todoKey] = false;
             });
           });
           setTodoCompletion(initialCompletion);
@@ -190,31 +106,21 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
 
   const getCoachStatus = (): CoachStatus => {
     const todos = getTodosForSelectedDate();
-
     if (!plan || todos.length === 0) {
       return { emoji: '😊', message: '오늘도 화이팅!', color: '#4CAF50' };
     }
-
     const completedCount = todos.filter((todo, index) => {
       const milestone = plan.milestones.find(m => m.daily_todos.includes(todo));
       if (!milestone) return false;
       const todoKey = `${milestone.title}-${index}`;
       return todoCompletion[todoKey];
     }).length;
-
     const avgRate = completedCount / todos.length;
-    
-    if (avgRate >= 1) {
-      return { emoji: '🥳', message: '완벽한 하루!', color: '#4CAF50' };
-    } else if (avgRate >= 0.7) {
-      return { emoji: '😊', message: '정말 잘하고 있어요!', color: '#8BC34A' };
-    } else if (avgRate >= 0.5) {
-      return { emoji: '😌', message: '꾸준히 실천 중이네요', color: '#FFC107' };
-    } else if (avgRate > 0) {
-        return { emoji: '😐', message: '조금만 더 힘내요!', color: '#FF9800' };
-    } else {
-      return { emoji: '🤔', message: '시작이 반이에요!', color: '#9E9E9E' };
-    }
+    if (avgRate >= 1) return { emoji: '🥳', message: '완벽한 하루!', color: '#4CAF50' };
+    if (avgRate >= 0.7) return { emoji: '😊', message: '정말 잘하고 있어요!', color: '#8BC34A' };
+    if (avgRate >= 0.5) return { emoji: '😌', message: '꾸준히 실천 중이네요', color: '#FFC107' };
+    if (avgRate > 0) return { emoji: '😐', message: '조금만 더 힘내요!', color: '#FF9800' };
+    return { emoji: '🤔', message: '시작이 반이에요!', color: '#9E9E9E' };
   };
 
   const getGreeting = (): string => {
@@ -227,9 +133,8 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const getCalendarDates = (): Date[] => {
     const dates: Date[] = [];
     const today = new Date();
-    
     for (let i = -3; i <= 3; i++) {
-      const date = new Date(today.getTime());
+      const date = new Date(today);
       date.setDate(today.getDate() + i);
       dates.push(date);
     }
@@ -238,17 +143,10 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
 
   const getTodosForSelectedDate = (): DailyTodo[] => {
     if (!plan || !effectiveStartDate) return [];
-  
     const selected = new Date(selectedDate);
     const startDate = new Date(effectiveStartDate);
-
-    if (selected < startDate) {
-      return [];
-    }
-  
-    const diffTime = selected.getTime() - startDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
+    if (selected < startDate) return [];
+    const diffDays = Math.floor((selected.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     let dayCounter = 0;
     for (const milestone of plan.milestones) {
       const durationInDays = parseDurationToDays(milestone.duration);
@@ -257,7 +155,6 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
       }
       dayCounter += durationInDays;
     }
-  
     return [];
   };
 
@@ -265,23 +162,7 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     const todoKey = `${milestoneTitle}-${todoIndex}`;
     setTodoCompletion(prev => ({ ...prev, [todoKey]: !prev[todoKey] }));
   };
-
-  const getTodayTodos = (): TodoItem[] => {
-    const today = new Date().toISOString().split('T')[0];
-    return todoData.filter(todo => todo.date === today);
-  };
-
-  const handleTodoToggleLocal = (todoId: string): void => {
-    setTodoData(prev => 
-      prev.map(todo => 
-        todo.id === todoId 
-          ? { ...todo, completed: !todo.completed }
-          : todo
-      )
-    );
-  };
-
-  // Format date for calendar
+  
   const formatCalendarDate = (date: Date) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return {
@@ -292,39 +173,29 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     };
   };
 
-  // Handle calendar date press
   const handleCalendarDatePress = (dateString: string): void => {
     setSelectedDate(dateString);
-    // Extract day number and call onDayPress if provided
-    const day = parseInt(dateString.split('-')[2], 10);
     if (onDayPress) {
+      const day = parseInt(dateString.split('-')[2], 10);
       onDayPress(day);
     }
   };
 
   if (currentScreen === 'settings') {
-    return (
-      <AppSettingsScreen 
-        onBack={() => setCurrentScreen('home')}
-      />
-    );
+    return <AppSettingsScreen onBack={() => setCurrentScreen('home')} />;
   }
 
   const coachStatus = getCoachStatus();
   const calendarDates = getCalendarDates();
-  const todayTodos = getTodayTodos();
+  const todosForSelectedDate = getTodosForSelectedDate();
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header Area */}
         <View style={styles.headerArea}>
-          {/* Profile and Greeting */}
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>🌱</Text>
-              <Text style={styles.logoSubtext}>0</Text>
-              {/* 숫자 바로 오른쪽에 정사각형 버튼 */}
               <TouchableOpacity style={styles.squareButton} onPress={() => setCalendarVisible(true)}>
                 <CalendarOutlineIcon size={20} color="#fff" />
               </TouchableOpacity>
@@ -333,19 +204,19 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
               style={styles.profileButton}
               onPress={() => setCurrentScreen('settings')}
             >
-              <View style={styles.profileIcon}>
-                <Text style={styles.profileIconText}>👤</Text>
-              </View>
+              <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
             </TouchableOpacity>
           </View>
 
-          {/* Greeting and Goal */}
           <Text style={styles.greetingText}>{getGreeting()}</Text>
-          <Text style={styles.goalText}>
-            {plan?.primary_goal || '목표를 설정해주세요'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" style={{alignSelf: 'flex-start', marginBottom: 20}} />
+          ) : (
+            <Text style={styles.goalText}>
+              {plan?.primary_goal || '진행 중인 목표가 없습니다.'}
+            </Text>
+          )}
 
-          {/* Calendar Scroll */}
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
@@ -355,35 +226,21 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
             {calendarDates.map((date, index) => {
               const dateInfo = formatCalendarDate(date);
               const isSelected = selectedDate === dateInfo.dateString;
-              
               return (
                 <TouchableOpacity
                   key={index}
-                  style={[
-                    styles.calendarDate,
-                    dateInfo.isToday && styles.calendarDateToday,
-                    isSelected && styles.calendarDateSelected
-                  ]}
+                  style={[styles.calendarDate, dateInfo.isToday && styles.calendarDateToday, isSelected && styles.calendarDateSelected]}
                   onPress={() => handleCalendarDatePress(dateInfo.dateString)}
                 >
-                  <Text style={styles.calendarDayName}>
-                    {dateInfo.dayName}
-                  </Text>
-                  <Text style={[
-                    styles.calendarDayNumber,
-                    (dateInfo.isToday || isSelected) && styles.calendarTextActive
-                  ]}>
-                    {dateInfo.dayNumber}
-                  </Text>
+                  <Text style={styles.calendarDayName}>{dateInfo.dayName}</Text>
+                  <Text style={[styles.calendarDayNumber, (dateInfo.isToday || isSelected) && styles.calendarTextActive]}>{dateInfo.dayNumber}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
 
-        {/* Main Content Area - Two Column Layout */}
         <View style={styles.mainContent}>
-          {/* Left Card - Coach's Status */}
           <View style={styles.coachCard}>
             <Text style={styles.cardTitle}>Coach's Status</Text>
             <View style={styles.coachContent}>
@@ -393,73 +250,54 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
             </View>
           </View>
 
-          {/* Right Card - Today's To-Do List */}
           <View style={styles.todoCard}>
             <Text style={styles.cardTitle}>Today's To-Do</Text>
-            <ScrollView 
-              style={styles.todoScrollView}
-              showsVerticalScrollIndicator={false}
-            >
-              {todayTodos.length > 0 ? (
-                todayTodos.map((todo) => (
-                  <TouchableOpacity
-                    key={todo.id}
-                    style={styles.todoItem}
-                    onPress={() => handleTodoToggleLocal(todo.id)}
-                  >
-                    <View style={[
-                      styles.todoCheckbox,
-                      todo.completed && styles.todoCheckedBox
-                    ]} />
-                    <Text 
-                      style={[
-                        styles.todoText,
-                        todo.completed && styles.todoTextCompleted
-                      ]}
-                      numberOfLines={2}
-                      ellipsizeMode="tail"
+            <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
+              {loading ? <ActivityIndicator color="#fff" />
+              : error ? <Text style={styles.emptyTodoText}>{error}</Text>
+              : todosForSelectedDate.length > 0 ? (
+                todosForSelectedDate.map((todo, index) => {
+                  const milestone = plan?.milestones.find(m => m.daily_todos.includes(todo));
+                  if (!milestone) return null;
+                  const todoKey = `${milestone.title}-${index}`;
+                  const isCompleted = todoCompletion[todoKey];
+                  return (
+                    <TouchableOpacity
+                      key={todoKey}
+                      style={styles.todoItem}
+                      onPress={() => handleTodoToggle(index, milestone.title)}
                     >
-                      {todo.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))
+                      <View style={[styles.todoCheckbox, isCompleted && styles.todoCheckedBox]} />
+                      <Text style={[styles.todoText, isCompleted && styles.todoTextCompleted]} numberOfLines={2} ellipsizeMode="tail">
+                        {todo.description}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
               ) : (
                 <View style={styles.emptyTodoContainer}>
-                  <Text style={styles.emptyTodoText}>오늘은 할 일이 없습니다</Text>
+                  <Text style={styles.emptyTodoText}>오늘의 할 일이 없습니다.</Text>
                 </View>
               )}
             </ScrollView>
           </View>
         </View>
       </ScrollView>
-      {/* 캘린더 모달 */}
+
       <Modal
         visible={calendarVisible}
         transparent={true}
         animationType="fade"
         onRequestClose={() => setCalendarVisible(false)}
       >
-        <View style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.4)',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-          <View style={{
-            backgroundColor: '#1c1c2e',
-            borderRadius: 20,
-            padding: 20,
-            elevation: 5,
-            minWidth: 350,
-            maxWidth: '90%',
-            maxHeight: '90%',
-          }}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
             <CalendarScreen />
             <TouchableOpacity 
-              style={{ marginTop: 16, alignSelf: 'center' }} 
+              style={styles.closeButton} 
               onPress={() => setCalendarVisible(false)}
             >
-              <Text style={{ color: '#fff', fontSize: 16 }}>닫기</Text>
+              <Text style={styles.closeButtonText}>닫기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -469,203 +307,44 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1c1c2e',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  headerArea: {
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 20,
-    backgroundColor: '#1c1c2e',
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  logoText: {
-    fontSize: 36,
-    color: '#6c63ff',
-    fontWeight: 'bold',
-  },
-  logoSubtext: {
-    fontSize: 18,
-    color: '#a9a9c2',
-    marginLeft: 8,
-  },
-  profileButton: {
-    padding: 8,
-  },
-  profileIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#3a3a50',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileIconText: {
-    fontSize: 24,
-    color: '#a9a9c2',
-  },
-  greetingText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 10,
-    fontFamily: 'Inter',
-  },
-  goalText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#a9a9c2',
-    marginBottom: 20,
-    fontFamily: 'Inter',
-  },
-  calendarScroll: {
-    marginTop: 10,
-  },
-  calendarContainer: {
-    paddingHorizontal: 10,
-  },
-  calendarDate: {
-    width: 60,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: '#3a3a50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 5,
-    paddingVertical: 10,
-  },
-  calendarDateToday: {
-    backgroundColor: '#6c63ff',
-  },
-  calendarDateSelected: {
-    backgroundColor: '#6c63ff',
-    borderWidth: 2,
-    borderColor: '#6c63ff',
-  },
-  calendarDayName: {
-    fontSize: 12,
-    color: '#a9a9c2',
-    fontFamily: 'Inter',
-  },
-  calendarDayNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    fontFamily: 'Inter',
-  },
-  calendarTextActive: {
-    color: '#ffffff',
-  },
-  mainContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  coachCard: {
-    flex: 1,
-    backgroundColor: '#3a3a50',
-    borderRadius: 16,
-    padding: 20,
-    marginRight: 10,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 15,
-    fontFamily: 'Inter',
-  },
-  coachContent: {
-    alignItems: 'center',
-  },
-  coachEmoji: {
-    fontSize: 120,
-    marginBottom: 10,
-  },
-  coachMessage: {
-    fontSize: 16,
-    color: '#a9a9c2',
-    textAlign: 'center',
-    marginBottom: 10,
-    fontFamily: 'Inter',
-  },
-  coachIndicator: {
-    width: 60,
-    height: 8,
-    borderRadius: 4,
-  },
-  todoCard: {
-    flex: 1,
-    backgroundColor: '#3a3a50',
-    borderRadius: 16,
-    padding: 20,
-    marginLeft: 10,
-  },
-  todoScrollView: {
-    maxHeight: 160,
-  },
-  todoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#4a4a60',
-  },
-  todoCheckbox: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#a9a9c2',
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  todoCheckedBox: {
-    backgroundColor: '#6c63ff',
-    borderColor: '#6c63ff',
-  },
-  todoText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#ffffff',
-    flex: 1,
-    fontFamily: 'Inter',
-  },
-  todoTextCompleted: {
-    textDecorationLine: 'line-through',
-    color: '#a9a9c2',
-  },
-  emptyTodoContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  emptyTodoText: {
-    fontSize: 14,
-    color: '#a9a9c2',
-    fontFamily: 'Inter',
-  },
-  squareButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    marginLeft: 8,
-    alignSelf: 'flex-end', // 버튼만 아래로 정렬
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#1c1c2e' },
+  scrollView: { flex: 1 },
+  headerArea: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 20 },
+  profileHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  logoContainer: { flexDirection: 'row', alignItems: 'center' },
+  logoText: { fontSize: 36, color: '#6c63ff', fontWeight: 'bold' },
+  profileButton: { padding: 8 },
+  profileIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#3a3a50', justifyContent: 'center', alignItems: 'center' },
+  profileIconText: { fontSize: 24, color: '#a9a9c2' },
+  greetingText: { fontSize: 24, fontWeight: 'bold', color: '#ffffff', marginBottom: 10, fontFamily: 'Inter' },
+  goalText: { fontSize: 18, fontWeight: '600', color: '#a9a9c2', marginBottom: 20, fontFamily: 'Inter' },
+  calendarScroll: { marginTop: 10 },
+  calendarContainer: { paddingHorizontal: 10 },
+  calendarDate: { width: 60, height: 80, borderRadius: 12, backgroundColor: '#3a3a50', justifyContent: 'center', alignItems: 'center', marginHorizontal: 5, paddingVertical: 10 },
+  calendarDateToday: { backgroundColor: '#6c63ff' },
+  calendarDateSelected: { borderWidth: 2, borderColor: '#6c63ff' },
+  calendarDayName: { fontSize: 12, color: '#a9a9c2', fontFamily: 'Inter' },
+  calendarDayNumber: { fontSize: 20, fontWeight: 'bold', color: '#ffffff', fontFamily: 'Inter' },
+  calendarTextActive: { color: '#ffffff' },
+  mainContent: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingBottom: 40 },
+  coachCard: { flex: 1, backgroundColor: '#3a3a50', borderRadius: 16, padding: 20, marginRight: 10 },
+  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginBottom: 15, fontFamily: 'Inter' },
+  coachContent: { alignItems: 'center', justifyContent: 'center', flex: 1 },
+  coachEmoji: { fontSize: 100, marginBottom: 10 },
+  coachMessage: { fontSize: 16, color: '#a9a9c2', textAlign: 'center', marginBottom: 10, fontFamily: 'Inter' },
+  coachIndicator: { width: 60, height: 8, borderRadius: 4 },
+  todoCard: { flex: 1, backgroundColor: '#3a3a50', borderRadius: 16, padding: 20, marginLeft: 10, minHeight: 250 },
+  todoScrollView: { flex: 1 },
+  todoItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#4a4a60' },
+  todoCheckbox: { width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: '#a9a9c2', marginRight: 10 },
+  todoCheckedBox: { backgroundColor: '#6c63ff', borderColor: '#6c63ff' },
+  todoText: { fontSize: 14, fontWeight: '500', color: '#ffffff', flex: 1, fontFamily: 'Inter' },
+  todoTextCompleted: { textDecorationLine: 'line-through', color: '#a9a9c2' },
+  emptyTodoContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyTodoText: { fontSize: 14, color: '#a9a9c2', fontFamily: 'Inter' },
+  squareButton: { width: 36, height: 36, borderRadius: 8, marginLeft: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#3a3a50' },
+  modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#1c1c2e', borderRadius: 20, padding: 20, elevation: 5, minWidth: 350, maxWidth: '90%', maxHeight: '90%' },
+  closeButton: { marginTop: 16, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20, backgroundColor: '#6c63ff', borderRadius: 20 },
+  closeButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 }); 
