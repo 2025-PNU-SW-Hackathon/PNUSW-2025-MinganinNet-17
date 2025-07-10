@@ -1,11 +1,11 @@
 import {
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -13,6 +13,7 @@ const { width, height } = Dimensions.get('window');
 interface DailyReportResultScreenProps {
   achievementScore: number;
   onBack: () => void;
+  aiReportText: string;
 }
 
 // Coach status based on achievement rate (copied from HomeScreen)
@@ -24,7 +25,8 @@ interface CoachStatus {
 
 export default function DailyReportResultScreen({ 
   achievementScore, 
-  onBack 
+  onBack,
+  aiReportText
 }: DailyReportResultScreenProps) {
   
   const getCoachStatus = (): CoachStatus => {
@@ -37,24 +39,6 @@ export default function DailyReportResultScreen({
   };
 
   const coachStatus = getCoachStatus();
-
-  // Placeholder AI report text
-  const aiReportText = `오늘 하루 동안 ${achievementScore}/10의 성과를 보여주셨네요!
-
-🎯 **오늘의 성과 분석**
-• 설정한 목표 대비 ${Math.round((achievementScore / 10) * 100)}%의 달성률을 보이셨습니다
-• 꾸준한 노력의 흔적이 보입니다
-• 일관성 있는 실천이 인상적입니다
-
-💡 **내일을 위한 조언**
-• 오늘의 성과를 바탕으로 내일은 조금 더 도전적인 목표를 설정해보세요
-• 완료하지 못한 부분에 대해서는 너무 자책하지 마세요
-• 작은 성취도 충분히 의미가 있습니다
-
-🌟 **격려의 메시지**
-매일 조금씩 나아지는 것이 가장 중요합니다. 오늘도 수고하셨고, 내일도 함께 화이팅해요!
-
-"성공은 하루아침에 이루어지는 것이 아니라, 매일의 작은 노력이 쌓여서 만들어지는 것입니다." - 당신의 AI 코치 🤖`;
 
   return (
     <SafeAreaView style={styles.container}>

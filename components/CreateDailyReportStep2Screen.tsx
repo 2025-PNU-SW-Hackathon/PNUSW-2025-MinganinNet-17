@@ -1,32 +1,60 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { generateDailyFeedback } from '../backend/hwirang/gemini';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import DailyReportResultScreen from './DailyReportResultScreen';
 
+interface TodoItem {
+    id: string;
+    description: string;
+    completed: boolean;
+}
+
 interface CreateDailyReportStep2ScreenProps {
   onBack: () => void;
   achievementScore: number;
+  todos: TodoItem[];
 }
 
-export default function CreateDailyReportStep2Screen({ onBack, achievementScore }: CreateDailyReportStep2ScreenProps) {
+export default function CreateDailyReportStep2Screen({ onBack, achievementScore, todos }: CreateDailyReportStep2ScreenProps) {
   const colorScheme = useColorScheme();
   const [currentScreen, setCurrentScreen] = useState<'step2' | 'result'>('step2');
   const [userSummary, setUserSummary] = useState<string>('');
+  const [aiFeedback, setAiFeedback] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
 
   // Handle navigation to result screen
-  const handleSubmit = () => {
-    setCurrentScreen('result');
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const feedback = await generateDailyFeedback(userSummary, achievementScore, todos);
+      setAiFeedback(feedback);
+      setCurrentScreen('result');
+    } catch (err) {
+      setError('피드백을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle back from result screen
   const handleBackFromResult = () => {
     setCurrentScreen('step2');
+    setAiFeedback(''); // Reset feedback when returning
   };
 
   // Show result screen
   if (currentScreen === 'result') {
-    return <DailyReportResultScreen onBack={handleBackFromResult} achievementScore={achievementScore} />;
+    return <DailyReportResultScreen 
+              onBack={handleBackFromResult} 
+              achievementScore={achievementScore} 
+              aiReportText={aiFeedback} 
+           />;
   }
 
   return (
@@ -79,18 +107,23 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore 
 
         {/* Final Action Button */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              !userSummary.trim() && styles.submitButtonDisabled
-            ]}
-            onPress={handleSubmit}
-            disabled={!userSummary.trim()}
-          >
-            <Text style={styles.submitButtonText}>
-              하루에 대한 피드백 받기
-            </Text>
-          </TouchableOpacity>
+          {isLoading ? (
+            <ActivityIndicator size="large" color={Colors.dark.tint} />
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                !userSummary.trim() && styles.submitButtonDisabled
+              ]}
+              onPress={handleSubmit}
+              disabled={!userSummary.trim()}
+            >
+              <Text style={styles.submitButtonText}>
+                하루에 대한 피드백 받기
+              </Text>
+            </TouchableOpacity>
+          )}
+          {error && <Text style={styles.errorText}>{error}</Text>}
         </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -143,6 +176,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'right',
     marginTop: 8,
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginTop: 10,
   },
   buttonContainer: {
     paddingHorizontal: 24,
