@@ -13,7 +13,7 @@ import AppSettingsScreen from './AppSettingsScreen';
 const { width } = Dimensions.get('window');
 
 interface HomeScreenProps {
-  // No onDayPress needed anymore - handled internally
+  onDayPress?: (day: number) => void;
 }
 
 // Data interfaces
@@ -43,7 +43,7 @@ const generateMockData = (): DayData[] => {
   const mockData: DayData[] = [];
   
   for (let i = 14; i >= 0; i--) {
-    const date = new Date(today);
+    const date = new Date(today.getTime());
     date.setDate(today.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
     
@@ -68,7 +68,7 @@ const generateTodoData = (): TodoItem[] => {
   const todos: TodoItem[] = [];
   
   for (let i = 0; i < 7; i++) {
-    const date = new Date(today);
+    const date = new Date(today.getTime());
     date.setDate(today.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
     
@@ -94,7 +94,7 @@ const generateTodoData = (): TodoItem[] => {
   return todos;
 };
 
-export default function HomeScreen({ }: HomeScreenProps) {
+export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [habitData] = useState<DayData[]>(generateMockData());
@@ -105,7 +105,7 @@ export default function HomeScreen({ }: HomeScreenProps) {
     const recentData = habitData.slice(-7); // Last 7 days
     if (recentData.length === 0) return 0;
     
-    const totalRate = recentData.reduce((sum, day) => sum + day.completionRate, 0);
+    const totalRate = recentData.reduce((sum: number, day: DayData) => sum + day.completionRate, 0);
     return totalRate / recentData.length;
   };
 
@@ -133,12 +133,12 @@ export default function HomeScreen({ }: HomeScreenProps) {
   };
 
   // Generate calendar dates for horizontal scroll
-  const getCalendarDates = () => {
-    const dates = [];
+  const getCalendarDates = (): Date[] => {
+    const dates: Date[] = [];
     const today = new Date();
     
     for (let i = -3; i <= 3; i++) {
-      const date = new Date(today);
+      const date = new Date(today.getTime());
       date.setDate(today.getDate() + i);
       dates.push(date);
     }
@@ -149,13 +149,13 @@ export default function HomeScreen({ }: HomeScreenProps) {
   // Get todos for today
   const getTodayTodos = (): TodoItem[] => {
     const today = new Date().toISOString().split('T')[0];
-    return todoData.filter(todo => todo.date === today);
+    return todoData.filter((todo: TodoItem) => todo.date === today);
   };
 
   // Handle todo toggle
-  const handleTodoToggle = (todoId: string) => {
-    setTodoData(prev => 
-      prev.map(todo => 
+  const handleTodoToggle = (todoId: string): void => {
+    setTodoData((prev: TodoItem[]) => 
+      prev.map((todo: TodoItem) => 
         todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
       )
     );
@@ -173,8 +173,13 @@ export default function HomeScreen({ }: HomeScreenProps) {
   };
 
   // Handle calendar date press
-  const handleCalendarDatePress = (dateString: string) => {
+  const handleCalendarDatePress = (dateString: string): void => {
     setSelectedDate(dateString);
+    // Extract day number and call onDayPress if provided
+    const day = parseInt(dateString.split('-')[2], 10);
+    if (onDayPress) {
+      onDayPress(day);
+    }
   };
 
   if (currentScreen === 'settings') {
@@ -446,48 +451,48 @@ const styles = StyleSheet.create({
     padding: 20,
     marginLeft: 10,
   },
-     todoScrollView: {
-     maxHeight: 160, // Prevent overflow
-   },
-   todoItem: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     paddingVertical: 10,
-     borderBottomWidth: 1,
-     borderBottomColor: '#4a4a60',
-   },
-   todoCheckbox: {
-     width: 16,
-     height: 16,
-     borderRadius: 4,
-     borderWidth: 2,
-     borderColor: '#a9a9c2',
-     marginRight: 10,
-     justifyContent: 'center',
-     alignItems: 'center',
-   },
-   todoCheckedBox: {
-     backgroundColor: '#6c63ff',
-     borderColor: '#6c63ff',
-   },
-   todoText: {
-     fontSize: 14,
-     fontWeight: '500',
-     color: '#ffffff',
-     flex: 1,
-     fontFamily: 'Inter',
-   },
-   todoTextCompleted: {
-     textDecorationLine: 'line-through',
-     color: '#a9a9c2',
-   },
-   emptyTodoContainer: {
-     alignItems: 'center',
-     paddingVertical: 20,
-   },
-   emptyTodoText: {
-     fontSize: 14,
-     color: '#a9a9c2',
-     fontFamily: 'Inter',
-   },
+  todoScrollView: {
+    maxHeight: 160, // Prevent overflow
+  },
+  todoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#4a4a60',
+  },
+  todoCheckbox: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#a9a9c2',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todoCheckedBox: {
+    backgroundColor: '#6c63ff',
+    borderColor: '#6c63ff',
+  },
+  todoText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#ffffff',
+    flex: 1,
+    fontFamily: 'Inter',
+  },
+  todoTextCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#a9a9c2',
+  },
+  emptyTodoContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  emptyTodoText: {
+    fontSize: 14,
+    color: '#a9a9c2',
+    fontFamily: 'Inter',
+  },
 }); 

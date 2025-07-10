@@ -4,6 +4,8 @@
     "jsx": "react-jsx",
     "strict": true,
     "allowImportingTsExtensions": true,
+    "lib": ["ES2017", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
     "paths": {
       "@/*": [
         "./*"

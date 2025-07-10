@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { signUp } from '../backend/supabase/auth';
+import DebugNextButton from './DebugNextButton';
 import SignUpStep0 from './SignUpStep0';
 import SignUpStep1 from './SignUpStep1';
 
@@ -68,6 +69,16 @@ export default function SignUpScreen({
     setCurrentStep('step0');
   };
 
+  // Debug navigation handler - bypasses backend signup call
+  const handleDebugSkipSignup = () => {
+    if (signUpData.email && signUpData.password) {
+      // Only call navigation callback - no backend calls
+      if (onSignUpComplete) {
+        onSignUpComplete(signUpData);
+      }
+    }
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 'step0':
@@ -81,13 +92,24 @@ export default function SignUpScreen({
       
       case 'step1':
         return (
-          <SignUpStep1
-            onNext={handleStep1Next}
-            onBack={handleStep1Back}
-            email={signUpData.email}
-            initialValue={signUpData.password}
-            isLoading={isLoading}
-          />
+          <View style={styles.stepContainer}>
+            <SignUpStep1
+              onNext={handleStep1Next}
+              onBack={handleStep1Back}
+              email={signUpData.email}
+              initialValue={signUpData.password}
+              isLoading={isLoading}
+            />
+            
+            {/* Debug Navigation Button */}
+            <DebugNextButton
+              to="Goal Setting"
+              onPress={handleDebugSkipSignup}
+              label="Debug: Skip Signup (Backend 건너뛰기)"
+              disabled={!signUpData.email || !signUpData.password || isLoading}
+              style={styles.debugButton}
+            />
+          </View>
         );
       
       default:
@@ -111,5 +133,14 @@ export default function SignUpScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  stepContainer: {
+    flex: 1,
+  },
+  debugButton: {
+    position: 'absolute',
+    bottom: 120,
+    left: 24,
+    right: 24,
   },
 }); 

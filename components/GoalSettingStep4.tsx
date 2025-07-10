@@ -1,7 +1,15 @@
 import { useState } from 'react';
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+    Alert,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
+import DebugNextButton from './DebugNextButton';
 
 interface GoalSettingStep4Props {
   onNext?: (intensity: string) => void;
@@ -79,6 +87,17 @@ export default function GoalSettingStep4({
     }
   };
 
+  // Debug navigation handler - bypasses backend calls
+  const handleDebugNext = () => {
+    if (selectedIntensity) {
+      // Only call local store and navigation - no backend calls
+      setIntensity(selectedIntensity);
+      if (onNext) {
+        onNext(selectedIntensity);
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.stepIndicator}>4 / 5 단계</Text>
@@ -124,6 +143,15 @@ export default function GoalSettingStep4({
           </TouchableOpacity>
         ))}
       </View>
+      
+      {/* Debug Navigation Button */}
+      <DebugNextButton
+        to="Goal Step 5"
+        onPress={handleDebugNext}
+        label="Debug: Skip DB Save (DB 건너뛰기)"
+        disabled={isSubmitting}
+        style={styles.debugButton}
+      />
     </View>
   );
 }
@@ -204,5 +232,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#a9a9c2',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  debugButton: {
+    position: 'absolute',
+    bottom: 40,
+    left: 24,
+    right: 24,
   },
 }); 
