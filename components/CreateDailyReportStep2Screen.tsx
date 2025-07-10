@@ -6,9 +6,10 @@ import DailyReportResultScreen from './DailyReportResultScreen';
 
 interface CreateDailyReportStep2ScreenProps {
   onBack: () => void;
+  achievementScore: number;
 }
 
-export default function CreateDailyReportStep2Screen({ onBack }: CreateDailyReportStep2ScreenProps) {
+export default function CreateDailyReportStep2Screen({ onBack, achievementScore }: CreateDailyReportStep2ScreenProps) {
   const colorScheme = useColorScheme();
   const [currentScreen, setCurrentScreen] = useState<'step2' | 'result'>('step2');
   const [userSummary, setUserSummary] = useState<string>('');
@@ -25,7 +26,7 @@ export default function CreateDailyReportStep2Screen({ onBack }: CreateDailyRepo
 
   // Show result screen
   if (currentScreen === 'result') {
-    return <DailyReportResultScreen onBack={handleBackFromResult} />;
+    return <DailyReportResultScreen onBack={handleBackFromResult} achievementScore={achievementScore} />;
   }
 
   return (

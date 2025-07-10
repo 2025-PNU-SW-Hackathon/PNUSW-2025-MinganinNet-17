@@ -84,7 +84,7 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
 
   // Show step 2 screen
   if (currentStep === 'step2') {
-    return <CreateDailyReportStep2Screen onBack={handleBackFromStep2} />;
+    return <CreateDailyReportStep2Screen onBack={handleBackFromStep2} achievementScore={achievementRate} />;
   }
 
   const TodoList = () => {
