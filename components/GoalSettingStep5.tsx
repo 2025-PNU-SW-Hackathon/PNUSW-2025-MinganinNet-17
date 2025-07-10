@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { submitHabitData } from '../backend/hwirang/habit';
 import { scheduleAllHabitRoutines } from '../backend/hwirang/routineNotifications';
-import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
+import { HabitData, HabitEvent, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
 
@@ -16,17 +16,17 @@ export default function GoalSettingStep5({
   onBack
 }: GoalSettingStep5Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, time, intensity, difficulty } = useHabitStore();
+  const { habit, time, intensity, difficulty, goalPeriod } = useHabitStore();
 
   const handleSubmit = async () => {
-    console.log('🔄 Starting final submission...', { habit, time, intensity, difficulty });
+    console.log('🔄 Starting final submission...', { habit, time, intensity, difficulty, goalPeriod });
     setIsSubmitting(true);
 
     try {
       // 1. AI 루틴 생성
       console.log('🤖 Generating AI routine...');
-      const habitEvents = await submitHabitData(habit, time, difficulty);
-      console.log('✅ AI routine generated:', habitEvents);
+      const aiPlan = await submitHabitData(habit, time, difficulty, intensity, goalPeriod);
+      console.log('✅ AI routine generated:', aiPlan);
 
       // 2. 데이터베이스에 모든 데이터 저장
       const habitData: HabitData = {
@@ -34,7 +34,7 @@ export default function GoalSettingStep5({
         time_slot: time,
         intensity: intensity,
         difficulty: difficulty,
-        ai_routine: JSON.stringify(habitEvents)
+        ai_routine: JSON.stringify(aiPlan)
       };
 
       console.log('💾 Saving complete data to Supabase...', habitData);
@@ -59,9 +59,20 @@ export default function GoalSettingStep5({
       }
 
       // 3. 알림 설정
-      if (habitEvents) {
+      if (aiPlan && aiPlan.milestones) {
         try {
           console.log('🔔 Setting up notifications...');
+          
+          const habitEvents: HabitEvent[] = aiPlan.milestones.flatMap(milestone => 
+            milestone.daily_todos.map(todo => ({
+              startDate: aiPlan.start_date,
+              description: todo.description,
+              time: todo.time_slot,
+              repeat: todo.repeat_count,
+              score: todo.score,
+            }))
+          );
+      
           const notificationResult = await scheduleAllHabitRoutines(habitEvents);
           if (!notificationResult.success) {
             console.warn('⚠️ Notification setup failed:', notificationResult.error);
