@@ -1,3 +1,4 @@
+import { Plan } from '../../types/habit';
 import { supabase } from './client';
 
 // 습관 이벤트 타입 정의
@@ -62,6 +63,49 @@ export async function saveHabitToSupabase(habitData: HabitData) {
       throw new Error(`습관 저장 중 오류 발생: ${error.message}`);
     }
     throw error;
+  }
+}
+
+export async function getLatestHabitPlan(): Promise<Plan | null> {
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      console.warn('🔓 No authenticated user found, cannot fetch plan.');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('habits')
+      .select('ai_routine')
+      .eq('user_id', userData.user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      // 'PGRST116' is the error code for when no rows are found
+      if (error.code === 'PGRST116') {
+        console.log('✅ No habit plan found for this user.');
+        return null;
+      }
+      console.error('Supabase error fetching habit plan:', error);
+      throw error;
+    }
+
+    if (data && data.ai_routine && typeof data.ai_routine === 'string') {
+      const plan = JSON.parse(data.ai_routine) as Plan;
+      console.log('✅ Successfully fetched and parsed habit plan.');
+      return plan;
+    }
+
+    console.log('⚠️ Fetched data but no ai_routine found.');
+    return null;
+  } catch (error) {
+    console.error('💥 Error in getLatestHabitPlan:', error);
+    if (error instanceof SyntaxError) {
+      console.error('JSON parsing error. The ai_routine data may be malformed.');
+    }
+    return null;
   }
 }
 
