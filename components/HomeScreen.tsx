@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Dimensions,
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,7 +9,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import CalendarScreen from '../backend/calendar/calendar';
 import AppSettingsScreen from './AppSettingsScreen';
+import CalendarOutlineIcon from './ui/CalendarOutlineIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -99,6 +102,7 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [habitData] = useState<DayData[]>(generateMockData());
   const [todoData, setTodoData] = useState<TodoItem[]>(generateTodoData());
+  const [calendarVisible, setCalendarVisible] = useState(false);
 
   // Calculate average achievement rate for coach status
   const calculateAverageAchievementRate = (): number => {
@@ -204,6 +208,10 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>🌱</Text>
               <Text style={styles.logoSubtext}>0</Text>
+              {/* 숫자 바로 오른쪽에 정사각형 버튼 */}
+              <TouchableOpacity style={styles.squareButton} onPress={() => setCalendarVisible(true)}>
+                <CalendarOutlineIcon size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
             <TouchableOpacity 
               style={styles.profileButton}
@@ -307,6 +315,36 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
           </View>
         </View>
       </ScrollView>
+      {/* 캘린더 모달 */}
+      <Modal
+        visible={calendarVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCalendarVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            backgroundColor: '#1c1c2e',
+            borderRadius: 20,
+            padding: 20,
+            elevation: 5,
+            minWidth: 350,
+            maxWidth: '90%',
+            maxHeight: '90%',
+          }}>
+            <CalendarScreen />
+            {/* 닫기 버튼 */}
+            <TouchableOpacity onPress={() => setCalendarVisible(false)} style={{marginTop: 16, alignSelf: 'center'}}>
+              <Text style={{color: '#6c63ff', fontWeight: 'bold', fontSize: 16}}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -494,5 +532,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#a9a9c2',
     fontFamily: 'Inter',
+  },
+  squareButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    marginLeft: 8,
+    alignSelf: 'flex-end', // 버튼만 아래로 정렬
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

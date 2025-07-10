@@ -1,66 +1,100 @@
 import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
+import type { Task as PopupTask } from '../../components/DailySchedulePopup';
 import DailySchedulePopup from '../../components/DailySchedulePopup';
-import inputData from './inputData'; // input.json을 JS 객체로 변환해서 import
-import { calendarSupabase } from './supabaseClient';
 
 const getCompletionColor = (score: number): string => {
-  if (score >= 9) return '#2d5a2d';
-  if (score >= 7) return '#4a7c4a';
-  if (score >= 5) return '#6b9b6b';
-  if (score >= 3) return '#8cb98c';
-  if (score >= 1) return '#b8d8b8';
-  return '#e8e8e8';
+  if (score >= 9) return '#d6d4ff';      // 가장 밝은 보라
+  if (score >= 7) return '#b2aaff';      // 밝은 보라
+  if (score >= 5) return '#a29bfe';      // 중간 보라
+  if (score >= 3) return '#7d75ff';      // 진한 보라
+  if (score >= 1) return '#2d2966';      // 가장 진한 보라
+  return '#1c1c2e';                      // score 0: 더 어두운 보라(달력 배경색과 동일)
 };
+
+// 타입 선언 (calendar 전용)
+type CalendarTask = { id: string; description: string; time: string; score?: number };
+type SampleData = { [date: string]: CalendarTask[] };
+const sampleData: SampleData = require('./sample.json');
+type MarkedDate = { customStyles: { container: any } };
 
 const CalendarScreen = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);
 
-  // 임시: 빈 markedDates (향후 supabase 연동 시 대체)
-  const markedDates = useMemo(() => ({}), [selectedDate]);
+  // 커스텀 날짜 컴포넌트
+  const CustomDayComponent = ({ date, state, onPress }: any) => {
+    const dateStr = date?.dateString;
+    const tasks = sampleData[dateStr] as CalendarTask[] | undefined;
+    const avgScore = tasks?.length
+      ? tasks.reduce((sum: number, t: CalendarTask) => sum + (t.score ?? 0), 0) / tasks.length
+      : NaN;
+    
+    const backgroundColor = !isNaN(avgScore) ? getCompletionColor(avgScore) : 'transparent';
+    const isSelected = selectedDate === dateStr;
+    
+    return (
+      <TouchableOpacity
+        onPress={() => onPress(date)}
+        style={[
+          styles.dayContainer,
+          { backgroundColor },
+          isSelected && styles.selectedDay,
+        ]}
+      >
+        <Text style={[
+          styles.dayText,
+          state === 'disabled' && styles.disabledDayText,
+          isSelected && styles.selectedDayText,
+        ]}>
+          {date?.day}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // sample.json 기반 markedDates 생성 (이제는 색상만 관리)
+  const markedDates = useMemo(() => {
+    const result: { [date: string]: MarkedDate } = {};
+    
+    // sampleData에 있는 날짜만 마킹 (색상은 dayComponent에서 처리)
+    Object.entries(sampleData as SampleData).forEach(([date, tasks]) => {
+      const arr = tasks as CalendarTask[];
+      const avgScore = arr.length
+        ? arr.reduce((sum: number, t: CalendarTask) => sum + (t.score ?? 0), 0) / arr.length
+        : NaN;
+      if (!isNaN(avgScore)) {
+        result[date] = {
+          customStyles: {
+            container: {
+              // 색상은 dayComponent에서 처리하므로 여기서는 빈 객체
+            },
+          },
+        };
+      }
+    });
+    return result;
+  }, [selectedDate]);
 
   const handleDayPress = (day: DateData) => {
     setSelectedDate(day.dateString);
     setPopupVisible(true);
   };
 
-  // 임시: 빈 popupTasks (향후 supabase 연동 시 대체)
-  const popupTasks = useMemo(() => [], [selectedDate]);
+  // 선택된 날짜의 task 목록 표시 (CalendarTask → PopupTask로 변환)
+  const popupTasks: PopupTask[] = useMemo(() => {
+    if (!selectedDate) return [];
+    const arr = sampleData[selectedDate] as CalendarTask[] | undefined;
+    if (!arr) return [];
+    return arr.map((item) => ({
+      id: item.id,
+      title: item.description, // description을 title로
+      completed: false,        // 임의로 false (score 등으로 변환 가능)
+      type: 'normal',          // 임의로 normal (score 등으로 변환 가능)
+    }));
+  }, [selectedDate]);
 
-  // 버튼 클릭 시 inputData를 Supabase에 insert
-  const handleInsert = async () => {
-    const rowsToInsert: any[] = [];
-    inputData.forEach((item: any) => {
-      const { startDate, description, time, repeat, score } = item;
-      const start = new Date(startDate);
-      for (let i = 0; i < repeat; i++) {
-        const d = new Date(start);
-        d.setDate(start.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
-        rowsToInsert.push({
-          date: dateStr,
-          description,
-          time,
-          score
-        });
-      }
-    });
-
-    const { data, error } = await calendarSupabase
-      .from('calendar')
-      .insert(rowsToInsert);
-
-    const inserted: any = data;
-    if (error) {
-      Alert.alert('삽입 오류', error.message);
-    } else if (inserted && inserted.length) {
-      Alert.alert('삽입 성공', `${inserted.length}개 일정이 추가되었습니다.`);
-    } else {
-      Alert.alert('삽입 성공', `일정이 추가되었습니다.`);
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -70,20 +104,20 @@ const CalendarScreen = () => {
         onDayPress={handleDayPress}
         markingType="custom"
         markedDates={markedDates}
+        dayComponent={CustomDayComponent}
         theme={{
-          backgroundColor: '#fff',
-          calendarBackground: '#fff',
+          backgroundColor: '#1c1c2e',
+          calendarBackground: '#1c1c2e',
           textSectionTitleColor: '#a9a9c2',
           selectedDayBackgroundColor: '#6c63ff',
           selectedDayTextColor: '#fff',
           todayTextColor: '#6c63ff',
-          dayTextColor: '#333',
-          textDisabledColor: '#ccc',
-          monthTextColor: '#333',
+          dayTextColor: '#fff', // 이번 달 날짜 밝게
+          textDisabledColor: '#333', // 이전/다음 달 날짜 밝게
+          monthTextColor: '#fff',
           indicatorColor: '#6c63ff',
           textDayFontFamily: 'Inter',
           textMonthFontFamily: 'Inter',
-          textDayHeaderFontFamily: 'Inter',
           textDayFontWeight: '500',
           textMonthFontWeight: 'bold',
           textDayHeaderFontWeight: '500',
@@ -91,7 +125,7 @@ const CalendarScreen = () => {
           textMonthFontSize: 18,
           textDayHeaderFontSize: 12,
         }}
-        style={styles.calendar}
+        style={[styles.calendar, { width: 310 }]}
       />
       <DailySchedulePopup
         visible={popupVisible}
@@ -109,20 +143,42 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#1c1c2e',
     paddingTop: 40,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
     marginBottom: 20,
   },
   calendar: {
-    width: 350,
     borderRadius: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#1c1c2e',
     elevation: 2,
+  },
+  dayContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: -6,
+  },
+  dayText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#fff',
+  },
+  disabledDayText: {
+    color: '#333',
+  },
+  selectedDay: {
+    backgroundColor: '#3a3a50',
+  },
+  selectedDayText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 

@@ -1,9 +1,8 @@
-import React from 'react';
 import { Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
-interface Task {
+export interface Task {
   id: string;
   title: string;
   completed: boolean;

@@ -4,9 +4,22 @@ const path = require('path');
 // 파일 경로
 const inputPath = path.join(__dirname, 'input.json');
 const outputPath = path.join(__dirname, 'sample.json');
+const scorePath = path.join(__dirname, 'score.json');
 
 // input.json 읽기
 const inputData = JSON.parse(fs.readFileSync(inputPath, 'utf-8'));
+// score.json 읽기 (날짜별 score 매핑)
+let scoreMap = {};
+if (fs.existsSync(scorePath)) {
+  try {
+    console.log('score.json 읽기 시작');
+    const scoreArr = JSON.parse(fs.readFileSync(scorePath, 'utf-8'));
+    console.log('score.json 읽기 완료', scoreArr.length);
+    scoreMap = Object.fromEntries(scoreArr.map(({ Date, score }) => [Date, score]));
+  } catch (e) {
+    console.error('score.json 읽기/파싱 에러:', e);
+  }
+}
 
 // 날짜를 YYYY-MM-DD 문자열로 변환
 function formatDate(date) {
@@ -25,11 +38,12 @@ inputData.forEach((item) => {
     d.setDate(start.getDate() + i);
     const dateStr = formatDate(d);
     if (!result[dateStr]) result[dateStr] = [];
+    // score.json에 값이 있으면 덮어쓰기, 없으면 기존 score 사용
     result[dateStr].push({
       id: `uuid-${uuidCounter++}`,
       description,
       time,
-      score
+      score: scoreMap[dateStr] !== undefined ? scoreMap[dateStr] : score
     });
   }
 });
