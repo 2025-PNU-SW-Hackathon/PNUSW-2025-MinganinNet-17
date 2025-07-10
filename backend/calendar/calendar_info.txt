@@ -1,0 +1,20 @@
+COLUMN : id {
+    TYPE : number
+    FORMAT : bigint
+}
+COLUMN : date {
+    TYPE : string
+    FORMAT : date
+}
+COLUMN : description {
+    TYPE : string
+    FORMAT : text
+}
+COLUMN : time {
+    TYPE : string
+    FORMAT : timestamp without time zone
+}
+COLUMN : score {
+    TYPE : number
+    FORMAT : integer
+}
