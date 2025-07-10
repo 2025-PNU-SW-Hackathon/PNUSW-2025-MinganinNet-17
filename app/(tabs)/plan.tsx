@@ -1,5 +1,5 @@
-import PlanScreen from '../../components/PlanScreen';
+import CalendarScreen from '../../backend/calendar/calendar';
 
 export default function PlanTab() {
-  return <PlanScreen />;
+  return <CalendarScreen />;
 } 
