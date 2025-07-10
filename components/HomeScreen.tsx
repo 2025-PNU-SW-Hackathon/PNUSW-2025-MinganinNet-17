@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   coachEmoji: {
-    fontSize: 40,
+    fontSize: 120,
     marginBottom: 10,
   },
   coachMessage: {
