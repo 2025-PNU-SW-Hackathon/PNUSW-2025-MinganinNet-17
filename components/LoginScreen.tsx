@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Dimensions,
     Platform,
@@ -9,6 +10,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { signIn } from '../backend/supabase/auth';
+import DebugNextButton from './DebugNextButton';
 
 const { width } = Dimensions.get('window');
 
@@ -25,29 +28,68 @@ export default function LoginScreen({
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleLogin = async () => {
+    // 입력값 검증
     if (!email.trim() || !password.trim()) {
-      Alert.alert('오류', '이메일과 비밀번호를 모두 입력해주세요.');
+      Alert.alert('입력 오류', '이메일과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      Alert.alert('입력 오류', '올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('입력 오류', '비밀번호는 최소 6자 이상이어야 합니다.');
       return;
     }
 
     setIsLoading(true);
-    // Simulate login process
-    setTimeout(() => {
-      setIsLoading(false);
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      } else {
-        Alert.alert('성공', '로그인이 완료되었습니다!');
+    try {
+      const { user, error } = await signIn(email.trim(), password);
+      
+      if (error) {
+        let errorMessage = '로그인에 실패했습니다.';
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = '이메일 인증이 필요합니다. 이메일을 확인해주세요.';
+        }
+        Alert.alert('로그인 실패', errorMessage);
+        return;
       }
-    }, 1000);
+
+      if (user) {
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        }
+      }
+    } catch (error) {
+      Alert.alert('시스템 오류', '로그인 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSignUp = () => {
     if (onSignUpPress) {
       onSignUpPress();
     } else {
-      Alert.alert('회원가입', '회원가입 기능은 준비 중입니다.');
+      Alert.alert('알림', '회원가입 페이지로 이동합니다.');
+    }
+  };
+
+  // Debug navigation handler - bypasses backend signin call
+  const handleDebugLogin = () => {
+    // Only call success callback - no backend calls
+    if (onLoginSuccess) {
+      onLoginSuccess();
     }
   };
 
@@ -59,14 +101,15 @@ export default function LoginScreen({
       <View style={styles.formContainer}>
         <Text style={styles.label}>이메일 주소</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, !validateEmail(email) && email.length > 0 && styles.inputError]}
           value={email}
           onChangeText={setEmail}
-          placeholder=""
+          placeholder="example@email.com"
           placeholderTextColor="#a9a9c2"
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
+          editable={!isLoading}
         />
 
         <Text style={styles.label}>비밀번호</Text>
@@ -74,10 +117,11 @@ export default function LoginScreen({
           style={styles.input}
           value={password}
           onChangeText={setPassword}
-          placeholder=""
+          placeholder="비밀번호 입력"
           placeholderTextColor="#a9a9c2"
           secureTextEntry
           autoComplete="password"
+          editable={!isLoading}
         />
       </View>
 
@@ -86,14 +130,26 @@ export default function LoginScreen({
         onPress={handleLogin}
         disabled={isLoading}
       >
-        <Text style={styles.loginButtonText}>
-          {isLoading ? '로그인 중...' : '로그인'}
-        </Text>
+        {isLoading ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={styles.loginButtonText}>로그인</Text>
+        )}
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={handleSignUp}>
-        <Text style={styles.signUpText}>계정이 없으신가요? 회원가입</Text>
+      <TouchableOpacity onPress={handleSignUp} disabled={isLoading}>
+        <Text style={[styles.signUpText, isLoading && styles.textDisabled]}>
+          계정이 없으신가요? 회원가입
+        </Text>
       </TouchableOpacity>
+      
+      {/* Floating Debug Button - does not interfere with layout */}
+      <DebugNextButton
+        to="Goal Setting"
+        onPress={handleDebugLogin}
+        label="Debug: Skip Login"
+        disabled={isLoading}
+      />
     </View>
   );
 }
@@ -140,6 +196,10 @@ const styles = StyleSheet.create({
     height: 52,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
+  inputError: {
+    borderColor: '#ff4444',
+    borderWidth: 1,
+  },
   loginButton: {
     backgroundColor: '#6c63ff',
     borderRadius: 28,
@@ -164,5 +224,8 @@ const styles = StyleSheet.create({
     color: '#a9a9c2',
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  textDisabled: {
+    opacity: 0.7,
   },
 }); 

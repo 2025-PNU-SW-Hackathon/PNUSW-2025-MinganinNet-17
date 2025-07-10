@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Dimensions,
     Platform,
@@ -17,13 +18,15 @@ interface SignUpStep1Props {
   onBack?: () => void;
   email: string;
   initialValue?: string;
+  isLoading?: boolean;
 }
 
 export default function SignUpStep1({ 
   onNext, 
   onBack, 
   email,
-  initialValue = '' 
+  initialValue = '',
+  isLoading = false
 }: SignUpStep1Props) {
   const [password, setPassword] = useState(initialValue);
 
@@ -45,7 +48,7 @@ export default function SignUpStep1({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={onBack}>
+      <TouchableOpacity style={styles.backButton} onPress={onBack} disabled={isLoading}>
         <Text style={styles.backArrow}>←</Text>
       </TouchableOpacity>
       
@@ -72,6 +75,7 @@ export default function SignUpStep1({
           secureTextEntry
           autoComplete="new-password"
           autoFocus
+          editable={!isLoading}
         />
         <View style={styles.requirementContainer}>
           <Text style={styles.requirementText}>영문포함</Text>
@@ -86,16 +90,25 @@ export default function SignUpStep1({
           placeholder="비밀번호 확인"
           placeholderTextColor="#a9a9c2"
           secureTextEntry
+          editable={!isLoading}
         />
         <Text style={styles.confirmText}>비밀번호 일치</Text>
       </View>
 
       <TouchableOpacity
-        style={[styles.nextButton, !password.trim() && styles.nextButtonDisabled]}
+        style={[
+          styles.nextButton, 
+          !password.trim() && styles.nextButtonDisabled,
+          isLoading && styles.nextButtonDisabled
+        ]}
         onPress={handleNext}
-        disabled={!password.trim()}
+        disabled={!password.trim() || isLoading}
       >
-        <Text style={styles.nextButtonText}>다음</Text>
+        {isLoading ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={styles.nextButtonText}>다음</Text>
+        )}
       </TouchableOpacity>
     </View>
   );

@@ -9,8 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
+import { saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
+import { HabitData } from '../types/habit';
+import DebugNextButton from './DebugNextButton';
 
 const { width } = Dimensions.get('window');
 
@@ -92,6 +94,17 @@ export default function GoalSettingStep1({
     }
   };
 
+  // Debug navigation handler - bypasses backend calls
+  const handleDebugNext = () => {
+    if (habitText.trim()) {
+      // Only call local store and navigation - no backend calls
+      setHabit(habitText);
+      if (onNext) {
+        onNext(habitText);
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.stepIndicator}>1 / 5 단계</Text>
@@ -107,7 +120,7 @@ export default function GoalSettingStep1({
       
       <View style={styles.titleContainer}>
         <Text style={styles.title}>
-          가장 만들고 싶은{'\n'}좋은 습관은 무엇인가요?
+          당신과 제가 함께{'\n'}이뤄나갈 목표는 무엇인가요?
         </Text>
       </View>
 
@@ -116,7 +129,7 @@ export default function GoalSettingStep1({
           style={styles.habitInput}
           value={habitText}
           onChangeText={setHabitText}
-          placeholder="예) 매일 아침 10분씩 책 읽기"
+          placeholder="예) 한 달 동안 책 10권 읽기기"
           placeholderTextColor="#a9a9c2"
           multiline
           textAlignVertical="top"
@@ -137,23 +150,13 @@ export default function GoalSettingStep1({
         </Text>
       </TouchableOpacity>
       
-      {/* 임시 테스트 버튼 - 디버깅용 */}
-      <TouchableOpacity
-        style={[
-          styles.testButton,
-          !habitText.trim() && styles.testButtonDisabled
-        ]}
-        onPress={() => {
-          console.log('🧪 TEST BUTTON: Bypassing database, calling onNext directly');
-          if (habitText.trim() && onNext) {
-            setHabit(habitText);
-            onNext(habitText);
-          }
-        }}
-        disabled={!habitText.trim()}
-      >
-        <Text style={styles.testButtonText}>테스트: 다음으로 (DB 건너뛰기)</Text>
-      </TouchableOpacity>
+      {/* Floating Debug Button - does not interfere with layout */}
+      <DebugNextButton
+        to="Goal Step 2"
+        onPress={handleDebugNext}
+        label="Debug: Skip DB Save"
+        disabled={!habitText.trim() || isSubmitting}
+      />
     </View>
   );
 }
@@ -233,24 +236,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#a9a9c2',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  testButton: {
-    backgroundColor: '#ff6b6b',
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginHorizontal: 24,
-    marginTop: 16,
-  },
-  testButtonDisabled: {
-    backgroundColor: '#cccccc',
-    opacity: 0.5,
-  },
-  testButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ffffff',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
+import { signUp } from '../backend/supabase/auth';
+import DebugNextButton from './DebugNextButton';
 import SignUpStep0 from './SignUpStep0';
 import SignUpStep1 from './SignUpStep1';
 
@@ -24,6 +26,7 @@ export default function SignUpScreen({
     email: '',
     password: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   // Step 0 handlers
   const handleStep0Next = (email: string) => {
@@ -38,17 +41,42 @@ export default function SignUpScreen({
   };
 
   // Step 1 handlers
-  const handleStep1Next = (password: string) => {
-    const finalData = { ...signUpData, password };
-    setSignUpData(finalData);
-    
-    if (onSignUpComplete) {
-      onSignUpComplete(finalData);
+  const handleStep1Next = async (password: string) => {
+    setIsLoading(true);
+    try {
+      const finalData = { ...signUpData, password };
+      setSignUpData(finalData);
+      
+      // Supabase 회원가입 요청
+      const { user, error } = await signUp(finalData.email, password);
+      
+      if (error) {
+        Alert.alert('회원가입 오류', error.message);
+        return;
+      }
+
+      if (onSignUpComplete) {
+        onSignUpComplete(finalData);
+      }
+    } catch (error) {
+      Alert.alert('오류', '회원가입 중 문제가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleStep1Back = () => {
     setCurrentStep('step0');
+  };
+
+  // Debug navigation handler - bypasses backend signup call
+  const handleDebugSkipSignup = () => {
+    if (signUpData.email && signUpData.password) {
+      // Only call navigation callback - no backend calls
+      if (onSignUpComplete) {
+        onSignUpComplete(signUpData);
+      }
+    }
   };
 
   const renderStep = () => {
@@ -64,12 +92,23 @@ export default function SignUpScreen({
       
       case 'step1':
         return (
-          <SignUpStep1
-            onNext={handleStep1Next}
-            onBack={handleStep1Back}
-            email={signUpData.email}
-            initialValue={signUpData.password}
-          />
+          <>
+            <SignUpStep1
+              onNext={handleStep1Next}
+              onBack={handleStep1Back}
+              email={signUpData.email}
+              initialValue={signUpData.password}
+              isLoading={isLoading}
+            />
+            
+            {/* Floating Debug Button - does not interfere with layout */}
+            <DebugNextButton
+              to="Goal Setting"
+              onPress={handleDebugSkipSignup}
+              label="Debug: Skip Signup"
+              disabled={!signUpData.email || !signUpData.password || isLoading}
+            />
+          </>
         );
       
       default:

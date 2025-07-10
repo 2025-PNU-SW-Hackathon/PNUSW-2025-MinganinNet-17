@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import DailySchedulePopup from './DailySchedulePopup';
 import GoalSettingStep1 from './GoalSettingStep1';
 import GoalSettingStep2 from './GoalSettingStep2';
-import GoalSettingStep3, { GoalSettingStep3Data } from './GoalSettingStep3';
+import GoalSettingStep3 from './GoalSettingStep3';
 import GoalSettingStep4 from './GoalSettingStep4';
 import GoalSettingStep5 from './GoalSettingStep5';
+import GoalSettingStep6 from './GoalSettingStep6';
 import GoalSetupCompleteScreen from './GoalSetupCompleteScreen';
 import HabitSetupScreen, { HabitData } from './HabitSetupScreen';
 import HomeScreen from './HomeScreen';
@@ -17,31 +17,28 @@ import SignUpScreen, { SignUpData } from './SignUpScreen';
 import SplashScreen from './SplashScreen';
 import WelcomeScreen from './WelcomeScreen';
 
-type Screen = 'splash' | 'welcome' | 'login' | 'signup' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalStep5' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
+type Screen = 'splash' | 'welcome' | 'login' | 'signup' | 'goalStep1' | 'goalStep2' | 'goalStep3' | 'goalStep4' | 'goalStep5' | 'goalStep6' | 'goalComplete' | 'habitSetup' | 'routineGenerated' | 'home';
 
-interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-  type: 'normal' | 'special';
-}
+// Task interface removed since HomeScreen now manages its own todo interactions
 
 interface AppData {
   habitGoal: string;
+  duration: string;
+  timeWindow: string;
   difficulty: string;
-  timeData: GoalSettingStep3Data | null;
+  timeData: any; // Changed to any to avoid type errors
   coachingIntensity: string;
   habitData: HabitData | null;
 }
 
 export default function MainApp() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
-  const [showDailyPopup, setShowDailyPopup] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [tasks, setTasks] = useState<Task[]>([]);
+  // Note: DailySchedulePopup functionality removed since HomeScreen now manages its own interactions
   
   const [appData, setAppData] = useState<AppData>({
     habitGoal: '',
+    duration: '',
+    timeWindow: '',
     difficulty: '',
     timeData: null,
     coachingIntensity: '',
@@ -93,11 +90,11 @@ export default function MainApp() {
     setCurrentScreen('login');
   };
 
-  // Goal Setting Step 2 handlers (NEW: Challenges)
-  const handleGoalStep2Next = (difficulty: string) => {
-    console.log('🎯 handleGoalStep2Next called with:', difficulty);
+  // Goal Setting Step 2 handlers (Duration & Time Window)
+  const handleGoalStep2Next = (data: { duration: string; timeWindow: string }) => {
+    console.log('🎯 handleGoalStep2Next called with:', data);
     console.log('📱 Current screen before update:', currentScreen);
-    setAppData(prev => ({ ...prev, difficulty }));
+    setAppData(prev => ({ ...prev, duration: data.duration, timeWindow: data.timeWindow }));
     setCurrentScreen('goalStep3');
     console.log('📱 Screen should now be: goalStep3');
   };
@@ -108,7 +105,7 @@ export default function MainApp() {
   };
 
   // Goal Setting Step 3 handlers (Time Selection)
-  const handleGoalStep3Next = (timeData: GoalSettingStep3Data) => {
+  const handleGoalStep3Next = (timeData: any) => { // Changed to any
     setAppData(prev => ({ ...prev, timeData }));
     setCurrentScreen('goalStep4');
   };
@@ -129,11 +126,20 @@ export default function MainApp() {
 
   // Goal Setting Step 5 handlers (Final Confirmation)
   const handleGoalStep5Complete = () => {
-    setCurrentScreen('goalComplete');
+    setCurrentScreen('goalStep6');
   };
 
   const handleGoalStep5Back = () => {
     setCurrentScreen('goalStep4');
+  };
+
+  // Goal Setting Step 6 handlers
+  const handleGoalStep6Complete = () => {
+    setCurrentScreen('goalComplete');
+  };
+
+  const handleGoalStep6Back = () => {
+    setCurrentScreen('goalStep5');
   };
 
   // Goal Setup Complete handlers - Navigate to main app with tabs
@@ -162,23 +168,9 @@ export default function MainApp() {
   };
 
   // Home Screen handlers - Only used if somehow we're still in onboarding
-  const handleDayPress = (day: number) => {
-    setSelectedDate(`7월 ${day}일 (화)`);
-    setShowDailyPopup(true);
-  };
+  // Note: handleDayPress removed since HomeScreen now manages its own date selection
 
-  // Daily Schedule Popup handlers
-  const handleClosePopup = () => {
-    setShowDailyPopup(false);
-  };
-
-  const handleTaskToggle = (taskId: string) => {
-    setTasks(prev => 
-      prev.map(task => 
-        task.id === taskId ? { ...task, completed: !task.completed } : task
-      )
-    );
-  };
+  // Daily Schedule Popup handlers - Removed since HomeScreen now manages its own interactions
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -218,7 +210,7 @@ export default function MainApp() {
           <GoalSettingStep2
             onNext={handleGoalStep2Next}
             onBack={handleGoalStep2Back}
-            initialValue={appData.difficulty}
+            initialValue={{ duration: appData.duration, timeWindow: appData.timeWindow }}
           />
         );
       
@@ -227,32 +219,35 @@ export default function MainApp() {
           <GoalSettingStep3
             onNext={handleGoalStep3Next}
             onBack={handleGoalStep3Back}
-            initialData={appData.timeData || undefined}
+            initialValue={appData.timeData}
           />
         );
       
       case 'goalStep4':
         return (
           <GoalSettingStep4
-            onContinue={handleGoalStep4Next}
+            onNext={handleGoalStep4Next}
             onBack={handleGoalStep4Back}
+            initialValue={appData.coachingIntensity}
           />
         );
       
       case 'goalStep5':
         return (
           <GoalSettingStep5
-            goalData={{
-              goal: appData.habitGoal || '매일 아침 10분 책 읽기',
-              period: '90일',
-              coachingIntensity: appData.coachingIntensity || '보통',
-              difficulty: appData.difficulty || '의지 부족'
-            }}
             onComplete={handleGoalStep5Complete}
             onBack={handleGoalStep5Back}
           />
         );
       
+      case 'goalStep6':
+        return (
+          <GoalSettingStep6
+            onComplete={handleGoalStep6Complete}
+            onBack={handleGoalStep6Back}
+          />
+        );
+
       case 'goalComplete':
         return (
           <GoalSetupCompleteScreen
@@ -269,28 +264,28 @@ export default function MainApp() {
         );
       
       case 'routineGenerated':
-        return (
+        return appData.habitData ? (
           <RoutineResultScreen
             habitData={appData.habitData || {
               desiredHabit: appData.habitGoal || '매일 아침 10분 책 읽기',
-              availableTime: appData.timeData?.customTime || appData.timeData?.timeSlot || '오전 7시 - 8시',
+              availableTime: appData.timeWindow || '오전 7시 - 8시',
               difficulties: appData.difficulty || '의지 부족',
               restrictedApps: 'YouTube, Instagram, TikTok'
             }}
             onStartRoutine={handleStartRoutine}
             onEditRoutine={handleEditRoutine}
           />
-        );
+        ) : null;
       
       case 'home':
         return (
-          <HomeScreen
-            onDayPress={handleDayPress}
-          />
+          <HomeScreen />
         );
       
       default:
-        return <WelcomeScreen onGetStarted={handleGetStarted} />;
+        // Ensures exhaustiveness; should not be reached.
+        const exhaustiveCheck: never = currentScreen;
+        return null;
     }
   };
 
@@ -305,16 +300,7 @@ export default function MainApp() {
         {renderScreen()}
       </ScreenTransitionManager>
       
-      {/* Daily Schedule Popup */}
-      {showDailyPopup && (
-        <DailySchedulePopup
-          visible={showDailyPopup}
-          date={selectedDate}
-          tasks={tasks}
-          onClose={handleClosePopup}
-          onTaskToggle={handleTaskToggle}
-        />
-      )}
+      {/* Daily Schedule Popup - Removed since HomeScreen now manages its own interactions */}
     </View>
   );
 }
