@@ -1,7 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     Animated,
     Dimensions,
     Modal,
@@ -16,6 +15,7 @@ import CalendarScreen from '../backend/calendar/calendar';
 import { getLatestHabitPlan } from '../backend/supabase/habits';
 import { DailyTodo, Plan } from '../types/habit';
 import AppSettingsScreen from './AppSettingsScreen';
+import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
 import CalendarOutlineIcon from './ui/CalendarOutlineIcon';
 
 const { width } = Dimensions.get('window');
@@ -162,6 +162,11 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   // Animation for coach status
   const coachScaleAnimation = useRef(new Animated.Value(1)).current;
   const [previousCoachStatus, setPreviousCoachStatus] = useState<CoachStatus | null>(null);
+  
+  // Animations for smooth content loading
+  const goalFadeAnimation = useRef(new Animated.Value(0)).current;
+  const todoFadeAnimation = useRef(new Animated.Value(0)).current;
+  const coachFadeAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -327,6 +332,30 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     setPreviousCoachStatus(coachStatus);
   }, [coachStatus.emoji, coachStatus.message]);
 
+  // Animate content when loading completes
+  useEffect(() => {
+    if (!loading) {
+      // Stagger the animations for a more polished feel
+      Animated.stagger(150, [
+        Animated.timing(goalFadeAnimation, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(coachFadeAnimation, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(todoFadeAnimation, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [loading]);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -347,12 +376,19 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
           </View>
 
           <Text style={styles.greetingText}>{getGreeting()}</Text>
+          
+          {/* Enhanced Goal Text Loading */}
           {loading ? (
-            <ActivityIndicator color="#fff" style={{alignSelf: 'flex-start', marginBottom: 20}} />
+            <View style={styles.goalLoadingContainer}>
+              <SkeletonText width="90%" height={18} style={styles.goalSkeletonLine1} />
+              <SkeletonText width="60%" height={18} style={styles.goalSkeletonLine2} />
+            </View>
           ) : (
-            <Text style={styles.goalText}>
-              {plan?.primary_goal || '진행 중인 목표가 없습니다.'}
-            </Text>
+            <Animated.View style={{ opacity: goalFadeAnimation }}>
+              <Text style={styles.goalText}>
+                {plan?.primary_goal || '진행 중인 목표가 없습니다.'}
+              </Text>
+            </Animated.View>
           )}
 
           <ScrollView 
@@ -379,41 +415,51 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
         </View>
 
         <View style={styles.mainContent}>
-          <View style={styles.coachCard}>
-            <Text style={styles.cardTitle}>Coach's Status</Text>
-            <View style={styles.coachContent}>
-              <Animated.View style={{ transform: [{ scale: coachScaleAnimation }] }}>
-                <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
-              </Animated.View>
-              <Text style={styles.coachMessage}>{coachStatus.message}</Text>
-              <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
-            </View>
-          </View>
+          {/* Enhanced Coach Card Loading */}
+          {loading ? (
+            <SkeletonCard type="coach" />
+          ) : (
+            <Animated.View style={[styles.coachCard, { opacity: coachFadeAnimation }]}>
+              <Text style={styles.cardTitle}>Coach's Status</Text>
+              <View style={styles.coachContent}>
+                <Animated.View style={{ transform: [{ scale: coachScaleAnimation }] }}>
+                  <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
+                </Animated.View>
+                <Text style={styles.coachMessage}>{coachStatus.message}</Text>
+                <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
+              </View>
+            </Animated.View>
+          )}
 
+          {/* Enhanced Todo Card Loading */}
           <View style={styles.todoCard}>
             <Text style={styles.cardTitle}>Today's To-Do</Text>
             <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
-              {loading ? <ActivityIndicator color="#fff" />
-              : error ? <Text style={styles.emptyTodoText}>{error}</Text>
-              : todosForSelectedDate.length > 0 ? (
-                todosForSelectedDate.map((todo, index) => {
-                  const milestone = plan?.milestones.find(m => m.daily_todos.includes(todo));
-                  if (!milestone) return null;
-                  const todoKey = `${milestone.title}-${index}`;
-                  const isCompleted = todoCompletion[todoKey];
-                  return (
-                    <AnimatedTodoItem
-                      key={todoKey}
-                      todo={todo}
-                      isCompleted={isCompleted}
-                      onToggle={() => handleTodoToggle(index, milestone.title)}
-                    />
-                  );
-                })
+              {loading ? (
+                <SkeletonTodoList count={3} />
+              ) : error ? (
+                <Text style={styles.emptyTodoText}>{error}</Text>
+              ) : todosForSelectedDate.length > 0 ? (
+                <Animated.View style={{ opacity: todoFadeAnimation }}>
+                  {todosForSelectedDate.map((todo, index) => {
+                    const milestone = plan?.milestones.find(m => m.daily_todos.includes(todo));
+                    if (!milestone) return null;
+                    const todoKey = `${milestone.title}-${index}`;
+                    const isCompleted = todoCompletion[todoKey];
+                    return (
+                      <AnimatedTodoItem
+                        key={todoKey}
+                        todo={todo}
+                        isCompleted={isCompleted}
+                        onToggle={() => handleTodoToggle(index, milestone.title)}
+                      />
+                    );
+                  })}
+                </Animated.View>
               ) : (
-                <View style={styles.emptyTodoContainer}>
+                <Animated.View style={[styles.emptyTodoContainer, { opacity: todoFadeAnimation }]}>
                   <Text style={styles.emptyTodoText}>오늘의 할 일이 없습니다.</Text>
-                </View>
+                </Animated.View>
               )}
             </ScrollView>
           </View>
@@ -484,4 +530,13 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: '#1c1c2e', borderRadius: 20, padding: 20, elevation: 5, minWidth: 350, maxWidth: '90%', maxHeight: '90%' },
   closeButton: { marginTop: 16, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20, backgroundColor: '#6c63ff', borderRadius: 20 },
   closeButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  goalLoadingContainer: {
+    marginBottom: 20,
+  },
+  goalSkeletonLine1: {
+    marginBottom: 8,
+  },
+  goalSkeletonLine2: {
+    marginBottom: 0,
+  },
 }); 
