@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import GoalSettingStep1 from './GoalSettingStep1';
 import GoalSettingStep2 from './GoalSettingStep2';
-import GoalSettingStep3, { GoalSettingStep3Data } from './GoalSettingStep3';
+import GoalSettingStep3 from './GoalSettingStep3';
 import GoalSettingStep4 from './GoalSettingStep4';
 import GoalSettingStep5 from './GoalSettingStep5';
 import GoalSetupCompleteScreen from './GoalSetupCompleteScreen';
@@ -22,8 +22,9 @@ type Screen = 'splash' | 'welcome' | 'login' | 'signup' | 'goalStep1' | 'goalSte
 
 interface AppData {
   habitGoal: string;
+  duration: string;
+  timeWindow: string;
   difficulty: string;
-  timeData: GoalSettingStep3Data | null;
   coachingIntensity: string;
   habitData: HabitData | null;
 }
@@ -34,8 +35,9 @@ export default function MainApp() {
   
   const [appData, setAppData] = useState<AppData>({
     habitGoal: '',
+    duration: '',
+    timeWindow: '',
     difficulty: '',
-    timeData: null,
     coachingIntensity: '',
     habitData: null,
   });
@@ -85,11 +87,11 @@ export default function MainApp() {
     setCurrentScreen('login');
   };
 
-  // Goal Setting Step 2 handlers (NEW: Challenges)
-  const handleGoalStep2Next = (difficulty: string) => {
-    console.log('🎯 handleGoalStep2Next called with:', difficulty);
+  // Goal Setting Step 2 handlers (Duration & Time Window)
+  const handleGoalStep2Next = (data: { duration: string; timeWindow: string }) => {
+    console.log('🎯 handleGoalStep2Next called with:', data);
     console.log('📱 Current screen before update:', currentScreen);
-    setAppData(prev => ({ ...prev, difficulty }));
+    setAppData(prev => ({ ...prev, duration: data.duration, timeWindow: data.timeWindow }));
     setCurrentScreen('goalStep3');
     console.log('📱 Screen should now be: goalStep3');
   };
@@ -99,9 +101,9 @@ export default function MainApp() {
     setCurrentScreen('goalStep1');
   };
 
-  // Goal Setting Step 3 handlers (Time Selection)
-  const handleGoalStep3Next = (timeData: GoalSettingStep3Data) => {
-    setAppData(prev => ({ ...prev, timeData }));
+  // Goal Setting Step 3 handlers (Challenges/Difficulty)
+  const handleGoalStep3Next = (difficulty: string) => {
+    setAppData(prev => ({ ...prev, difficulty }));
     setCurrentScreen('goalStep4');
   };
 
@@ -196,7 +198,7 @@ export default function MainApp() {
           <GoalSettingStep2
             onNext={handleGoalStep2Next}
             onBack={handleGoalStep2Back}
-            initialValue={appData.difficulty}
+            initialValue={{ duration: appData.duration, timeWindow: appData.timeWindow }}
           />
         );
       
@@ -205,7 +207,7 @@ export default function MainApp() {
           <GoalSettingStep3
             onNext={handleGoalStep3Next}
             onBack={handleGoalStep3Back}
-            initialData={appData.timeData || undefined}
+            initialValue={appData.difficulty}
           />
         );
       
@@ -214,18 +216,13 @@ export default function MainApp() {
           <GoalSettingStep4
             onNext={handleGoalStep4Next}
             onBack={handleGoalStep4Back}
+            initialValue={appData.coachingIntensity}
           />
         );
       
       case 'goalStep5':
         return (
           <GoalSettingStep5
-            goalData={{
-              goal: appData.habitGoal || '매일 아침 10분 책 읽기',
-              period: '90일',
-              coachingIntensity: appData.coachingIntensity || '보통',
-              difficulty: appData.difficulty || '의지 부족'
-            }}
             onComplete={handleGoalStep5Complete}
             onBack={handleGoalStep5Back}
           />
@@ -251,7 +248,7 @@ export default function MainApp() {
           <RoutineResultScreen
             habitData={appData.habitData || {
               desiredHabit: appData.habitGoal || '매일 아침 10분 책 읽기',
-              availableTime: appData.timeData?.customTime || appData.timeData?.timeSlot || '오전 7시 - 8시',
+              availableTime: appData.timeWindow || '오전 7시 - 8시',
               difficulties: appData.difficulty || '의지 부족',
               restrictedApps: 'YouTube, Instagram, TikTok'
             }}
