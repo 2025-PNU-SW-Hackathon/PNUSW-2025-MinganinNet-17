@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
@@ -120,7 +120,7 @@ export default function GoalSettingStep1({
       
       <View style={styles.titleContainer}>
         <Text style={styles.title}>
-          가장 만들고 싶은{'\n'}좋은 습관은 무엇인가요?
+          당신과 제가 함께{'\n'}이뤄나갈 목표는 무엇인가요?
         </Text>
       </View>
 
@@ -129,7 +129,7 @@ export default function GoalSettingStep1({
           style={styles.habitInput}
           value={habitText}
           onChangeText={setHabitText}
-          placeholder="예) 매일 아침 10분씩 책 읽기"
+          placeholder="예) 한 달 동안 책 10권 읽기기"
           placeholderTextColor="#a9a9c2"
           multiline
           textAlignVertical="top"

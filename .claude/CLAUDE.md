@@ -1,8 +1,10 @@
-# Project Functional Specification: Habit Formation and Management App
+# Project Functional Specification: Intelligent Goal Decomposition and Habit Management App
 
 ## 1. Overview
 
-This document specifies the main features of a mobile app service designed to help users form habits, restrict the use of specific apps to achieve set goals, and provide personalized routines and warning messages using AI (Google Gemini).
+This document specifies the main features of a mobile app service designed to help users achieve high-level goals through intelligent goal decomposition, automated sub-goal scheduling, and personalized AI coaching. The app breaks down complex goals into manageable sub-goals, schedules them efficiently on the calendar without time conflicts, and provides AI-powered guidance and app restriction features.
+
+**Key Evolution:** The app has expanded from simple habit management to intelligent goal decomposition. Users input high-level goals (e.g., "read 10 books in a month", "master the college-level Calculus 1 in 2 months"), and the system automatically breaks them down into actionable sub-goals, then schedules them optimally on the calendar while leveraging existing features like morning briefings and daily/weekly reports.
 
 Note: As the application is intended for the Korean market, all user-facing text in the UI (including inputs, prompts, and messages) will be displayed in Korean.
 
@@ -16,43 +18,79 @@ Note: As the application is intended for the Korean market, all user-facing text
 
 ## 3. Key Features and Execution Flow
 
-### 3.1. Habit Setting and Routine Generation
+### 3.1. Intelligent Goal Decomposition and Sub-Goal Scheduling
 
-**Objective:** Based on the user's habit goals, available time, and difficulties, Google Gemini generates an optimized routine and saves it to the calendar.
+**Objective:** Based on the user's high-level goal and available time window, Google Gemini intelligently breaks down the goal into actionable sub-goals and schedules them on the calendar without time conflicts.
 
 **Input:**
-*   **Desired Habit:** Specific habit goals the user wants to achieve (e.g., "Exercise for 30 minutes every morning," "Read for 2 hours a day").
-*   **Available Time for Habit:** Time slots when the user can practice the habit (e.g., "7 AM to 8 AM," "1 hour after work").
-*   **Difficulties in Habit Formation:** Obstacles that hinder consistent practice of the habit (e.g., "Difficulty in being consistent," "Fatigue after exercise," "Lack of focus").
-*   **Restricted Apps:** A list of apps the user deems distracting from habit formation (e.g., "YouTube," "Instagram," "TikTok").
+*   **Primary Goal:** High-level goal the user wants to achieve (String, e.g., "read 10 books in a month," "learn intermediate Spanish conversation in 3 months," "lose 5kg in 8 weeks").
+*   **Available Time Window:** Daily time slot when the user can work on their goal (String, e.g., "19:00 - 22:00," "06:00 - 08:00"). No differentiation between weekdays and weekends for implementation simplicity.
 
 **Processing Flow:**
-1.  **User Input:** The app receives the above input values from the user through the UI.
-2.  **Data Storage:** The entered user settings are saved to the Supabase database.
-3.  **Backend Function Call:** The app calls a Supabase backend function, passing the user input data as arguments.
-4.  **Google Gemini API Call (Backend):**
-    *   The backend function calls the Google Gemini API based on the received user data.
+1.  **User Input:** The app receives the primary goal and time window from the user through the UI.
+2.  **Data Storage:** The entered goal information is saved to the Supabase database. For Exception Handling, It can be stored both on local database and Supabase database. 
+3.  **Backend Function Call:** The app calls a Supabase backend function, passing the goal and time window as arguments.
+4.  **Google Gemini API Call for Goal Decomposition (Backend):**
+    *   The backend function calls the Google Gemini API to decompose the high-level goal.
     *   **Prompt Example:**
         ```
-        "Based on the following information, create a personalized habit formation routine for the user.
-        - Desired Habit: [User Input: Desired Habit]
-        - Available Time: [User Input: Available Time]
-        - Difficulties in Habit Formation: [User Input: Difficulties in Habit Formation]
-        - Restricted Apps: [User Input: List of Restricted Apps]
-
-        The routine should consist of specific activities and recommended times, and include advice to help the user overcome their difficulties.
-        The response should be in JSON format, including 'routine_name', 'activities' (each activity with 'time' and 'description' fields), and 'tips' fields."
+        "Break down the following high-level goal into specific, actionable sub-goals that can be completed within the given time constraints.
+        - Primary Goal: [User Input: Primary Goal]
+        - Available Time Window: [User Input: Available Time Window]
+        
+        Requirements:
+        - Create 3-10 sub-goals that collectively achieve the primary goal
+        - Each sub-goal should be specific, measurable, and time-bound
+        - Sub-goals should fit within the available time window
+        - Provide realistic time estimates for each sub-goal
+        - Include difficulty progression (easier tasks first)
+        
+        The response should be in JSON format with the following structure:
+        {
+          'goal_breakdown': {
+            'primary_goal': '[Primary Goal]',
+            'total_duration': '[Estimated total duration]',
+            'sub_goals': [
+              {
+                'id': 1,
+                'title': '[Sub-goal title]',
+                'description': '[Detailed description]',
+                'estimated_duration': '[Duration in minutes]',
+                'priority': '[High/Medium/Low]',
+                'difficulty': '[Easy/Medium/Hard]',
+                'prerequisites': '[List of prerequisite sub-goal IDs]'
+              }
+            ],
+            'tips': '[Overall tips for achieving the primary goal]'
+          }
+        }"
         ```
-    *   **Response Format:** Receives and parses the routine information from Gemini in JSON format.
+    *   **Response Format:** Receives and parses the goal decomposition from Gemini in JSON format.
     *   **Model Selection:** Uses an appropriate Gemini model such as `gemini-pro` or `gemini-1.5-flash`.
     *   **Safety Settings:** Applies the Gemini API's safety settings for filtering harmful content.
-5.  **Calendar Integration (Backend):**
-    *   Automatically registers the generated routine information into the user's calendar.
-    *   **Calendar API Utilization:** Implemented using user-friendly calendar APIs like the React Native Calendar library or Expo Calendar API.
-    *   **Schedule Registration:** Registers each activity of the Gemini-generated routine as a calendar event according to its time slot.
-    *   **Notification Setup:** Sets up notifications at appropriate times before each routine activity starts to help the user avoid missing their habit practice.
-6.  **Response Return:** The generated routine information and calendar registration results are returned to the app.
 
+5.  **Intelligent Calendar Scheduling (Backend):**
+    *   Automatically schedules the generated sub-goals on the user's calendar using the  decided Calender such as `react-native-calendars` API.
+    *   **Conflict-Free Scheduling:** Implements intelligent scheduling algorithm to ensure no time overlaps between sub-goals.
+    *   **Scheduling Logic:**
+        - Analyzes the available time window
+        - Considers sub-goal prerequisites and dependencies
+        - Optimizes for difficulty progression (easier tasks first)
+        - Distributes sub-goals across available time slots
+        - Ensures adequate breaks between intensive sub-goals
+    *   **Calendar Event Creation:** Creates calendar events for each sub-goal with:
+        - Title and description
+        - Specific start and end times
+        - Priority and difficulty indicators
+        - Progress tracking capabilities
+    *   **Notification Setup:** Sets up notifications before each sub-goal activity to help users stay on track.
+
+6.  **Integration with Existing Features:**
+    *   **Morning Briefing:** Incorporates sub-goal progress into daily morning briefings
+    *   **Daily/Weekly Reports:** Provides comprehensive progress reports on sub-goal completion
+    *   **AI Coaching:** Adapts existing AI coaching features to work with decomposed sub-goals
+
+7.  **Response Return:** The generated sub-goals, calendar scheduling results, and integration status are returned to the app.
 
 ### 3.2. Restricted App Access Warning and Message Generation
 
@@ -61,25 +99,27 @@ Note: As the application is intended for the Korean market, all user-facing text
 **Input:**
 *   **Detected App Name:** The name of the restricted app the user has accessed (e.g., "YouTube").
 *   **AI Personality:** A pre-defined AI personality from the backend (e.g., "Friendly Advisor," "Strict Coach," "Witty Friend").
+*   **Current Sub-Goal Context:** Information about the user's current sub-goal to provide contextual warnings.
 
 **Processing Flow:**
 1.  **App Access Detection (Client-side):**
     *   Detects user access to restricted apps within the React Native/Expo environment. (Requires platform-specific native modules or libraries).
-2.  **Backend Function Call:** The app calls a Supabase backend function, passing the detected app name and AI personality as arguments.
+2.  **Backend Function Call:** The app calls a Supabase backend function, passing the detected app name, AI personality, and current sub-goal context as arguments.
 3.  **Google Gemini API Call (Backend):**
-    *   The backend function calls the Google Gemini API based on the received app name and AI personality.
+    *   The backend function calls the Google Gemini API based on the received app name, AI personality, and sub-goal context.
     *   **Prompt Example:**
         ```
-        "The user has accessed [Detected App Name].
-        Based on the following AI personality, write a 1-2 sentence warning message encouraging the user to refrain from using the app and focus on their habit.
+        "The user has accessed [Detected App Name] while working on their sub-goal: [Current Sub-Goal].
+        Based on the following AI personality, write a 1-2 sentence warning message encouraging the user to refrain from using the app and focus on their current sub-goal.
         - AI Personality: [AI Personality]
+        - Current Sub-Goal: [Current Sub-Goal Title and Description]
 
         Examples:
-        - Friendly Advisor: 'Hey there! How about we focus on your habit instead of [Detected App Name]? You're so close to reaching your goal!'
-        - Strict Coach: 'Access to [Detected App Name] is prohibited. It is now time to focus on your habit goal.'
-        - Witty Friend: 'Looks like [Detected App Name] is trying to tempt you! Show it that your habit is stronger!'"
+        - Friendly Advisor: 'Hey there! I see you're working on [Sub-Goal]. How about we focus on that instead of [Detected App Name]? You're making great progress!'
+        - Strict Coach: 'Access to [Detected App Name] is prohibited. Your current sub-goal "[Sub-Goal]" requires your full attention.'
+        - Witty Friend: 'Looks like [Detected App Name] is trying to distract you from [Sub-Goal]! Show it that your goals are stronger!'"
         ```
-    *   **Response Format:** Receives the warning message from Gemini in text format.
+    *   **Response Format:** Receives the contextual warning message from Gemini in text format.
     *   **Model Selection:** Uses an appropriate Gemini model such as `gemini-pro` or `gemini-1.5-flash`.
     *   **Safety Settings:** Applies the Gemini API's safety settings for filtering harmful content.
 4.  **Display Warning Message (Client-side):**
@@ -94,4 +134,21 @@ For security and flexible management, the following information is stored and ma
 *   `SUPABASE_ANON_KEY`: Supabase anonymous key.
 *   `BACKEND_FUNCTION_ENDPOINT`: Endpoint URL for backend function calls.
 
+## 5. Technical Requirements for Calendar Integration
+
+### 5.1. Conflict-Free Scheduling Algorithm
+*   **Time Window Analysis:** Parse user's available time window (e.g., "19:00 - 22:00") and calculate total available minutes.
+*   **Sub-Goal Duration Management:** Ensure sum of all sub-goal durations fits within available time slots.
+*   **Dependency Resolution:** Schedule sub-goals that have prerequisites after their dependencies are completed.
+*   **Buffer Time:** Include 5-10 minute buffers between sub-goals to prevent overlap and allow for transitions.
+
+### 5.2. Calendar API Integration
+*   **Calendar Library:** Utilize `react-native-calendars` for advanced calendar functionality.
+*   **Event Management:** Create, update, and delete calendar events programmatically.
+*   **Visual Indicators:** Display different colors or icons for sub-goals based on priority and difficulty.
+*   **Progress Tracking:** Update calendar events as sub-goals are completed.
+
+
+
 --- 
+

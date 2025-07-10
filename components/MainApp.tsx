@@ -23,6 +23,8 @@ type Screen = 'splash' | 'welcome' | 'login' | 'signup' | 'goalStep1' | 'goalSte
 
 interface AppData {
   habitGoal: string;
+  duration: string;
+  timeWindow: string;
   difficulty: string;
   timeData: any; // Changed to any to avoid type errors
   coachingIntensity: string;
@@ -35,6 +37,8 @@ export default function MainApp() {
   
   const [appData, setAppData] = useState<AppData>({
     habitGoal: '',
+    duration: '',
+    timeWindow: '',
     difficulty: '',
     timeData: null,
     coachingIntensity: '',
@@ -86,11 +90,11 @@ export default function MainApp() {
     setCurrentScreen('login');
   };
 
-  // Goal Setting Step 2 handlers (NEW: Challenges)
-  const handleGoalStep2Next = (difficulty: string) => {
-    console.log('🎯 handleGoalStep2Next called with:', difficulty);
+  // Goal Setting Step 2 handlers (Duration & Time Window)
+  const handleGoalStep2Next = (data: { duration: string; timeWindow: string }) => {
+    console.log('🎯 handleGoalStep2Next called with:', data);
     console.log('📱 Current screen before update:', currentScreen);
-    setAppData(prev => ({ ...prev, difficulty }));
+    setAppData(prev => ({ ...prev, duration: data.duration, timeWindow: data.timeWindow }));
     setCurrentScreen('goalStep3');
     console.log('📱 Screen should now be: goalStep3');
   };
@@ -206,16 +210,16 @@ export default function MainApp() {
           <GoalSettingStep2
             onNext={handleGoalStep2Next}
             onBack={handleGoalStep2Back}
-            initialValue={appData.difficulty}
+            initialValue={{ duration: appData.duration, timeWindow: appData.timeWindow }}
           />
         );
       
       case 'goalStep3':
         return (
           <GoalSettingStep3
-            onNext={handleGoalStep3Next as (difficulty: string) => void}
+            onNext={handleGoalStep3Next}
             onBack={handleGoalStep3Back}
-            initialValue={appData.difficulty}
+            initialValue={appData.timeData}
           />
         );
       
@@ -224,6 +228,7 @@ export default function MainApp() {
           <GoalSettingStep4
             onNext={handleGoalStep4Next}
             onBack={handleGoalStep4Back}
+            initialValue={appData.coachingIntensity}
           />
         );
       
@@ -261,7 +266,12 @@ export default function MainApp() {
       case 'routineGenerated':
         return appData.habitData ? (
           <RoutineResultScreen
-            habitData={appData.habitData}
+            habitData={appData.habitData || {
+              desiredHabit: appData.habitGoal || '매일 아침 10분 책 읽기',
+              availableTime: appData.timeWindow || '오전 7시 - 8시',
+              difficulties: appData.difficulty || '의지 부족',
+              restrictedApps: 'YouTube, Instagram, TikTok'
+            }}
             onStartRoutine={handleStartRoutine}
             onEditRoutine={handleEditRoutine}
           />
