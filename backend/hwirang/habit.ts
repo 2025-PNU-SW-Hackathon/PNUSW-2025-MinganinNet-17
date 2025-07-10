@@ -1,5 +1,5 @@
+import { PersonaType, Plan } from '../../types/habit';
 import { sendMessage } from './gemini';
-import { Plan, Milestone, DailyTodo, PersonaType } from '../../types/habit';
 
 // #region 시스템 프롬프트
 const SYSTEM_PROMPT = `당신은 사용자의 목표 달성을 돕는 애플리케이션 '루티(Routi)'의 핵심 AI 코치, '루티(Routi)' 입니다.
@@ -13,7 +13,7 @@ const SYSTEM_PROMPT = `당신은 사용자의 목표 달성을 돕는 애플리�
 당신은 아래에 주어질 <사용자 입력>에 따라, 다음 3단계 사고 프로세스를 엄격하게 준수해야 합니다.
 
 1.  **제 1 목표 확정:** <사용자 입력>의 "goal" 값을 **그대로 인용**하여 "primaryGoal" 필드에 설정합니다. **절대 이 내용을 수정하거나, 재해석하거나, 창작해서는 안 됩니다.**
-2.  **세부 목표(Milestones) 수립:** 확정된 "primaryGoal"을 달성하기 위한, 논리적인 중간 단계들을 목표 기간에 맞춰 설계합니다.
+2.  **세부 목표(Milestones) 수립:** 확정된 "primaryGoal"을 달성하기 위한 논리적인 중간 단계들을 설계합니다. 이때, **<사용자 입력>의 "goalPeriod"는 절대 변경 불가능한 제약 조건입니다.** 모든 "milestones"의 "duration" 기간을 합산한 총 기간은 "goalPeriod"와 **정확히 일치해야 합니다.** (예: "goalPeriod"가 "3개월"이면, "milestones"의 기간 합도 정확히 "3개월"이어야 합니다.)
 3.  **일일 To-Do 리스트 생성:** 각 세부 목표(Milestones)를 달성하기 위해, 즉시 실행할 수 있는 구체적인 행동 목록(dailyTodos)을 만듭니다.
 
 ---
@@ -60,7 +60,7 @@ const SYSTEM_PROMPT = `당신은 사용자의 목표 달성을 돕는 애플리�
 *   모든 UUID 필드("planId", "milestoneId", "todoId")는 "plan_", "ms_", "todo_" 접두사를 붙인 실제 UUID 값으로 생성해야 합니다.
 *   "dailyTodos.description"은 그 자체로 완벽히 이해 가능한 하나의 완전한 행동 지침이어야 합니다.
 *   **어떤 경우에도 이모지를 사용해서는 안 됩니다.**
-*   "primaryGoal", "aiPersona", "goalPeriod", "startDate" 필드는 반드시 <사용자 입력>의 값을 그대로 반영해야 합니다.
+*   **절대 규칙:** "primaryGoal", "aiPersona", "goalPeriod", "startDate" 필드는 <사용자 입력>의 값을 **어떠한 경우에도 수정, 변경, 또는 재해석해서는 안 됩니다.** 당신의 유일한 임무는 원본 값을 그대로 복사하여 붙여넣는 것입니다.
 
 ---
 
@@ -175,17 +175,23 @@ export async function submitHabitData(
   habit: string,
   availableTime: string,
   difficulty: string,
-  persona: PersonaType
+  persona: PersonaType,
+  goalPeriod: string
 ): Promise<Plan> {
   
-  const userPrompt = `
-    habit: "${habit}"
-    time: "${availableTime}"
-    difficulty: "${difficulty}"
-    persona: "${persona}"
-  `;
+  const formattedGoal = `${habit} (가능 시간: ${availableTime}, 어려운 점: ${difficulty})`;
+  const startDate = new Date().toISOString().split('T')[0];
 
-  const fullPrompt = `${SYSTEM_PROMPT}\n\n--- USER INPUT ---\n${userPrompt}`;
+  const userInput = {
+    goal: formattedGoal,
+    persona: persona,
+    goalPeriod: goalPeriod,
+    startDate: startDate,
+  };
+
+  const userPrompt = JSON.stringify(userInput, null, 2);
+
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n<사용자 입력>\n${userPrompt}\n</사용자 입력>`;
 
   try {
     console.log('🤖 AI 루틴 생성 시도 중...');
@@ -228,7 +234,7 @@ export async function submitHabitData(
       console.log('🔄 알 수 없는 오류 발생, 기본 루틴으로 대체');
     }
     
-    return createDefaultPlan(habit, availableTime, persona);
+    return createDefaultPlan(habit, availableTime, persona, goalPeriod);
   }
 }
 
@@ -242,7 +248,8 @@ export async function submitHabitData(
 function createDefaultPlan(
   habit: string,
   availableTime: string,
-  persona: PersonaType
+  persona: PersonaType,
+  goalPeriod: string
 ): Plan {
   console.log('🔄 기본 루틴 생성 중...');
   const today = new Date().toISOString().split('T')[0];
@@ -254,7 +261,7 @@ function createDefaultPlan(
     primary_goal: habit,
     ai_plan_title: `[루티]의 ${habit} 기본 플랜`,
     ai_persona: persona,
-    goal_period: "1개월",
+    goal_period: goalPeriod,
     start_date: today,
     milestones: [
       {
