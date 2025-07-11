@@ -116,7 +116,7 @@ export default function GoalSettingStep4({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.stepIndicator}>4 / 5 단계</Text>
+      <Text style={styles.stepIndicator}>4 / 6 단계</Text>
       
       {/* Back Button */}
       <TouchableOpacity

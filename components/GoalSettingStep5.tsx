@@ -146,7 +146,7 @@ export default function GoalSettingStep5({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.stepIndicator}>5 / 5 단계</Text>
+      <Text style={styles.stepIndicator}>5 / 6 단계</Text>
       
       {/* Back Button */}
       <TouchableOpacity

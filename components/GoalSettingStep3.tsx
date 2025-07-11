@@ -80,7 +80,7 @@ export default function GoalSettingStep3({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.stepIndicator}>3 / 5 단계</Text>
+      <Text style={styles.stepIndicator}>3 / 6 단계</Text>
       
       {/* Back Button */}
       <TouchableOpacity
