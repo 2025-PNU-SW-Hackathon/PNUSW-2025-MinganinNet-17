@@ -16,7 +16,6 @@ import { getLatestHabitPlan } from '../backend/supabase/habits';
 import { DailyTodo, Plan } from '../types/habit';
 import AppSettingsScreen from './AppSettingsScreen';
 import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
-import CalendarOutlineIcon from './ui/CalendarOutlineIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -363,9 +362,6 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>🌱</Text>
-              <TouchableOpacity style={styles.squareButton} onPress={() => setCalendarVisible(true)}>
-                <CalendarOutlineIcon size={20} color="#fff" />
-              </TouchableOpacity>
             </View>
             <TouchableOpacity 
               style={styles.profileButton}
@@ -525,7 +521,6 @@ const styles = StyleSheet.create({
   todoTextCompleted: { textDecorationLine: 'line-through', color: '#a9a9c2' },
   emptyTodoContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyTodoText: { fontSize: 14, color: '#a9a9c2', fontFamily: 'Inter' },
-  squareButton: { width: 36, height: 36, borderRadius: 8, marginLeft: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#3a3a50' },
   modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#1c1c2e', borderRadius: 20, padding: 20, elevation: 5, minWidth: 350, maxWidth: '90%', maxHeight: '90%' },
   closeButton: { marginTop: 16, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20, backgroundColor: '#6c63ff', borderRadius: 20 },
