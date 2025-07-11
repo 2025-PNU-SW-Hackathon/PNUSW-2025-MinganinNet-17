@@ -129,7 +129,7 @@ export default function GoalSettingStep1({
           style={styles.habitInput}
           value={habitText}
           onChangeText={setHabitText}
-          placeholder="예) 한 달 동안 책 10권 읽기"
+          placeholder="예) 책 10권 읽기"
           placeholderTextColor="#a9a9c2"
           multiline
           textAlignVertical="top"
