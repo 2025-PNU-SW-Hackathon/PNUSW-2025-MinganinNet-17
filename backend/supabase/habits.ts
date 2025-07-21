@@ -49,7 +49,7 @@ export async function saveHabitToSupabase(habitData: HabitData) {
       throw new Error('데이터 저장 후 응답이 없습니다.');
     }
 
-    console.log('✅ 습관 데이터 저장 성공:', data);
+    // console.log('✅ 습관 데터 저장 성공:', data);
     return data;
   } catch (error) {
     console.error('Error saving habit:', error);

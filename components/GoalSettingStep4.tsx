@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { HabitData, saveHabitToSupabase } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
 
@@ -17,7 +16,7 @@ export default function GoalSettingStep4({
 }: GoalSettingStep4Props) {
   const [selectedIntensity, setSelectedIntensity] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, time, setIntensity } = useHabitStore();
+  const { setIntensity } = useHabitStore();
 
   const intensityOptions = [
     { id: '높음', label: '높음 - 강하게 동기부여하고 꾸준히 체크해주세요' },
@@ -27,7 +26,7 @@ export default function GoalSettingStep4({
 
   // Handle intensity selection (just selection, not navigation)
   const handleIntensitySelect = (intensity: string) => {
-    console.log('🔄 Intensity selected:', intensity);
+    console.log('🎯 GoalSettingStep4 Intensity selected:', intensity);
     setSelectedIntensity(intensity);
   };
 
@@ -38,53 +37,33 @@ export default function GoalSettingStep4({
       return;
     }
 
-    console.log('🔄 Starting GoalSettingStep4 submission...', { selectedIntensity });
+    console.log('🔄 Starting GoalSettingStep4 submission...', {
+      selectedIntensity,
+    });
     setIsSubmitting(true);
 
     try {
-      // 기존 데이터를 업데이트
-      const habitData: HabitData = {
-        habit_name: habit,
-        time_slot: time,
-        intensity: selectedIntensity,
-        difficulty: '',  // 아직 설정되지 않음
-        ai_routine: ''   // 아직 생성되지 않음
-      };
-
-      console.log('💾 Attempting to save to Supabase...', habitData);
-      
-      try {
-        await saveHabitToSupabase(habitData);
-        console.log('✅ Successfully saved to Supabase');
-      } catch (dbError) {
-        console.error('❌ Database save failed:', dbError);
-        
-        // 인증 오류인 경우 조용히 처리
-        if (dbError instanceof Error && dbError.message === 'AUTH_MISSING') {
-          console.log('🔓 No authentication - continuing with local storage only');
-        } else {
-          // 다른 오류는 알림 표시하지만 계속 진행
-          console.warn('⚠️ Database error, continuing with local storage:', dbError);
-        }
-      }
-      
-      // Zustand store에 저장 (항상 실행)
-      console.log('🏪 Saving to local store...');
+      // Zustand store에만 저장하고 데이터베이스 호출은 제거합니다.
+      // console.log('🏪 Saving to local store...');
       setIntensity(selectedIntensity);
-      console.log('✅ Successfully saved to local store');
+      // console.log('✅ Successfully saved to local store');
 
       // 다음 단계로
-      console.log('🚀 Calling onNext handler...');
+      // console.log('🚀 Calling onNext handler...');
       if (onNext) {
         onNext(selectedIntensity);
-        console.log('✅ onNext called successfully');
+        // console.log('✅ onNext called successfully');
       } else {
-        console.warn('⚠️ onNext is undefined!');
+        // console.warn('⚠️ onNext is undefined!');
       }
-      
     } catch (error) {
       console.error('💥 Unexpected error in handleNext:', error);
-      Alert.alert('오류', `예상치 못한 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      Alert.alert(
+        '오류',
+        `예상치 못한 오류가 발생했습니다: ${
+          error instanceof Error ? error.message : '알 수 없는 오류'
+        }`
+      );
     } finally {
       setIsSubmitting(false);
       console.log('🏁 Finished GoalSettingStep4 submission');

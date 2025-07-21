@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 
@@ -135,26 +135,26 @@ export default function GoalSettingStep2({
 
     const timeWindow = `${formatTime(startTime.hours, startTime.minutes)}-${formatTime(endTime.hours, endTime.minutes)}`;
     
-    console.log('🔄 Starting data submission...', { duration: finalDuration, timeWindow });
+    console.log('🔄 Starting GoalSettingStep2 submission...', { duration: finalDuration, timeWindow });
     
     try {
       // Save to habit store (using existing structure)
-      console.log('🏪 Saving to habit store...');
+      // console.log('🏪 Saving to habit store...');
       setTime(timeWindow);
       setGoalPeriod(finalDuration);
-      console.log('✅ Successfully saved to habit store');
+      // console.log('✅ Successfully saved to habit store');
 
       const data = {
         duration: finalDuration,
         timeWindow: timeWindow
       };
 
-      console.log('🚀 Calling onNext handler...');
+      // console.log('🚀 Calling onNext handler...');
       if (onNext) {
         onNext(data);
-        console.log('✅ onNext called successfully');
+        // console.log('✅ onNext called successfully');
       } else {
-        console.warn('⚠️ onNext is undefined!');
+        // console.warn('⚠️ onNext is undefined!');
       }
     } catch (error) {
       console.error('💥 Error in GoalSettingStep2:', error);
