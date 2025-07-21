@@ -40,16 +40,16 @@ export default function GoalSettingStep1({
 
     try {
       // Zustand store에만 저장하고 데이터베이스 호출은 제거합니다.
-      console.log('🏪 Saving to local store...');
+      // console.log('🏪 Saving to local store...');
       setHabit(habitText);
-      console.log('✅ Successfully saved to local store');
+      // console.log('✅ Successfully saved to local store');
 
-      console.log('🚀 Calling onNext handler...');
+      // console.log('🚀 Calling onNext handler...');
       if (onNext) {
         onNext(habitText);
-        console.log('✅ onNext called successfully');
+        // console.log('✅ onNext called successfully');
       } else {
-        console.warn('⚠️ onNext is undefined!');
+        // console.warn('⚠️ onNext is undefined!');
       }
     } catch (error) {
       console.error('💥 Unexpected error in handleHabitSubmit:', error);

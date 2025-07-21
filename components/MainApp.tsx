@@ -78,8 +78,8 @@ export default function MainApp() {
 
   // Goal Setting Step 1 handlers
   const handleGoalStep1Next = (habitGoal: string) => {
-    console.log('🎯 handleGoalStep1Next called with:', habitGoal);
-    console.log('📱 Current screen before update:', currentScreen);
+    // console.log('🎯 handleGoalStep1Next called with:', habitGoal);
+    // console.log('📱 Current screen before update:', currentScreen);
     setAppData(prev => ({ ...prev, habitGoal }));
     setCurrentScreen('goalStep2');
     console.log('📱 Screen should now be: goalStep2');

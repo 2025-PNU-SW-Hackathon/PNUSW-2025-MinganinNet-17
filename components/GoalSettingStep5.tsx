@@ -72,7 +72,7 @@ export default function GoalSettingStep5({
 
       // AI가 생성한 계획(camelCase)을 snake_case로 변환
       const snakeCasePlan = convertKeysToSnakeCase(aiPlan);
-      console.log('🔄 Converted to snake_case for store:', snakeCasePlan);
+      // console.log('🔄 Converted to snake_case for store:', snakeCasePlan);
 
       // 변환된 계획을 스토어에 저장
       setPlan(snakeCasePlan);

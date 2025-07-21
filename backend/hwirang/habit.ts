@@ -207,7 +207,7 @@ export async function submitHabitData(
     console.log('🤖 AI 루틴 생성 시도 중...');
     
     const aiResponse = await sendMessage(fullPrompt);
-    console.log('AI 원본 응답:', aiResponse);
+    // console.log('AI 원본 응답:', aiResponse);
 
     if (aiResponse.includes('API 키') || aiResponse.includes('API_KEY') || aiResponse.includes('401') || aiResponse.includes('400')) {
       console.warn('🔑 API 키 오류 감지, 기본 루틴 사용');
@@ -228,10 +228,10 @@ export async function submitHabitData(
       throw new Error('AI 응답에서 유효한 JSON 객체를 찾을 수 없습니다.');
     }
 
-    console.log('정제된 JSON 문자열:', jsonString);
+    // console.log('정제된 JSON 문자열:', jsonString);
 
     const plan = JSON.parse(jsonString) as Plan;
-    console.log('✅ 파싱된 AI 계획:', plan);
+    // console.log('✅ 파싱된 AI 계획:', plan);
 
     return plan;
 

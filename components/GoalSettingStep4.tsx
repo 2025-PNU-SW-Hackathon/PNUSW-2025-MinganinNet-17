@@ -26,7 +26,7 @@ export default function GoalSettingStep4({
 
   // Handle intensity selection (just selection, not navigation)
   const handleIntensitySelect = (intensity: string) => {
-    console.log('🔄 Intensity selected:', intensity);
+    console.log('🎯 GoalSettingStep4 Intensity selected:', intensity);
     setSelectedIntensity(intensity);
   };
 
@@ -44,17 +44,17 @@ export default function GoalSettingStep4({
 
     try {
       // Zustand store에만 저장하고 데이터베이스 호출은 제거합니다.
-      console.log('🏪 Saving to local store...');
+      // console.log('🏪 Saving to local store...');
       setIntensity(selectedIntensity);
-      console.log('✅ Successfully saved to local store');
+      // console.log('✅ Successfully saved to local store');
 
       // 다음 단계로
-      console.log('🚀 Calling onNext handler...');
+      // console.log('🚀 Calling onNext handler...');
       if (onNext) {
         onNext(selectedIntensity);
-        console.log('✅ onNext called successfully');
+        // console.log('✅ onNext called successfully');
       } else {
-        console.warn('⚠️ onNext is undefined!');
+        // console.warn('⚠️ onNext is undefined!');
       }
     } catch (error) {
       console.error('💥 Unexpected error in handleNext:', error);

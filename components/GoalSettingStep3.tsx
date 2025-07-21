@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
-    Alert,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 
@@ -61,14 +61,14 @@ export default function GoalSettingStep3({
 
     try {
       // Save to habit store
-      console.log('🏪 Saving to habit store...');
+      // console.log('🏪 Saving to habit store...');
       setDifficulty(finalDifficulty);
-      console.log('✅ Successfully saved to habit store');
+      // console.log('✅ Successfully saved to habit store');
 
-      console.log('🚀 Calling onNext handler...');
+      // console.log('🚀 Calling onNext handler...');
       if (onNext) {
         onNext(finalDifficulty);
-        console.log('✅ onNext called successfully');
+        // console.log('✅ onNext called successfully');
       } else {
         console.warn('⚠️ onNext is undefined!');
       }
