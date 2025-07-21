@@ -3,10 +3,8 @@ import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react
 import {
   submitHabitData
 } from '../backend/hwirang/habit';
-import { scheduleAllHabitRoutines } from '../backend/hwirang/routineNotifications';
 import {
-  HabitEvent,
-  saveHabitToSupabase,
+  saveHabitToSupabase
 } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 import { PersonaType } from '../types/habit';
@@ -113,6 +111,7 @@ export default function GoalSettingStep5({
       }
 
       // 5. 알림 설정
+      /*
       if (aiPlan && aiPlan.milestones) {
         try {
           console.log('🔔 Setting up notifications...');
@@ -153,6 +152,7 @@ export default function GoalSettingStep5({
           );
         }
       }
+      */
 
       // 6. 완료 처리
       console.log('🎉 All steps completed successfully');
