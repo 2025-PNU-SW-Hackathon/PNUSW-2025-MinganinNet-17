@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
-  Alert,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 
@@ -24,7 +24,7 @@ export default function GoalSettingStep3({
   const [selectedDifficulty, setSelectedDifficulty] = useState(initialValue || '의지 부족');
   const [customDifficulty, setCustomDifficulty] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(initialValue === '기타' || false);
-  const { setDifficulty } = useHabitStore();
+  const { setDifficultyReason } = useHabitStore();
 
   const difficultyOptions = [
     { key: '의지 부족', label: '의지 부족' },
@@ -62,7 +62,7 @@ export default function GoalSettingStep3({
     try {
       // Save to habit store
       // console.log('🏪 Saving to habit store...');
-      setDifficulty(finalDifficulty);
+      setDifficultyReason(finalDifficulty);
       // console.log('✅ Successfully saved to habit store');
 
       // console.log('🚀 Calling onNext handler...');

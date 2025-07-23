@@ -1,147 +1,139 @@
-import { Plan } from '../../types/habit';
+import { Plan, PlanForCreation } from '../../types/habit';
 import { supabase } from './client';
 
-// 습관 이벤트 타입 정의
-export interface HabitEvent {
-  startDate: string;
-  description: string;
-  time: string;
-  repeat: number;
-  score: number;
-}
-
-export interface HabitData {
-  habit_name: string;
-  time_slot: string;
-  intensity: string;
-  difficulty: string;
-  ai_routine: string;
-}
-
-export async function saveHabitToSupabase(habitData: HabitData) {
-  try {
-    // 1. 사용자 인증 확인
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !userData.user) {
-      console.warn('🔓 No authenticated user found, skipping database save:', userError?.message || 'No user');
-      // 인증되지 않은 경우 로컬 저장소만 사용하고 성공으로 처리
-      throw new Error('AUTH_MISSING');
-    }
-
-    // 2. 데이터 저장 (인증된 사용자만)
-    const { data, error } = await supabase
-      .from('habits')
-      .insert([
-        {
-          user_id: userData.user.id,
-          ...habitData
-        }
-      ])
-      .select();
-
-    if (error) {
-      console.error('Supabase 저장 오류:', error);
-      throw error;
-    }
-
-    if (!data) {
-      throw new Error('데이터 저장 후 응답이 없습니다.');
-    }
-
-    // console.log('✅ 습관 데터 저장 성공:', data);
-    return data;
-  } catch (error) {
-    console.error('Error saving habit:', error);
-    
-    // 인증 오류는 특별히 처리
-    if (error instanceof Error && error.message === 'AUTH_MISSING') {
-      throw new Error('AUTH_MISSING');
-    }
-    
-    if (error instanceof Error) {
-      throw new Error(`습관 저장 중 오류 발생: ${error.message}`);
-    }
-    throw error;
+/**
+ * Fetches the currently active plan for the logged-in user.
+ * It retrieves a nested structure of Plan -> Milestones -> Daily_Todos.
+ *
+ * @returns {Promise<Plan | null>} A promise that resolves to the user's active plan or null if not found.
+ */
+export async function getActivePlan(): Promise<Plan | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    console.warn('🔓 No authenticated user found, cannot fetch plan.');
+    return null;
   }
-}
 
-export async function getLatestHabitPlan(): Promise<Plan | null> {
-  try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      console.warn('🔓 No authenticated user found, cannot fetch plan.');
+  const { data: planData, error } = await supabase
+    .from('plans')
+    .select(
+      `
+      *,
+      milestones (
+        *,
+        daily_todos ( * )
+      )
+    `
+    )
+    .eq('user_id', user.id) // Assuming 'plans' has 'user_id'
+    .eq('status', 'in_progress')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // No rows found, which is not an error in this context
+      console.log('✅ No active plan found for this user.');
       return null;
     }
-
-    const { data, error } = await supabase
-      .from('habits')
-      .select('ai_routine')
-      .eq('user_id', userData.user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error) {
-      // 'PGRST116' is the error code for when no rows are found
-      if (error.code === 'PGRST116') {
-        console.log('✅ No habit plan found for this user.');
-        return null;
-      }
-      console.error('Supabase error fetching habit plan:', error);
-      throw error;
-    }
-
-    if (data && data.ai_routine && typeof data.ai_routine === 'string') {
-      const plan = JSON.parse(data.ai_routine) as Plan;
-      console.log('✅ Successfully fetched and parsed habit plan.');
-      return plan;
-    }
-
-    console.log('⚠️ Fetched data but no ai_routine found.');
-    return null;
-  } catch (error) {
-    console.error('💥 Error in getLatestHabitPlan:', error);
-    if (error instanceof SyntaxError) {
-      console.error('JSON parsing error. The ai_routine data may be malformed.');
-    }
+    console.error('Supabase error fetching active plan:', error);
     return null;
   }
+
+  return planData as Plan;
 }
 
-// 습관 데이터를 데이터베이스에 저장하는 함수
-export async function saveHabitRoutine(
-  habit: string,
-  availableTime: string,
-  intensity: string,
-  difficulty: string,
-  habitEvents: HabitEvent[]
-) {
-  try {
-    const habitData: HabitData = {
-      habit_name: habit,
-      time_slot: availableTime,
-      intensity: intensity,
-      difficulty: difficulty,
-      ai_routine: JSON.stringify(habitEvents)
-    };
-
-    try {
-      const savedData = await saveHabitToSupabase(habitData);
-      console.log('✅ Full habit routine saved to database');
-      return savedData;
-    } catch (error) {
-      // 인증 오류인 경우 로컬 저장소만 사용
-      if (error instanceof Error && error.message === 'AUTH_MISSING') {
-        console.log('🔓 No authentication - routine saved locally only');
-        return { message: 'Saved locally only - no authentication' };
-      }
-      
-      // 다른 오류는 재발생
-      throw error;
-    }
-  } catch (error) {
-    console.error('습관 데이터 저장 중 오류 발생:', error);
-    throw error;
+/**
+ * Creates a new habit and its associated plan, milestones, and daily todos in the database.
+ * This function handles the entire relational insert process.
+ *
+ * @param habitName - The name of the new habit.
+ * @param planData - An object with the structure of PlanForCreation, containing all details for the new plan.
+ * @returns {Promise<Plan>} A promise that resolves to the newly created plan, including DB-generated fields.
+ */
+export async function createNewHabitAndPlan(
+  habitName: string,
+  planData: PlanForCreation // <-- Use the new creation type
+): Promise<Plan> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('Authentication required to create a new habit and plan.');
   }
+
+  // Step 1: Create the new Habit
+  const { data: newHabit, error: habitError } = await supabase
+    .from('habits')
+    .insert({
+      user_id: user.id,
+      habit_name: habitName,
+    })
+    .select()
+    .single();
+
+  if (habitError || !newHabit) {
+    console.error('Error creating habit:', habitError);
+    throw new Error('Failed to create the habit.');
+  }
+
+  // Step 2: Create the new Plan, linked to the habit
+  const { milestones, ...planDetails } = planData;
+  const { data: newPlan, error: planError } = await supabase
+    .from('plans')
+    .insert({
+      ...planDetails,
+      habit_id: newHabit.id,
+      user_id: user.id, // Make sure user_id is in plans table
+    })
+    .select()
+    .single();
+
+  if (planError || !newPlan) {
+    console.error('Error creating plan:', planError);
+    throw new Error('Failed to create the plan.');
+  }
+
+  // Step 3: Create the Milestones and Daily_Todos
+  const createdMilestones = [];
+  for (const milestone of milestones) {
+    const { daily_todos, ...milestoneDetails } = milestone;
+    const { data: newMilestone, error: milestoneError } = await supabase
+      .from('milestones')
+      .insert({
+        ...milestoneDetails,
+        plan_id: newPlan.id,
+      })
+      .select()
+      .single();
+
+    if (milestoneError || !newMilestone) {
+      console.error('Error creating milestone:', milestoneError);
+      throw new Error('Failed to create a milestone.');
+    }
+
+    const createdTodos = [];
+    for (const todo of daily_todos) {
+      const { data: newTodo, error: todoError } = await supabase
+        .from('daily_todos')
+        .insert({
+          ...todo,
+          milestone_id: newMilestone.id,
+        })
+        .select()
+        .single();
+      
+      if (todoError || !newTodo) {
+        console.error('Error creating daily todo:', todoError);
+        throw new Error('Failed to create a daily todo.');
+      }
+      createdTodos.push(newTodo);
+    }
+    createdMilestones.push({ ...newMilestone, daily_todos: createdTodos });
+  }
+
+  return { ...newPlan, milestones: createdMilestones };
 } 

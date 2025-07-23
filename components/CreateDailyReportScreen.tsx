@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getLatestHabitPlan } from '../backend/supabase/habits';
+import { getActivePlan } from '../backend/supabase/habits';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import { DailyTodo, Plan } from '../types/habit';
@@ -11,14 +11,9 @@ interface CreateDailyReportScreenProps {
   onBack: () => void;
 }
 
-interface TodoItem extends DailyTodo {
-  id: string; // Add a unique ID for list rendering
-  completed: boolean;
-}
-
 // Animated Todo Item Component for CreateDailyReportScreen
 interface AnimatedTodoItemProps {
-  todo: TodoItem;
+  todo: DailyTodo;
   isCompleted: boolean;
   onToggle: () => void;
   colorScheme: string;
@@ -39,50 +34,20 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle, colorScheme }: Animated
 
     // Scale animation for the whole item
     Animated.sequence([
-      Animated.spring(scaleAnimation, {
-        toValue: 1.05,
-        useNativeDriver: true,
-        tension: 300,
-        friction: 8,
-      }),
-      Animated.spring(scaleAnimation, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 300,
-        friction: 8,
-      })
+      Animated.spring(scaleAnimation, { toValue: 1.05, useNativeDriver: true, tension: 300, friction: 8 }),
+      Animated.spring(scaleAnimation, { toValue: 1, useNativeDriver: true, tension: 300, friction: 8 })
     ]).start();
 
     // Checkmark and text animations
     if (!isCompleted) {
-      // Completing task
       Animated.parallel([
-        Animated.spring(checkmarkScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 300,
-          friction: 6,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 0.6,
-          duration: 200,
-          useNativeDriver: true,
-        })
+        Animated.spring(checkmarkScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 6 }),
+        Animated.timing(textOpacity, { toValue: 0.6, duration: 200, useNativeDriver: true })
       ]).start();
     } else {
-      // Uncompleting task
       Animated.parallel([
-        Animated.spring(checkmarkScale, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 300,
-          friction: 6,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        })
+        Animated.spring(checkmarkScale, { toValue: 0, useNativeDriver: true, tension: 300, friction: 6 }),
+        Animated.timing(textOpacity, { toValue: 1, duration: 200, useNativeDriver: true })
       ]).start();
     }
 
@@ -91,37 +56,21 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle, colorScheme }: Animated
 
   return (
     <Animated.View style={[{ transform: [{ scale: scaleAnimation }] }]}>
-      <TouchableOpacity
-        style={styles.todoItem}
-        onPress={handlePress}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={styles.todoItem} onPress={handlePress} activeOpacity={0.8}>
         <View style={[
           styles.todoCheckbox,
           isCompleted && [styles.todoCheckedBox, { backgroundColor: Colors[colorScheme as keyof typeof Colors].tint }]
         ]}>
-          <Animated.Text 
-            style={[
-              styles.checkmark,
-              { 
-                transform: [{ scale: checkmarkScale }],
-                opacity: checkmarkScale
-              }
-            ]}
-          >
+          <Animated.Text style={[styles.checkmark, { transform: [{ scale: checkmarkScale }], opacity: checkmarkScale }]}>
             ✓
           </Animated.Text>
         </View>
-        <Animated.Text 
-          style={[
-            styles.todoText,
-            { color: Colors[colorScheme as keyof typeof Colors].text },
-            isCompleted && styles.todoTextCompleted,
-            { opacity: textOpacity }
-          ]}
-          numberOfLines={2}
-          ellipsizeMode="tail"
-        >
+        <Animated.Text style={[
+          styles.todoText,
+          { color: Colors[colorScheme as keyof typeof Colors].text },
+          isCompleted && styles.todoTextCompleted,
+          { opacity: textOpacity }
+        ]} numberOfLines={2} ellipsizeMode="tail">
           {todo.description}
         </Animated.Text>
       </TouchableOpacity>
@@ -129,34 +78,25 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle, colorScheme }: Animated
   );
 };
 
-// Helper function to parse duration strings into days (from HomeScreen)
 const parseDurationToDays = (duration: string): number => {
-  if (duration.includes('개월')) {
-    const months = parseInt(duration.replace('개월', '').trim(), 10);
-    return isNaN(months) ? 0 : months * 30; // Approximation
-  }
-  if (duration.includes('주')) {
-    const weeks = parseInt(duration.replace('주', '').trim(), 10);
-    return isNaN(weeks) ? 0 : weeks * 7;
-  }
-  if (duration.includes('일')) {
-    const days = parseInt(duration.replace('일', '').trim(), 10);
-    return isNaN(days) ? 0 : days;
-  }
+  if (duration.includes('개월')) return parseInt(duration) * 30;
+  if (duration.includes('주')) return parseInt(duration) * 7;
+  if (duration.includes('일')) return parseInt(duration);
   return 0;
 };
-// Achievement score color mapping (same as calendar logic)
+
 const getAchievementColor = (score: number): string => {
-  if (score >= 9) return '#4CAF50';        // Green (90%+)
-  if (score >= 7) return '#8BC34A';        // Light Green (70%+)
-  if (score >= 5) return '#FF9800';        // Orange (50%+)
-  return '#F44336';                        // Red (below 50%)
+  if (score >= 9) return '#4CAF50';
+  if (score >= 7) return '#8BC34A';
+  if (score >= 5) return '#FF9800';
+  return '#F44336';
 };
 
 export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScreenProps) {
   const colorScheme = useColorScheme();
   const [currentStep, setCurrentStep] = useState<'step1' | 'step2'>('step1');
-  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [todos, setTodos] = useState<DailyTodo[]>([]);
+  const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -165,20 +105,18 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
       setLoading(true);
       setError(null);
       try {
-        const plan: Plan | null = await getLatestHabitPlan();
+        const plan: Plan | null = await getActivePlan();
         if (plan && plan.milestones && plan.start_date) {
           const today = new Date();
-          // Set time to 00:00:00 to compare dates only
           today.setHours(0, 0, 0, 0);
 
           const startDate = new Date(plan.start_date);
           startDate.setHours(0, 0, 0, 0);
 
-          const diffTime = today.getTime() - startDate.getTime();
-          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          const diffDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
           if (diffDays < 0) {
-            setTodos([]); // Plan hasn't started yet
+            setTodos([]);
             return;
           }
 
@@ -186,18 +124,18 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
           for (const milestone of plan.milestones) {
             const durationInDays = parseDurationToDays(milestone.duration);
             if (diffDays >= dayCounter && diffDays < dayCounter + durationInDays) {
-              const todayTodos = milestone.daily_todos.map((todo, index) => ({
-                ...todo,
-                id: `${plan.start_date}-${dayCounter}-${index}`,
-                completed: false,
-              }));
-              setTodos(todayTodos);
-              return; // Found today's todos
+              setTodos(milestone.daily_todos);
+              
+              const initialCompletion: { [key: string]: boolean } = {};
+              milestone.daily_todos.forEach(todo => {
+                initialCompletion[todo.id.toString()] = todo.is_completed;
+              });
+              setTodoCompletion(initialCompletion);
+              return;
             }
             dayCounter += durationInDays;
           }
-          
-          setTodos([]); // No todos found for today in any milestone
+          setTodos([]);
         } else {
           setTodos([]);
         }
@@ -212,36 +150,32 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
     fetchTodayTodos();
   }, []);
 
-  // Calculate achievement rate based on completed todos
   const achievementRate = todos.length > 0
-    ? Math.round((todos.filter(t => t.completed).length / todos.length) * 10)
+    ? Math.round((Object.values(todoCompletion).filter(Boolean).length / todos.length) * 10)
     : 0;
 
-  // Handle todo toggle
-  const handleTodoToggle = (todoId: string): void => {
-    setTodos(prev =>
-      prev.map(todo =>
-        todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
-      )
-    );
+  const handleTodoToggle = (todoId: number): void => {
+    const todoKey = todoId.toString();
+    setTodoCompletion(prev => ({ ...prev, [todoKey]: !prev[todoKey] }));
   };
   
-  // Handle next button press
   const handleNext = (): void => {
     setCurrentStep('step2');
   };
 
-  // Handle back from step 2
   const handleBackFromStep2 = (): void => {
     setCurrentStep('step1');
   };
 
-  // Show step 2 screen
   if (currentStep === 'step2') {
     return <CreateDailyReportStep2Screen 
               onBack={handleBackFromStep2} 
               achievementScore={achievementRate} 
-              todos={todos} 
+              todos={todos.map(t => ({ 
+                ...t, 
+                // No longer need to convert id to string here
+                completed: todoCompletion[t.id.toString()] 
+              }))}
            />;
   }
 
@@ -266,30 +200,12 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
             <AnimatedTodoItem
               key={todo.id}
               todo={todo}
-              isCompleted={todo.completed}
+              isCompleted={todoCompletion[todo.id.toString()]}
               onToggle={() => handleTodoToggle(todo.id)}
               colorScheme={colorScheme ?? 'light'}
             />
           ))}
         </ScrollView>
-      </View>
-    );
-  };
-
-  const AchievementRateDisplay = () => {
-    return (
-      <View style={styles.achievementContainer}>
-        <Text style={[styles.achievementTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-          오늘의 달성률
-        </Text>
-        <View style={styles.achievementDisplay}>
-          <Text style={[styles.achievementValue, { color: getAchievementColor(achievementRate) }]}>
-            {achievementRate}
-          </Text>
-          <Text style={[styles.achievementTotal, { color: Colors[colorScheme ?? 'light'].text }]}>
-            / 10
-          </Text>
-        </View>
       </View>
     );
   };
@@ -317,7 +233,19 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
         <TodoList />
 
         {/* Achievement Rate Display */}
-        <AchievementRateDisplay />
+        <View style={styles.achievementContainer}>
+          <Text style={[styles.achievementTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+            오늘의 달성률
+          </Text>
+          <View style={styles.achievementDisplay}>
+            <Text style={[styles.achievementValue, { color: getAchievementColor(achievementRate) }]}>
+              {achievementRate}
+            </Text>
+            <Text style={[styles.achievementTotal, { color: Colors[colorScheme ?? 'light'].text }]}>
+              / 10
+            </Text>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Next Button */}
