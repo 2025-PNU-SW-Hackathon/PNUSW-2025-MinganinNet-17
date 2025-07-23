@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import {
-  submitHabitData
-} from '../backend/hwirang/habit';
-import {
-  saveHabitToSupabase
-} from '../backend/supabase/habits';
+import { submitHabitData } from '../backend/hwirang/habit';
+import { createNewHabitAndPlan } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
-import { PersonaType } from '../types/habit';
+import { PlanForCreation } from '../types/habit'; // Import the new type
 import DebugNextButton from './DebugNextButton';
+
+// Temporary PersonaType definition to fix the type error locally
+type PersonaType = 'Easy' | 'Medium' | 'Hard' | 'System';
 
 interface GoalSettingStep5Props {
   onComplete: () => void;
@@ -17,144 +16,69 @@ interface GoalSettingStep5Props {
 
 export default function GoalSettingStep5({
   onComplete,
-  onBack
+  onBack,
 }: GoalSettingStep5Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { habit, time, intensity, difficulty, goalPeriod, setPlan, getHabitData } =
-    useHabitStore();
-
-  // camelCase를 snake_case로 변환하는 헬퍼 함수들
-  const toSnakeCase = (str: string) =>
-    str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-
-  const convertKeysToSnakeCase = (obj: any): any => {
-    if (Array.isArray(obj)) {
-      return obj.map((v) => convertKeysToSnakeCase(v));
-    } else if (obj !== null && obj.constructor === Object) {
-      return Object.keys(obj).reduce((acc, key) => {
-        const newKey = toSnakeCase(key);
-        acc[newKey] = convertKeysToSnakeCase(obj[key]);
-        return acc;
-      }, {} as { [key: string]: any });
-    }
-    return obj;
-  };
+  // Use all the necessary states from the store
+  const {
+    habitName,
+    difficultyReason,
+    intensity,
+    availableTime,
+    goalPeriod,
+    setPlan,
+  } = useHabitStore();
 
   const handleSubmit = async () => {
     console.log('🔄 Starting final submission...', {
-      habit,
-      time,
+      habitName,
+      availableTime,
       intensity,
-      difficulty,
+      difficultyReason,
       goalPeriod,
     });
     setIsSubmitting(true);
 
     try {
-      // 1. 코칭 강도(intensity)를 PersonaType으로 변환
+      // Step 1: Convert UI-friendly intensity to PersonaType for the AI
       const personaMap: { [key: string]: PersonaType } = {
-        높음: 'Hard',
-        보통: 'Medium',
-        낮음: 'Easy',
+        '높음': 'Hard',
+        '보통': 'Medium',
+        '낮음': 'Easy',
       };
-      const persona = personaMap[intensity] || 'Medium'; // 기본값 설정
+      const persona = personaMap[intensity] || 'Medium';
 
-      // 2. AI 루틴 생성
-      console.log('🤖 Generating AI routine...');
-      const aiPlan = await submitHabitData(
-        habit,
-        time,
-        difficulty,
-        persona, // 변환된 persona 값을 사용
+      // Step 2: Generate the plan from the AI using data from the store
+      console.log('🤖 Generating AI plan...');
+      const aiPlanFromAI = await submitHabitData(
+        habitName,
+        availableTime,
+        difficultyReason,
+        persona,
         goalPeriod
       );
-      console.log('✅ AI routine generated (camelCase):', aiPlan);
+      console.log('✅ AI plan generated:', aiPlanFromAI);
 
-      // AI가 생성한 계획(camelCase)을 snake_case로 변환
-      const snakeCasePlan = convertKeysToSnakeCase(aiPlan);
-      // console.log('🔄 Converted to snake_case for store:', snakeCasePlan);
+      // Step 3: Combine AI-generated plan with user-selected data to form the complete PlanForCreation.
+      const planForCreation: PlanForCreation = {
+        ...aiPlanFromAI,
+        difficulty_reason: difficultyReason,
+        intensity: intensity,
+        available_time: availableTime,
+      };
 
-      // 변환된 계획을 스토어에 저장
-      setPlan(snakeCasePlan);
+      // Step 3: Save the entire new habit and plan structure to the database
+      console.log('💾 Saving new habit and plan to Supabase...');
+      const finalPlan = await createNewHabitAndPlan(habitName, planForCreation);
+      console.log('✅ Successfully saved to Supabase:', finalPlan);
 
-      // 3. Zustand 스토어에서 전체 습관 데이터를 가져옵니다.
-      const habitData = getHabitData();
+      // Step 4: Set the final, DB-synced plan in the global store
+      setPlan(finalPlan);
 
-      // 4. 데이터베이스에 모든 데이터 저장
-      console.log('💾 Saving complete data to Supabase...', habitData);
-      try {
-        await saveHabitToSupabase({
-          ...habitData,
-          ai_routine: JSON.stringify(aiPlan), // ai_routine은 항상 최신 계획으로 설정
-        });
-        console.log('✅ Successfully saved to Supabase');
-      } catch (dbError) {
-        console.error('❌ Database save failed:', dbError);
+      // (Optional) Step 5: Schedule notifications based on the finalPlan
+      // The notification logic would need to be updated to use the new Plan structure.
 
-        // 인증 오류인 경우 조용히 처리
-        if (dbError instanceof Error && dbError.message === 'AUTH_MISSING') {
-          console.log(
-            '🔓 No authentication - continuing with local storage only'
-          );
-        } else {
-          // 다른 오류는 알림 표시하지만 계속 진행
-          console.warn(
-            '⚠️ Database error, continuing with local storage:',
-            dbError
-          );
-          Alert.alert(
-            '알림',
-            '데이터베이스 저장에 실패했지만 계속 진행합니다. 나중에 다시 시도해주세요.',
-            [{ text: '확인', style: 'default' }]
-          );
-        }
-      }
-
-      // 5. 알림 설정
-      /*
-      if (aiPlan && aiPlan.milestones) {
-        try {
-          console.log('🔔 Setting up notifications...');
-
-          const habitEvents: HabitEvent[] = aiPlan.milestones.flatMap(
-            (milestone) =>
-              milestone.daily_todos.map((todo) => ({
-                startDate: aiPlan.start_date,
-                description: todo.description,
-                time: todo.time_slot,
-                repeat: todo.repeat_count,
-                score: todo.score,
-              }))
-          );
-
-          const notificationResult =
-            await scheduleAllHabitRoutines(habitEvents);
-          if (!notificationResult.success) {
-            console.warn(
-              '⚠️ Notification setup failed:',
-              notificationResult.error
-            );
-            Alert.alert(
-              '주의',
-              '알림 설정에 실패했습니다. 나중에 다시 시도해주세요.'
-            );
-          } else {
-            console.log('✅ Notifications set up successfully');
-          }
-        } catch (notificationError) {
-          console.error(
-            '💥 Error setting up notifications:',
-            notificationError
-          );
-          Alert.alert(
-            '주의',
-            '알림 설정에 실패했습니다. 나중에 다시 시도해주세요.'
-          );
-        }
-      }
-      */
-
-      // 6. 완료 처리
+      // Step 6: Complete the flow
       console.log('🎉 All steps completed successfully');
       Alert.alert('성공', '습관이 성공적으로 생성되었습니다!');
       onComplete();
@@ -167,10 +91,8 @@ export default function GoalSettingStep5({
     }
   };
 
-  // Debug navigation handler - bypasses all backend calls
   const handleDebugComplete = () => {
-    // Only call completion callback - no backend calls
-    console.log('🐛 DEBUG: Bypassing AI routine generation, DB save, and notifications');
+    console.log('🐛 DEBUG: Bypassing AI generation and DB save');
     onComplete();
   };
 
@@ -178,7 +100,6 @@ export default function GoalSettingStep5({
     <View style={styles.container}>
       <Text style={styles.stepIndicator}>5 / 6 단계</Text>
       
-      {/* Back Button */}
       <TouchableOpacity
         style={styles.backButton}
         onPress={onBack}
@@ -209,7 +130,6 @@ export default function GoalSettingStep5({
         </Text>
       </TouchableOpacity>
       
-      {/* Floating Debug Button - does not interfere with layout */}
       <DebugNextButton
         to="Home Screen"
         onPress={handleDebugComplete}

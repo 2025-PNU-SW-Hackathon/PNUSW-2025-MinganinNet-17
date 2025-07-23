@@ -3,18 +3,15 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, Scroll
 import { generateDailyFeedback } from '../backend/hwirang/gemini';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
+import { DailyTodo } from '../types/habit'; // Import the correct type
 import DailyReportResultScreen from './DailyReportResultScreen';
 
-interface TodoItem {
-    id: string;
-    description: string;
-    completed: boolean;
-}
+// Removed local TodoItem interface
 
 interface CreateDailyReportStep2ScreenProps {
   onBack: () => void;
   achievementScore: number;
-  todos: TodoItem[];
+  todos: DailyTodo[]; // Use DailyTodo[] directly
 }
 
 // Step 2의 UI를 렌더링하는 것을 책임지는 분리된 컴포넌트입니다.
@@ -132,7 +129,16 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
     setIsLoading(true);
     setError(null);
     try {
-      const feedback = await generateDailyFeedback(userSummary, achievementScore, todos);
+      // The generateDailyFeedback function might expect a different structure.
+      // We need to map our `DailyTodo[]` to what it expects.
+      // Assuming it expects an array of { id: string, description: string, completed: boolean }
+      const feedbackTodos = todos.map(t => ({
+        id: t.id.toString(),
+        description: t.description,
+        completed: t.is_completed,
+      }));
+      
+      const feedback = await generateDailyFeedback(userSummary, achievementScore, feedbackTodos);
       setAiFeedback(feedback);
       setCurrentScreen('result');
     } catch (err) {

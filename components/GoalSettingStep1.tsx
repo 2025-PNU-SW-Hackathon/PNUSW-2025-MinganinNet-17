@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
@@ -27,7 +27,7 @@ export default function GoalSettingStep1({
 }: GoalSettingStep1Props) {
   const [habitText, setHabitText] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { setHabit } = useHabitStore();
+  const { setHabitName } = useHabitStore();
 
   const handleHabitSubmit = async () => {
     if (!habitText.trim()) {
@@ -41,7 +41,7 @@ export default function GoalSettingStep1({
     try {
       // Zustand store에만 저장하고 데이터베이스 호출은 제거합니다.
       // console.log('🏪 Saving to local store...');
-      setHabit(habitText);
+      setHabitName(habitText);
       // console.log('✅ Successfully saved to local store');
 
       // console.log('🚀 Calling onNext handler...');
@@ -69,7 +69,7 @@ export default function GoalSettingStep1({
   const handleDebugNext = () => {
     if (habitText.trim()) {
       // Only call local store and navigation - no backend calls
-      setHabit(habitText);
+      setHabitName(habitText);
       if (onNext) {
         onNext(habitText);
       }

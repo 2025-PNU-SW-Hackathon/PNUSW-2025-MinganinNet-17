@@ -38,25 +38,28 @@ export default function GoalSettingStep6({
 
       <Text style={styles.stepIndicator}>AI가 생성한 맞춤 플랜</Text>
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>{plan.ai_plan_title}</Text>
+        {/* Use the new property from the Plan interface */}
+        <Text style={styles.title}>{plan.plan_title}</Text>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {(plan.milestones ?? []).map((milestone, index) => (
-          <View key={milestone.title} style={styles.milestoneContainer}>
+        {/* Use milestone.id for the key */}
+        {(plan.milestones ?? []).map((milestone) => (
+          <View key={milestone.id} style={styles.milestoneContainer}>
             <View style={styles.milestoneHeader}>
               <Text style={styles.milestoneTitle}>
                 {milestone.title}
               </Text>
               <Text style={styles.milestoneDuration}>{milestone.duration}</Text>
             </View>
+            {/* Use todo.id for the key */}
             {(milestone.daily_todos ?? []).map((todo) => (
-              <View key={todo.description} style={styles.todoContainer}>
+              <View key={todo.id} style={styles.todoContainer}>
                 <Text style={styles.todoDescription}>{todo.description}</Text>
-                <Text style={styles.todoTime}>{todo.time_slot}</Text>
+                {/* todo.time_slot is removed as it no longer exists in DailyTodo */}
               </View>
             ))}
           </View>

@@ -1,18 +1,18 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    Modal,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Animated,
+  Dimensions,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import CalendarScreen from '../backend/calendar/calendar';
-import { getLatestHabitPlan } from '../backend/supabase/habits';
+import { getActivePlan } from '../backend/supabase/habits';
 import { DailyTodo, Plan } from '../types/habit';
 import AppSettingsScreen from './AppSettingsScreen';
 import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
@@ -171,35 +171,18 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     const fetchPlan = async () => {
       try {
         setLoading(true);
-        const fetchedPlan = await getLatestHabitPlan();
+        const fetchedPlan = await getActivePlan(); // <-- Use the new function
         setPlan(fetchedPlan);
 
         if (fetchedPlan) {
-          const now = new Date();
-          const planCreationDate = new Date(fetchedPlan.start_date);
-          let effectiveDate = new Date(planCreationDate);
-          
-          if (planCreationDate.toDateString() === now.toDateString()) {
-            const timeSlotMatch = fetchedPlan.primary_goal.match(/\(가능 시간: (.*?)\)/);
-            if (timeSlotMatch && timeSlotMatch[1]) {
-              const startTimeStr = timeSlotMatch[1].split('-')[0];
-              const [hours, minutes] = startTimeStr.split(':').map(Number);
-              
-              const slotStartTime = new Date(planCreationDate);
-              slotStartTime.setHours(hours, minutes, 0, 0);
+          // The start date from the new Plan object is considered the effective start date.
+          setEffectiveStartDate(fetchedPlan.start_date);
 
-              if (now > slotStartTime) {
-                effectiveDate.setDate(planCreationDate.getDate() + 1);
-              }
-            }
-          }
-          setEffectiveStartDate(effectiveDate.toISOString().split('T')[0]);
-
+          // Initialize todo completion status using the unique ID of each todo.
           const initialCompletion: { [key: string]: boolean } = {};
           fetchedPlan.milestones.forEach(m => {
-            m.daily_todos.forEach((_todo, index) => {
-              const todoKey = `${m.title}-${index}`;
-              initialCompletion[todoKey] = false;
+            m.daily_todos.forEach(todo => {
+              initialCompletion[todo.id.toString()] = todo.is_completed;
             });
           });
           setTodoCompletion(initialCompletion);
@@ -220,12 +203,8 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     if (!plan || todos.length === 0) {
       return { emoji: '😊', message: '오늘도 화이팅!', color: '#4CAF50' };
     }
-    const completedCount = todos.filter((todo, index) => {
-      const milestone = plan.milestones.find(m => m.daily_todos.includes(todo));
-      if (!milestone) return false;
-      const todoKey = `${milestone.title}-${index}`;
-      return todoCompletion[todoKey];
-    }).length;
+    // Updated to use the new todo completion state
+    const completedCount = todos.filter(todo => todoCompletion[todo.id.toString()]).length;
     const avgRate = completedCount / todos.length;
     if (avgRate >= 1) return { emoji: '🥳', message: '완벽한 하루!', color: '#4CAF50' };
     if (avgRate >= 0.7) return { emoji: '😊', message: '정말 잘하고 있어요!', color: '#8BC34A' };
@@ -269,8 +248,8 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     return [];
   };
 
-  const handleTodoToggle = (todoIndex: number, milestoneTitle: string): void => {
-    const todoKey = `${milestoneTitle}-${todoIndex}`;
+  const handleTodoToggle = (todoId: number): void => {
+    const todoKey = todoId.toString();
     const willBeCompleted = !todoCompletion[todoKey];
     
     // Haptic feedback for satisfying feel
@@ -281,6 +260,8 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     }
     
     setTodoCompletion(prev => ({ ...prev, [todoKey]: !prev[todoKey] }));
+    // Here you would also add a call to a Supabase function to update `is_completed` in the DB.
+    // e.g., updateTodoStatus(todoId, willBeCompleted);
   };
   
   const formatCalendarDate = (date: Date) => {
@@ -382,7 +363,7 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
           ) : (
             <Animated.View style={{ opacity: goalFadeAnimation }}>
               <Text style={styles.goalText}>
-                {plan?.primary_goal || '진행 중인 목표가 없습니다.'}
+                {plan?.plan_title || '진행 중인 목표가 없습니다.'} 
               </Text>
             </Animated.View>
           )}
@@ -437,17 +418,15 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
                 <Text style={styles.emptyTodoText}>{error}</Text>
               ) : todosForSelectedDate.length > 0 ? (
                 <Animated.View style={{ opacity: todoFadeAnimation }}>
-                  {todosForSelectedDate.map((todo, index) => {
-                    const milestone = plan?.milestones.find(m => m.daily_todos.includes(todo));
-                    if (!milestone) return null;
-                    const todoKey = `${milestone.title}-${index}`;
+                  {todosForSelectedDate.map((todo) => {
+                    const todoKey = todo.id.toString();
                     const isCompleted = todoCompletion[todoKey];
                     return (
                       <AnimatedTodoItem
-                        key={todoKey}
+                        key={todo.id} // Use the unique ID for the key
                         todo={todo}
                         isCompleted={isCompleted}
-                        onToggle={() => handleTodoToggle(index, milestone.title)}
+                        onToggle={() => handleTodoToggle(todo.id)}
                       />
                     );
                   })}
