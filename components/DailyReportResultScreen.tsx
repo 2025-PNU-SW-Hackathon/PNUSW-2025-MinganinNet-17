@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   SafeAreaView,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { createReport } from '../backend/supabase/reports';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,6 +33,9 @@ export default function DailyReportResultScreen({
   aiReportText
 }: DailyReportResultScreenProps) {
   
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  
   // Animation values
   const animatedScore = useRef(new Animated.Value(0)).current;
   const animatedProgress = useRef(new Animated.Value(0)).current;
@@ -46,6 +51,34 @@ export default function DailyReportResultScreen({
   };
 
   const coachStatus = getCoachStatus();
+  
+  const handleSaveReport = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const feedbackArray = aiReportText.split('\n').map(s => s.trim()).filter(Boolean);
+      const reportToSave = {
+        report_date: new Date().toISOString().split('T')[0],
+        achievement_score: achievementScore,
+        ai_coach_feedback: feedbackArray,
+      };
+
+      const newReport = await createReport(reportToSave);
+
+      if (!newReport) {
+        throw new Error("리포트 저장에 실패했습니다.");
+      }
+
+      console.log("리포트가 성공적으로 저장되었습니다:", newReport);
+      // Navigate back to the main report screen
+      onBack();
+    } catch (error) {
+      console.error("리포트 저장 중 오류 발생:", error);
+      setSaveError("리포트 저장에 실패했습니다. 나중에 다시 시도해주세요.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
   
   // Start animation when component mounts
   useEffect(() => {
@@ -86,61 +119,75 @@ export default function DailyReportResultScreen({
       </View>
 
       {/* Main Content Area */}
-      <View style={styles.mainContent}>
-        {/* Top Section - 50% of main content */}
-        <View style={styles.topSection}>
-          {/* Left Half - Coach's Status */}
-          <View style={styles.leftHalf}>
-            <View style={styles.coachCard}>
-              <Text style={styles.cardTitle}>Coach's Status</Text>
-              <View style={styles.coachContent}>
-                <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
-                <Text style={styles.coachMessage}>{coachStatus.message}</Text>
-                <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
+      <ScrollView>
+        <View style={styles.mainContent}>
+          {/* Top Section - 50% of main content */}
+          <View style={styles.topSection}>
+            {/* Left Half - Coach's Status */}
+            <View style={styles.leftHalf}>
+              <View style={styles.coachCard}>
+                <Text style={styles.cardTitle}>Coach's Status</Text>
+                <View style={styles.coachContent}>
+                  <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
+                  <Text style={styles.coachMessage}>{coachStatus.message}</Text>
+                  <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
+                </View>
+              </View>
+            </View>
+
+            {/* Right Half - Achievement Score */}
+            <View style={styles.rightHalf}>
+              <View style={styles.achievementCard}>
+                <Text style={styles.cardTitle}>Achievement Score</Text>
+                <View style={styles.achievementContent}>
+                  <Text style={styles.achievementScore}>
+                    {displayScore}
+                  </Text>
+                  <Text style={styles.achievementTotal}>/10</Text>
+                </View>
+                <View style={styles.achievementBar}>
+                  <Animated.View 
+                    style={[
+                      styles.achievementProgress, 
+                      { 
+                        width: animatedProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0%', '100%'],
+                        }),
+                        backgroundColor: coachStatus.color
+                      }
+                    ]} 
+                  />
+                </View>
               </View>
             </View>
           </View>
 
-          {/* Right Half - Achievement Score */}
-          <View style={styles.rightHalf}>
-            <View style={styles.achievementCard}>
-              <Text style={styles.cardTitle}>Achievement Score</Text>
-              <View style={styles.achievementContent}>
-                <Text style={styles.achievementScore}>
-                  {displayScore}
-                </Text>
-                <Text style={styles.achievementTotal}>/10</Text>
-              </View>
-              <View style={styles.achievementBar}>
-                <Animated.View 
-                  style={[
-                    styles.achievementProgress, 
-                    { 
-                      width: animatedProgress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                      backgroundColor: coachStatus.color
-                    }
-                  ]} 
-                />
-              </View>
+          {/* Bottom Section - 50% of main content */}
+          <View style={styles.bottomSection}>
+            <View style={styles.reportCard}>
+              <Text style={styles.cardTitle}>AI Generated Report</Text>
+              <ScrollView 
+                style={styles.reportScrollView}
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.reportText}>{aiReportText}</Text>
+              </ScrollView>
             </View>
           </View>
         </View>
+      </ScrollView>
 
-        {/* Bottom Section - 50% of main content */}
-        <View style={styles.bottomSection}>
-          <View style={styles.reportCard}>
-            <Text style={styles.cardTitle}>AI Generated Report</Text>
-            <ScrollView 
-              style={styles.reportScrollView}
-              showsVerticalScrollIndicator={false}
-            >
-              <Text style={styles.reportText}>{aiReportText}</Text>
-            </ScrollView>
-          </View>
-        </View>
+      {/* Footer Button */}
+      <View style={styles.footer}>
+        {isSaving ? (
+          <ActivityIndicator size="large" color="#6c63ff" />
+        ) : (
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveReport} disabled={isSaving}>
+            <Text style={styles.saveButtonText}>완료 및 리포트 저장</Text>
+          </TouchableOpacity>
+        )}
+        {saveError && <Text style={styles.errorText}>{saveError}</Text>}
       </View>
     </SafeAreaView>
   );
@@ -286,6 +333,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
     lineHeight: 24,
+    fontFamily: 'Inter',
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+    alignItems: 'center',
+  },
+  saveButton: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#6c63ff',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  saveButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    fontFamily: 'Inter',
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 14,
+    textAlign: 'center',
     fontFamily: 'Inter',
   },
 }); 
