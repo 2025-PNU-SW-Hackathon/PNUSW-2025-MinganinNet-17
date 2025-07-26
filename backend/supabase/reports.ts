@@ -49,4 +49,45 @@ export const fetchReports = async (): Promise<{
   const historicalReports = data.filter(report => report.report_date !== todayStr);
 
   return { todayReport, historicalReports };
+};
+
+/**
+ * 새로운 일간 리포트를 Supabase DB에 생성합니다.
+ * @param reportData - 생성할 리포트의 데이터
+ * @returns 생성된 리포트 데이터 또는 null
+ */
+export const createReport = async (reportData: {
+  report_date: string;
+  achievement_score: number;
+  ai_coach_feedback: string[];
+}): Promise<ReportFromSupabase | null> => {
+  // 1. 현재 사용자 정보 가져오기
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.error('사용자가 인증되지 않아 리포트를 생성할 수 없습니다.');
+    return null;
+  }
+
+  // 2. 전달받은 데이터와 사용자 ID를 합쳐 새로운 리포트 객체 생성
+  const newReport = {
+    ...reportData,
+    user_id: user.id,
+  };
+
+  console.log('Supabase에 저장을 시도하는 리포트 데이터:', newReport);
+
+  // 3. Supabase `reports` 테이블에 데이터 삽입
+  const { data, error } = await supabase
+    .from('reports')
+    .insert(newReport)
+    .select()
+    .single(); // 삽입된 데이터를 바로 반환받음
+
+  if (error) {
+    console.error('Supabase 리포트 생성 오류:', error.message);
+    return null;
+  }
+
+  console.log('Supabase에 리포트가 성공적으로 저장되었습니다:', data);
+  return data;
 }; 

@@ -129,21 +129,19 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
     setIsLoading(true);
     setError(null);
     try {
-      // The generateDailyFeedback function might expect a different structure.
-      // We need to map our `DailyTodo[]` to what it expects.
-      // Assuming it expects an array of { id: string, description: string, completed: boolean }
       const feedbackTodos = todos.map(t => ({
         id: t.id.toString(),
         description: t.description,
-        completed: t.is_completed,
+        completed: t.is_completed, // Use is_completed from the incoming data
       }));
       
-      const feedback = await generateDailyFeedback(userSummary, achievementScore, feedbackTodos);
-      setAiFeedback(feedback);
+      const feedbackResult = await generateDailyFeedback(userSummary, achievementScore, feedbackTodos);
+
+      setAiFeedback(feedbackResult);
       setCurrentScreen('result');
     } catch (err) {
+      console.error('handleSubmit에서 오류 발생:', err);
       setError('피드백을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.');
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -158,7 +156,7 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
   // Show result screen
   if (currentScreen === 'result') {
     return <DailyReportResultScreen 
-              onBack={handleBackFromResult} 
+              onBack={onBack}  // 메인 리포트 화면으로 바로 이동하도록 변경
               achievementScore={achievementScore} 
               aiReportText={aiFeedback} 
            />;

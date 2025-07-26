@@ -169,7 +169,7 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
 
   if (currentStep === 'step2') {
     return <CreateDailyReportStep2Screen 
-              onBack={handleBackFromStep2} 
+              onBack={onBack}  // 메인 리포트 화면으로 바로 이동하도록 변경
               achievementScore={achievementRate} 
               todos={todos.map(t => ({ 
                 ...t, 
