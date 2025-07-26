@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { fetchReports, ReportFromSupabase } from '../backend/supabase/reports';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import CreateDailyReportScreen from './CreateDailyReportScreen';
@@ -24,63 +25,36 @@ const getAchievementColor = (score: number): string => {
   return '#F44336';                        // Red (below 50%)
 };
 
-// Mock data for historical reports
-const generateHistoricalReports = (): DailyReportData[] => {
-  const reports: DailyReportData[] = [];
-  const today = new Date();
-  
-  // Generate 15 days of historical data (excluding today)
-  for (let i = 1; i <= 15; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - i);
-    const achievementScore = Math.floor(Math.random() * 11); // 0-10
-    
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const weekday = date.toLocaleDateString('ko-KR', { weekday: 'short' });
-    
-    reports.push({
-      id: `report-${i}`,
-      date: date.toISOString().split('T')[0],
-      displayDate: `${month}월 ${day}일 일간 리포트`,
-      achievementScore,
-      aiCoachFeedback: [
-        "여기에는 리포트 내용이 표시됩니다.",
-        "주요 내용 2",
-        "주요 내용 3"
-      ]
-    });
-  }
-  
-  return reports;
+// Helper function to format date string
+const formatDisplayDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${month}월 ${day}일 일간 리포트`;
 };
 
-// Generate today's report data
-const generateTodayReport = (): DailyReportData => {
-  const today = new Date();
-  const month = String(today.getMonth() + 1).padStart(2, '0'); // Add leading zero
-  const day = String(today.getDate()).padStart(2, '0'); // Add leading zero
-  
-  return {
-    id: 'today-report',
-    date: today.toISOString().split('T')[0],
-    displayDate: `${month}월 ${day}일 일간 리포트`,
-    achievementScore: 8, // Today's achievement score
-    aiCoachFeedback: [
-      "여기에는 리포트 내용이 표시됩니다.",
-      "주요 내용 2",
-      "주요 내용 3"
-    ]
-  };
-};
 
 export default function ReportScreen() {
   const colorScheme = useColorScheme();
   const [selectedView, setSelectedView] = useState<ReportView>('daily');
   const [currentScreen, setCurrentScreen] = useState<ScreenView>('report');
-  const [todayReportExists, setTodayReportExists] = useState<boolean>(false); // Set to false to show create prompt
-  const historicalReports = generateHistoricalReports();
-  const todayReport = generateTodayReport();
+  
+  const [todayReport, setTodayReport] = useState<ReportFromSupabase | null>(null);
+  const [historicalReports, setHistoricalReports] = useState<ReportFromSupabase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadReports = async () => {
+      setIsLoading(true);
+      const { todayReport, historicalReports } = await fetchReports();
+      setTodayReport(todayReport);
+      setHistoricalReports(historicalReports);
+      setIsLoading(false);
+    };
+
+    loadReports();
+  }, [currentScreen]); // Re-fetch when returning from create screen
+
 
   // Handle navigation to create daily report screen
   const handleCreateReport = () => {
@@ -189,8 +163,8 @@ export default function ReportScreen() {
     );
   };
 
-  const DailyReportCard = ({ data, isToday = false }: { data: DailyReportData; isToday?: boolean }) => {
-    const achievementColor = getAchievementColor(data.achievementScore);
+  const DailyReportCard = ({ data, isToday = false }: { data: ReportFromSupabase; isToday?: boolean }) => {
+    const achievementColor = getAchievementColor(data.achievement_score);
     
     return (
       <View style={[
@@ -204,7 +178,7 @@ export default function ReportScreen() {
           isToday ? styles.todayCardTitle : styles.historyCardTitle,
           { color: Colors[colorScheme ?? 'light'].text }
         ]}>
-          {data.displayDate}
+          {formatDisplayDate(data.report_date)}
         </Text>
 
         {/* Achievement Rate Indicator */}
@@ -214,7 +188,7 @@ export default function ReportScreen() {
             { backgroundColor: achievementColor }
           ]}>
             <Text style={styles.achievementScore}>
-              {data.achievementScore}
+              {data.achievement_score}
             </Text>
           </View>
           <Text style={[styles.achievementLabel, { color: Colors[colorScheme ?? 'light'].icon }]}>
@@ -224,7 +198,7 @@ export default function ReportScreen() {
 
         {/* AI Coach's Feedback Summary */}
         <View style={styles.feedbackContainer}>
-          {data.aiCoachFeedback.map((feedback, index) => (
+          {data.ai_coach_feedback.map((feedback, index) => (
             <View key={index} style={styles.feedbackItem}>
               <Text style={styles.feedbackBullet}>•</Text>
               <Text style={[styles.feedbackText, { color: Colors[colorScheme ?? 'light'].text }]}>
@@ -238,11 +212,19 @@ export default function ReportScreen() {
   };
 
   const DailyReportContent = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.contentContainer}>
+          <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>리포트 로딩 중...</Text>
+        </View>
+      );
+    }
+    
     return (
       <View style={styles.dailyReportContainer}>
         {/* Sticky Today's Report Card - Conditional Rendering */}
         <View style={styles.stickyHeaderContainer}>
-          {todayReportExists ? (
+          {todayReport ? (
             <DailyReportCard data={todayReport} isToday={true} />
           ) : (
             <CreateReportPrompt />
