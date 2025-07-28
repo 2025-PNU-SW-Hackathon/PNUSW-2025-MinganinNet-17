@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import type { Task as PopupTask } from '../../components/DailySchedulePopup';
 import DailySchedulePopup from '../../components/DailySchedulePopup';
+import { CalendarReport, fetchReports } from '../supabase/reports';
 
 const getCompletionColor = (score: number): string => {
   if (score >= 9) return '#d6d4ff';      // 가장 밝은 보라
@@ -13,25 +14,58 @@ const getCompletionColor = (score: number): string => {
   return '#1c1c2e';                      // score 0: 더 어두운 보라(달력 배경색과 동일)
 };
 
-// 타입 선언 (calendar 전용)
-type CalendarTask = { id: string; description: string; time: string; score?: number };
-type SampleData = { [date: string]: CalendarTask[] };
-const sampleData: SampleData = require('./sample.json');
+// MarkedDate 타입 선언
 type MarkedDate = { customStyles: { container: any } };
 
 const CalendarScreen = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);
+  const [reportsData, setReportsData] = useState<{ [date: string]: CalendarReport }>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Supabase에서 리포트 데이터 가져오기
+  useEffect(() => {
+    const loadReports = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const { todayReport, historicalReports } = await fetchReports();
+        const allReports = [todayReport, ...historicalReports].filter(Boolean);
+        
+        // 날짜별로 데이터 매핑
+        const mappedData: { [date: string]: CalendarReport } = {};
+        allReports.forEach((report) => {
+          if (report) {
+            mappedData[report.report_date] = {
+              date: report.report_date,
+              achievement_score: report.achievement_score,
+              daily_tasks: report.daily_activities?.todos || [],
+              ai_coach_feedback: report.ai_coach_feedback || [],
+            };
+          }
+        });
+        
+        setReportsData(mappedData);
+      } catch (err) {
+        console.error('리포트 데이터 로딩 실패:', err);
+        setError('데이터를 불러오는 중 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReports();
+  }, []);
 
   // 커스텀 날짜 컴포넌트
   const CustomDayComponent = ({ date, state, onPress }: any) => {
     const dateStr = date?.dateString;
-    const tasks = sampleData[dateStr] as CalendarTask[] | undefined;
-    const avgScore = tasks?.length
-      ? tasks.reduce((sum: number, t: CalendarTask) => sum + (t.score ?? 0), 0) / tasks.length
-      : NaN;
+    const reportData = reportsData[dateStr];
+    const score = reportData?.achievement_score ?? NaN;
     
-    const backgroundColor = !isNaN(avgScore) ? getCompletionColor(avgScore) : 'transparent';
+    const backgroundColor = !isNaN(score) ? getCompletionColor(score) : 'transparent';
     const isSelected = selectedDate === dateStr;
     
     return (
@@ -54,17 +88,12 @@ const CalendarScreen = () => {
     );
   };
 
-  // sample.json 기반 markedDates 생성 (이제는 색상만 관리)
+  // Supabase 데이터 기반 markedDates 생성
   const markedDates = useMemo(() => {
     const result: { [date: string]: MarkedDate } = {};
     
-    // sampleData에 있는 날짜만 마킹 (색상은 dayComponent에서 처리)
-    Object.entries(sampleData as SampleData).forEach(([date, tasks]) => {
-      const arr = tasks as CalendarTask[];
-      const avgScore = arr.length
-        ? arr.reduce((sum: number, t: CalendarTask) => sum + (t.score ?? 0), 0) / arr.length
-        : NaN;
-      if (!isNaN(avgScore)) {
+    Object.entries(reportsData).forEach(([date, report]) => {
+      if (!isNaN(report.achievement_score)) {
         result[date] = {
           customStyles: {
             container: {
@@ -74,31 +103,88 @@ const CalendarScreen = () => {
         };
       }
     });
+    
     return result;
-  }, [selectedDate]);
+  }, [reportsData, selectedDate]);
 
   const handleDayPress = (day: DateData) => {
     setSelectedDate(day.dateString);
     setPopupVisible(true);
   };
 
-  // 선택된 날짜의 task 목록 표시 (CalendarTask → PopupTask로 변환)
+  // 선택된 날짜의 task 목록 표시 (DailyTask → PopupTask로 변환)
   const popupTasks: PopupTask[] = useMemo(() => {
-    if (!selectedDate) return [];
-    const arr = sampleData[selectedDate] as CalendarTask[] | undefined;
-    if (!arr) return [];
-    return arr.map((item) => ({
-      id: item.id,
-      title: item.description, // description을 title로
-      completed: false,        // 임의로 false (score 등으로 변환 가능)
-      type: 'normal',          // 임의로 normal (score 등으로 변환 가능)
+    if (!selectedDate || !reportsData[selectedDate]) return [];
+    
+    const dailyTasks = reportsData[selectedDate].daily_tasks;
+    if (!dailyTasks) return [];
+    
+    return dailyTasks.map((task) => ({
+      id: task.id.toString(),
+      title: task.description,
+      completed: task.completed,
+      type: 'normal',
     }));
-  }, [selectedDate]);
+  }, [selectedDate, reportsData]);
 
+  // 로딩 화면
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#6c63ff" />
+        <Text style={styles.loadingText}>데이터를 불러오는 중...</Text>
+      </View>
+    );
+  }
+
+  // 다시 시도 함수
+  const retryLoadReports = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const { todayReport, historicalReports } = await fetchReports();
+      const allReports = [todayReport, ...historicalReports].filter(Boolean);
+      
+             // 날짜별로 데이터 매핑
+       const mappedData: { [date: string]: CalendarReport } = {};
+       allReports.forEach((report) => {
+         if (report) {
+           mappedData[report.report_date] = {
+             date: report.report_date,
+             achievement_score: report.achievement_score,
+             daily_tasks: report.daily_activities?.todos || [],
+             ai_coach_feedback: report.ai_coach_feedback || [],
+           };
+         }
+       });
+      
+      setReportsData(mappedData);
+    } catch (err) {
+      console.error('리포트 데이터 로딩 실패:', err);
+      setError('데이터를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 에러 화면
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={retryLoadReports}
+        >
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* <Button title="캘린더 데이터 삽입" onPress={handleInsert} /> */}
       <Calendar
         current={selectedDate || new Date().toISOString().split('T')[0]}
         onDayPress={handleDayPress}
@@ -146,6 +232,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1c1c2e',
     paddingTop: 40,
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -179,6 +269,29 @@ const styles = StyleSheet.create({
   selectedDayText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 16,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  retryButton: {
+    backgroundColor: '#6c63ff',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
