@@ -56,7 +56,7 @@ export default function LoginScreen({
 
       if (user) {
         if (onLoginSuccess) {
-          onLoginSuccess();
+          await onLoginSuccess();
         }
       }
     } catch (error) {
