@@ -24,13 +24,7 @@ export default function DailySchedulePopup({
   tasks, 
   onTaskToggle 
 }: DailySchedulePopupProps) {
-  const defaultTasks: Task[] = [
-    { id: '1', title: '오전 10분 독서', completed: true, type: 'normal' },
-    { id: '2', title: '1챕터 초고 작성하기', completed: false, type: 'normal' },
-    { id: '3', title: '팀 회의', completed: false, type: 'special' },
-  ];
-
-  const currentTasks = tasks.length > 0 ? tasks : defaultTasks;
+  const hasData = tasks.length > 0;
 
   const renderTask = (task: Task) => {
     return (
@@ -68,7 +62,17 @@ export default function DailySchedulePopup({
           <Text style={styles.popupTitle}>{date || '7월 8일 (화)'} 할 일</Text>
           
           <View style={styles.taskList}>
-            {currentTasks.map(renderTask)}
+            {hasData ? (
+              tasks.map(renderTask)
+            ) : (
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>이 날짜에는 리포트가 없습니다</Text>
+                <Text style={styles.noDataSubText}>
+                  해당 날짜에 작성된 일일 리포트가 없어서{'\n'}
+                  할 일 목록을 표시할 수 없습니다.
+                </Text>
+              </View>
+            )}
           </View>
           
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -156,6 +160,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
+    fontFamily: 'Inter',
+  },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  noDataText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 12,
+    textAlign: 'center',
+    fontFamily: 'Inter',
+  },
+  noDataSubText: {
+    fontSize: 14,
+    color: '#a9a9c2',
+    textAlign: 'center',
+    lineHeight: 20,
     fontFamily: 'Inter',
   },
 }); 
