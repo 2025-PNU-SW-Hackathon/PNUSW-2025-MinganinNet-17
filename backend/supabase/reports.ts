@@ -1,6 +1,23 @@
 import { supabase } from './client';
 
 /**
+ * daily_activities 필드에 저장되는 개별 작업 항목의 타입입니다.
+ */
+export interface DailyTask {
+  id: number; // 실제 데이터에서는 number 타입
+  description: string;
+  completed: boolean;
+  time?: string; // "09:00-09:30" 형식
+}
+
+/**
+ * daily_activities 필드의 실제 구조 타입입니다.
+ */
+export interface DailyActivities {
+  todos: DailyTask[];
+}
+
+/**
  * Supabase `reports` 테이블의 데이터를 나타내는 타입입니다.
  */
 export interface ReportFromSupabase {
@@ -10,7 +27,17 @@ export interface ReportFromSupabase {
   report_date: string;
   achievement_score: number;
   ai_coach_feedback: string[];
-  daily_activities: any; // jsonb 타입 - 오늘 할일 목록 데이터
+  daily_activities: DailyActivities | null; // jsonb 타입 - {todos: [...]} 형태
+}
+
+/**
+ * 캘린더에서 사용할 리포트 데이터 타입입니다.
+ */
+export interface CalendarReport {
+  date: string;
+  achievement_score: number;
+  daily_tasks: DailyTask[];
+  ai_coach_feedback: string[];
 }
 
 /**
