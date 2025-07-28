@@ -10,6 +10,7 @@ export interface ReportFromSupabase {
   report_date: string;
   achievement_score: number;
   ai_coach_feedback: string[];
+  daily_activities: any; // jsonb 타입 - 오늘 할일 목록 데이터
 }
 
 /**
@@ -60,6 +61,7 @@ export const createReport = async (reportData: {
   report_date: string;
   achievement_score: number;
   ai_coach_feedback: string[];
+  daily_activities: any; // 오늘 할일 목록 데이터
 }): Promise<ReportFromSupabase | null> => {
   // 1. 현재 사용자 정보 가져오기
   const { data: { user } } = await supabase.auth.getUser();

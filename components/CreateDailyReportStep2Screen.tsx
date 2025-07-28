@@ -158,7 +158,8 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
     return <DailyReportResultScreen 
               onBack={onBack}  // 메인 리포트 화면으로 바로 이동하도록 변경
               achievementScore={achievementScore} 
-              aiReportText={aiFeedback} 
+              aiReportText={aiFeedback}
+              todos={todos} // 할일 목록 데이터 전달
            />;
   }
 

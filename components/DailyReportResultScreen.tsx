@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { createReport } from '../backend/supabase/reports';
+import { DailyTodo } from '../types/habit';
 
 const { width, height } = Dimensions.get('window');
 
@@ -18,6 +19,7 @@ interface DailyReportResultScreenProps {
   achievementScore: number;
   onBack: () => void;
   aiReportText: string;
+  todos: DailyTodo[]; // 할일 목록 데이터 추가
 }
 
 // Coach status based on achievement rate (copied from HomeScreen)
@@ -30,7 +32,8 @@ interface CoachStatus {
 export default function DailyReportResultScreen({ 
   achievementScore, 
   onBack,
-  aiReportText
+  aiReportText,
+  todos
 }: DailyReportResultScreenProps) {
   
   const [isSaving, setIsSaving] = useState(false);
@@ -57,10 +60,21 @@ export default function DailyReportResultScreen({
     setSaveError(null);
     try {
       const feedbackArray = aiReportText.split('\n').map(s => s.trim()).filter(Boolean);
+      
+      // 할일 목록 데이터를 JSON 형태로 구성
+      const dailyActivitiesData = {
+        todos: todos.map(todo => ({
+          id: todo.id,
+          description: todo.description,
+          completed: todo.is_completed
+        }))
+      };
+      
       const reportToSave = {
         report_date: new Date().toISOString().split('T')[0],
         achievement_score: achievementScore,
         ai_coach_feedback: feedbackArray,
+        daily_activities: dailyActivitiesData, // 할일 목록 데이터 추가
       };
 
       const newReport = await createReport(reportToSave);
