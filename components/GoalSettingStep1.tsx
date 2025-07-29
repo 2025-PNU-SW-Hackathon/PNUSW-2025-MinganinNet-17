@@ -65,14 +65,27 @@ export default function GoalSettingStep1({
     }
   };
 
-  // Debug navigation handler - bypasses backend calls
+  // Debug navigation handler - bypasses backend calls with fallback data
   const handleDebugNext = () => {
-    if (habitText.trim()) {
+    try {
+      console.log('🐛 DEBUG: GoalStep1 - current habitText:', habitText);
+      
+      // Provide fallback data for debug mode if no input
+      const debugHabitText = habitText.trim() || 'Debug Habit: 물 8잔 마시기';
+      console.log('🐛 DEBUG: GoalStep1 - using habit text:', debugHabitText);
+      
       // Only call local store and navigation - no backend calls
-      setHabitName(habitText);
+      setHabitName(debugHabitText);
+      
+      console.log('🐛 DEBUG: GoalStep1 - onNext callback exists:', !!onNext);
       if (onNext) {
-        onNext(habitText);
+        onNext(debugHabitText);
+        console.log('🐛 DEBUG: GoalStep1 - navigation callback called successfully');
+      } else {
+        console.error('🐛 DEBUG: GoalStep1 - ERROR: onNext callback is missing!');
       }
+    } catch (error) {
+      console.error('🐛 DEBUG: GoalStep1 - Error in debug handler:', error);
     }
   };
 
@@ -126,7 +139,7 @@ export default function GoalSettingStep1({
         to="Goal Step 2"
         onPress={handleDebugNext}
         label="Debug: Skip DB Save"
-        disabled={!habitText.trim() || isSubmitting}
+        disabled={isSubmitting}
       />
     </View>
   );

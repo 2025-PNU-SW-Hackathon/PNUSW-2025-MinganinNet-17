@@ -43,3 +43,6 @@ app-example
 .env.*
 .npmrc*
 .env*.local
+
+ROUTY_APP_FLOW_GUIDE.md
+.claude/

@@ -70,26 +70,29 @@ export default function GoalSettingStep4({
     }
   };
 
-  // Debug navigation handler - bypasses backend calls
+  // Debug navigation handler - bypasses backend calls with fallback data
   const handleDebugNext = () => {
-    console.log('🐛 DEBUG: Skip DB button clicked');
-    console.log('🐛 DEBUG: selectedIntensity:', selectedIntensity);
-    console.log('🐛 DEBUG: onNext function exists:', !!onNext);
-    
-    // For debug mode, auto-select default intensity if none selected
-    const intensityToUse = selectedIntensity || '보통';
-    
-    console.log('🐛 DEBUG: Using intensity:', intensityToUse);
-    
-    // Only call local store and navigation - no backend calls
-    setIntensity(intensityToUse);
-    
-    if (onNext) {
-      console.log('🐛 DEBUG: Calling onNext with:', intensityToUse);
+    try {
+      console.log('🐛 DEBUG: GoalStep4 - Skip DB button clicked');
+      console.log('🐛 DEBUG: GoalStep4 - selectedIntensity:', selectedIntensity);
+      console.log('🐛 DEBUG: GoalStep4 - onNext function exists:', !!onNext);
+      
+      // For debug mode, auto-select default intensity if none selected
+      const intensityToUse = selectedIntensity || '보통';
+      console.log('🐛 DEBUG: GoalStep4 - using intensity:', intensityToUse);
+      
+      // Only call local store and navigation - no backend calls
+      setIntensity(intensityToUse);
+      
+      if (!onNext) {
+        console.error('🐛 DEBUG: GoalStep4 - ERROR: onNext callback is missing!');
+        return;
+      }
+      
       onNext(intensityToUse);
-      console.log('🐛 DEBUG: onNext called successfully');
-    } else {
-      console.error('🐛 DEBUG: onNext is undefined!');
+      console.log('🐛 DEBUG: GoalStep4 - navigation callback called successfully');
+    } catch (error) {
+      console.error('🐛 DEBUG: GoalStep4 - Error in debug handler:', error);
     }
   };
 

@@ -94,6 +94,12 @@ const styles = StyleSheet.create({
 - **Location**: Final completion step
 - **Purpose**: Skip all backend processing for UI completion testing
 
+### 6. GoalSettingStep6.tsx
+- **Bypasses**: Missing AI-generated plan dependency
+- **Location**: Plan display and final completion
+- **Purpose**: Creates mock plan data when AI generation fails, allowing UI flow testing
+- **Special Feature**: Shows on both error state (missing plan) and normal state
+
 ## Standards for New Screens
 
 ### Required Implementation
@@ -170,14 +176,51 @@ export const IS_DEBUG_MODE_ENABLED = false; // Force disable
 - Ensure the component is imported correctly
 
 ### Navigation Not Working
-- Verify the `onPress` handler only contains navigation logic
-- Check if the parent component's navigation callback is properly passed
-- Ensure required data is available for the navigation
+- **Fixed in v2**: Enhanced error boundaries and validation now catch navigation failures
+- **Fixed in v2**: All debug handlers now validate callback existence before calling
+- **Fixed in v2**: Comprehensive logging helps identify the exact failure point
+- Check console logs for detailed error messages with 🐛 DEBUG prefix
+
+### Button Always Disabled
+- **Fixed in v2**: Debug buttons no longer require user input to function
+- **Fixed in v2**: All debug buttons provide fallback data automatically
+- Debug buttons are only disabled during loading/submitting states
+- Check console logs to see what fallback data is being used
 
 ### Styling Issues
 - Use absolute positioning for consistent placement
 - Ensure the button doesn't overlap with main UI elements
 - Test on different screen sizes
+
+## Version 2 Improvements (2025-01-29)
+
+### Enhanced Error Handling
+- All debug handlers now wrapped in try-catch blocks
+- Comprehensive logging for debugging navigation issues
+- Validation of callback functions before execution
+- Detailed error reporting with context information
+
+### Fallback Data Support
+- **GoalSettingStep1**: Provides "Debug Habit: 물 8잔 마시기" when no habit text entered
+- **SignUpScreen**: Uses "debug@test.com" / "debug123" when fields are empty
+- **GoalSettingStep4**: Auto-selects "보통" intensity when none selected
+- **GoalSettingStep6**: Creates complete mock plan with milestones and todos when AI generation fails
+- All buttons work immediately without requiring user input
+
+### Standardized Disabled States
+- LoginScreen: `disabled={isLoading}`
+- SignUpScreen: `disabled={isLoading}`
+- GoalSettingStep1: `disabled={isSubmitting}`
+- GoalSettingStep4: `disabled={isSubmitting}`
+- GoalSettingStep5: `disabled={isSubmitting}`
+- GoalSettingStep6: `disabled={isSubmitting}`
+- No longer dependent on user input validation
+
+### Improved Logging
+- Consistent 🐛 DEBUG prefix for all debug messages
+- Screen-specific logging (e.g., "GoalStep1", "SignUp", "Login")
+- Callback validation logging
+- Success/failure confirmation messages
 
 ## Future Enhancements
 

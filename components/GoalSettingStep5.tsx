@@ -92,8 +92,20 @@ export default function GoalSettingStep5({
   };
 
   const handleDebugComplete = () => {
-    console.log('🐛 DEBUG: Bypassing AI generation and DB save');
-    onComplete();
+    try {
+      console.log('🐛 DEBUG: GoalStep5 - Bypassing AI generation and DB save');
+      console.log('🐛 DEBUG: GoalStep5 - onComplete callback exists:', !!onComplete);
+      
+      if (!onComplete) {
+        console.error('🐛 DEBUG: GoalStep5 - ERROR: onComplete callback is missing!');
+        return;
+      }
+      
+      onComplete();
+      console.log('🐛 DEBUG: GoalStep5 - navigation callback called successfully');
+    } catch (error) {
+      console.error('🐛 DEBUG: GoalStep5 - Error in debug handler:', error);
+    }
   };
 
   return (
