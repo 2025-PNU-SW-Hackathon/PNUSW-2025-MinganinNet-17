@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, ViewStyle, Alert } from 'react-native';
 import { IS_DEBUG_MODE_ENABLED } from '../src/config/debug';
 
 interface DebugNextButtonProps {
@@ -22,12 +22,34 @@ export default function DebugNextButton({
   }
 
   const handlePress = () => {
-    // Enhanced event handling for web compatibility
+    // Enhanced event handling with better error reporting
     try {
-      console.log('🐛 DEBUG: Navigating to', to);
+      console.log('🐛 DEBUG: Button pressed - navigating to', to);
+      console.log('🐛 DEBUG: Button disabled state:', disabled);
+      console.log('🐛 DEBUG: onPress function exists:', !!onPress);
+      
+      if (!onPress) {
+        console.error('🐛 DEBUG: ERROR - onPress callback is missing!');
+        return;
+      }
+      
       onPress();
+      console.log('🐛 DEBUG: Navigation successful to', to);
+      
+      // Visual feedback for successful debug navigation
+      if (Platform.OS === 'web') {
+        // Brief visual feedback on web
+        setTimeout(() => {
+          console.log('🐛 DEBUG: Navigation completed to', to);
+        }, 100);
+      }
     } catch (error) {
       console.error('🐛 DEBUG: Navigation error:', error);
+      console.error('🐛 DEBUG: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        targetScreen: to
+      });
     }
   };
 

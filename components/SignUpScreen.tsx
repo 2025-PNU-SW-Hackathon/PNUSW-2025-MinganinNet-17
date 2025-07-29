@@ -69,13 +69,27 @@ export default function SignUpScreen({
     setCurrentStep('step0');
   };
 
-  // Debug navigation handler - bypasses backend signup call
+  // Debug navigation handler - bypasses backend signup call with fallback data
   const handleDebugSkipSignup = () => {
-    if (signUpData.email && signUpData.password) {
-      // Only call navigation callback - no backend calls
+    try {
+      console.log('🐛 DEBUG: SignUp - current signUpData:', signUpData);
+      
+      // Provide fallback data for debug mode if fields are missing
+      const debugSignUpData = {
+        email: signUpData.email || 'debug@test.com',
+        password: signUpData.password || 'debug123'
+      };
+      console.log('🐛 DEBUG: SignUp - using signup data:', debugSignUpData);
+      
+      console.log('🐛 DEBUG: SignUp - onSignUpComplete callback exists:', !!onSignUpComplete);
       if (onSignUpComplete) {
-        onSignUpComplete(signUpData);
+        onSignUpComplete(debugSignUpData);
+        console.log('🐛 DEBUG: SignUp - navigation callback called successfully');
+      } else {
+        console.error('🐛 DEBUG: SignUp - ERROR: onSignUpComplete callback is missing!');
       }
+    } catch (error) {
+      console.error('🐛 DEBUG: SignUp - Error in debug handler:', error);
     }
   };
 
@@ -106,7 +120,7 @@ export default function SignUpScreen({
               to="Goal Setting"
               onPress={handleDebugSkipSignup}
               label="Debug: Skip Signup"
-              disabled={!signUpData.email || !signUpData.password || isLoading}
+              disabled={isLoading}
             />
           </>
         );

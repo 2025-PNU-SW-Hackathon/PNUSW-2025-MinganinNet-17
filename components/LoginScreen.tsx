@@ -76,9 +76,19 @@ export default function LoginScreen({
 
   // Debug navigation handler - bypasses backend signin call
   const handleDebugLogin = () => {
-    // Only call success callback - no backend calls
-    if (onLoginSuccess) {
+    try {
+      console.log('🐛 DEBUG: Login - Bypassing backend signin call');
+      console.log('🐛 DEBUG: Login - onLoginSuccess callback exists:', !!onLoginSuccess);
+      
+      if (!onLoginSuccess) {
+        console.error('🐛 DEBUG: Login - ERROR: onLoginSuccess callback is missing!');
+        return;
+      }
+      
       onLoginSuccess();
+      console.log('🐛 DEBUG: Login - navigation callback called successfully');
+    } catch (error) {
+      console.error('🐛 DEBUG: Login - Error in debug handler:', error);
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
+import DebugNextButton from './DebugNextButton';
 
 interface GoalSettingStep6Props {
   onComplete: () => void;
@@ -12,16 +13,94 @@ export default function GoalSettingStep6({
   onBack,
 }: GoalSettingStep6Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { plan } = useHabitStore();
+  const { plan, setPlan } = useHabitStore();
+
+  // Debug navigation handler - creates mock plan data if missing
+  const handleDebugComplete = () => {
+    try {
+      console.log('🐛 DEBUG: GoalStep6 - Current plan state:', plan);
+      
+      // If no plan exists, create mock plan data for debug mode
+      if (!plan) {
+        console.log('🐛 DEBUG: GoalStep6 - Creating mock plan data');
+        const mockPlan = {
+          id: 'debug-plan-' + Date.now(),
+          habit_id: 'debug-habit',
+          plan_title: 'Debug Plan: 건강한 습관 만들기',
+          milestones: [
+            {
+              id: 'debug-milestone-1',
+              title: '1주차: 기초 습관 형성',
+              duration: '7일',
+              daily_todos: [
+                {
+                  id: 'debug-todo-1',
+                  description: '물 2잔 마시기',
+                },
+                {
+                  id: 'debug-todo-2', 
+                  description: '5분 스트레칭하기',
+                }
+              ]
+            },
+            {
+              id: 'debug-milestone-2',
+              title: '2주차: 습관 강화',
+              duration: '7일',
+              daily_todos: [
+                {
+                  id: 'debug-todo-3',
+                  description: '물 4잔 마시기',
+                },
+                {
+                  id: 'debug-todo-4',
+                  description: '10분 운동하기',
+                }
+              ]
+            }
+          ]
+        };
+        setPlan(mockPlan);
+        console.log('🐛 DEBUG: GoalStep6 - Mock plan created:', mockPlan);
+      }
+      
+      console.log('🐛 DEBUG: GoalStep6 - onComplete callback exists:', !!onComplete);
+      if (!onComplete) {
+        console.error('🐛 DEBUG: GoalStep6 - ERROR: onComplete callback is missing!');
+        return;
+      }
+      
+      onComplete();
+      console.log('🐛 DEBUG: GoalStep6 - navigation callback called successfully');
+    } catch (error) {
+      console.error('🐛 DEBUG: GoalStep6 - Error in debug handler:', error);
+    }
+  };
 
   if (!plan) {
     return (
       <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.backButtonText}>← 이전</Text>
+        </TouchableOpacity>
+        
         <Text style={styles.title}>AI 생성 계획을 불러오는 중...</Text>
         <Text style={styles.summaryValue}>
           이전 단계에서 계획이 생성되지 않았습니다. 뒤로 돌아가서 다시
           시도해주세요.
         </Text>
+        
+        {/* Debug button to bypass missing plan issue */}
+        <DebugNextButton
+          to="Home Screen"
+          onPress={handleDebugComplete}
+          label="Debug: Create Mock Plan"
+          disabled={isSubmitting}
+        />
       </View>
     );
   }
@@ -78,6 +157,14 @@ export default function GoalSettingStep6({
           {isSubmitting ? '시작하는 중...' : '완료하고 시작하기'}
         </Text>
       </TouchableOpacity>
+      
+      {/* Debug button for normal view */}
+      <DebugNextButton
+        to="Home Screen"
+        onPress={handleDebugComplete}
+        label="Debug: Skip Completion"
+        disabled={isSubmitting}
+      />
     </View>
   );
 }
