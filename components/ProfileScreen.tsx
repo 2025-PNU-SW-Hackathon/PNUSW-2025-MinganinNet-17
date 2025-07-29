@@ -1,69 +1,113 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
 
+  // Profile Header Component
+  const ProfileHeader = () => (
+    <View style={styles.profileHeader}>
+      {/* Profile Info */}
+      <TouchableOpacity style={styles.profileInfo} activeOpacity={0.7}>
+        <View style={[styles.avatar, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}>
+          <Text style={styles.avatarText}>👤</Text>
+        </View>
+        <View style={styles.profileDetails}>
+          <Text style={[styles.profileName, { color: Colors[colorScheme ?? 'light'].text }]}>
+            사용자 이름
+          </Text>
+          <Text style={[styles.profileEmail, { color: Colors[colorScheme ?? 'light'].icon }]}>
+            user@example.com
+          </Text>
+        </View>
+        <Text style={[styles.chevron, { color: Colors[colorScheme ?? 'light'].icon }]}>
+          ›
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Stats Card Component
+  const StatsCard = ({ icon, value, label }: { icon: string; value: string; label: string }) => (
+    <TouchableOpacity 
+      style={[styles.statsCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}
+      activeOpacity={0.8}
+    >
+      <Text style={styles.statsIcon}>{icon}</Text>
+      <Text style={[styles.statsValue, { color: Colors[colorScheme ?? 'light'].text }]}>
+        {value}
+      </Text>
+      <Text style={[styles.statsLabel, { color: Colors[colorScheme ?? 'light'].icon }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // Quick Access Card Component
+  const QuickAccessCard = () => (
+    <TouchableOpacity 
+      style={[styles.quickAccessCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}
+      activeOpacity={0.8}
+    >
+      <View style={styles.quickAccessContent}>
+        <Text style={styles.quickAccessIcon}>🎯</Text>
+        <Text style={[styles.quickAccessTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+          현재 활성 목표
+        </Text>
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusText}>진행중</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Menu Item Component
+  const MenuItem = ({ icon, title, onPress, isLast = false }: { icon: string; title: string; onPress?: () => void; isLast?: boolean }) => (
+    <TouchableOpacity 
+      style={[
+        styles.menuItem,
+        !isLast && { borderBottomColor: Colors[colorScheme ?? 'light'].icon, borderBottomWidth: 0.3 }
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text style={styles.menuIcon}>{icon}</Text>
+      <Text style={[styles.menuTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+        {title}
+      </Text>
+      <Text style={[styles.menuChevron, { color: Colors[colorScheme ?? 'light'].icon }]}>
+        ›
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.headerContainer}>
-          <Text style={[styles.title, { color: Colors[colorScheme ?? 'light'].text }]}>
-            Profile
-          </Text>
-          <Text style={[styles.subtitle, { color: Colors[colorScheme ?? 'light'].icon }]}>
-            Your account and personalization settings
-          </Text>
+        {/* Profile Header */}
+        <ProfileHeader />
+
+        {/* Stats Dashboard */}
+        <View style={styles.statsContainer}>
+          <StatsCard icon="🔥" value="7" label="일 연속" />
+          <StatsCard icon="🎯" value="12" label="완료된 목표" />
+          <StatsCard icon="📊" value="85%" label="이번 주" />
         </View>
 
-        {/* Content Area */}
-        <View style={styles.contentContainer}>
-          <View style={styles.placeholderCard}>
-            <Text style={[styles.cardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-              Account Settings
-            </Text>
-            <Text style={[styles.cardDescription, { color: Colors[colorScheme ?? 'light'].icon }]}>
-              Manage your account information, email, and authentication settings.
-            </Text>
-          </View>
+        {/* Quick Access Card */}
+        <View style={styles.quickAccessContainer}>
+          <QuickAccessCard />
+        </View>
 
-          <View style={styles.placeholderCard}>
-            <Text style={[styles.cardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-              AI Coach Personality
-            </Text>
-            <Text style={[styles.cardDescription, { color: Colors[colorScheme ?? 'light'].icon }]}>
-              Customize your AI coach's personality, coaching style, and intensity level.
-            </Text>
-          </View>
-
-          <View style={styles.placeholderCard}>
-            <Text style={[styles.cardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-              Notification Preferences
-            </Text>
-            <Text style={[styles.cardDescription, { color: Colors[colorScheme ?? 'light'].icon }]}>
-              Control how and when you receive notifications about your goals and progress.
-            </Text>
-          </View>
-
-          <View style={styles.placeholderCard}>
-            <Text style={[styles.cardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-              App Restrictions
-            </Text>
-            <Text style={[styles.cardDescription, { color: Colors[colorScheme ?? 'light'].icon }]}>
-              Manage which apps should be restricted during your goal-focused time.
-            </Text>
-          </View>
-
-          <View style={styles.placeholderCard}>
-            <Text style={[styles.cardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-              Data & Privacy
-            </Text>
-            <Text style={[styles.cardDescription, { color: Colors[colorScheme ?? 'light'].icon }]}>
-              Control your data sharing preferences and privacy settings.
-            </Text>
-          </View>
+        {/* Settings Menu */}
+        <View style={styles.menuContainer}>
+          <MenuItem icon="👤" title="계정 설정" />
+          <MenuItem icon="🔔" title="알림" />
+          <MenuItem icon="🤖" title="AI 코치" />
+          <MenuItem icon="🔒" title="개인정보 보호" />
+          <MenuItem icon="❓" title="도움말 및 지원" />
+          <MenuItem icon="ℹ️" title="앱 정보" isLast={true} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -77,37 +121,130 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  headerContainer: {
+  
+  // Profile Header Styles
+  profileHeader: {
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 32,
+    paddingTop: 80,
+    paddingBottom: 24,
   },
-  title: {
-    fontSize: 32,
+  profileInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  avatarText: {
+    fontSize: 24,
+  },
+  profileDetails: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  subtitle: {
+  profileEmail: {
     fontSize: 16,
-    opacity: 0.7,
   },
-  contentContainer: {
+  chevron: {
+    fontSize: 24,
+    fontWeight: '300',
+  },
+  
+  // Stats Dashboard Styles
+  statsContainer: {
+    flexDirection: 'row',
     paddingHorizontal: 24,
-    gap: 16,
+    marginBottom: 24,
+    gap: 12,
   },
-  placeholderCard: {
-    padding: 20,
-    backgroundColor: '#f5f5f5',
+  statsCard: {
+    flex: 1,
+    padding: 16,
     borderRadius: 16,
-    marginBottom: 16,
+    alignItems: 'center',
+    minHeight: 100,
+    justifyContent: 'center',
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  statsIcon: {
+    fontSize: 24,
     marginBottom: 8,
   },
-  cardDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+  statsValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statsLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  
+  // Quick Access Card Styles
+  quickAccessContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  quickAccessCard: {
+    borderRadius: 16,
+    padding: 20,
+  },
+  quickAccessContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickAccessIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  quickAccessTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  statusBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  // Menu Styles
+  menuContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  menuIcon: {
+    fontSize: 24,
+    width: 40,
+    textAlign: 'center',
+  },
+  menuTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 12,
+  },
+  menuChevron: {
+    fontSize: 20,
+    fontWeight: '300',
   },
 }); 
