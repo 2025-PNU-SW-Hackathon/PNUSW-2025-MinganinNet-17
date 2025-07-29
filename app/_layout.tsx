@@ -19,24 +19,18 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <Stack>
+    <Stack initialRouteName="index">
       <Stack.Screen 
-        name="(tabs)" 
+        name="index" 
         options={{ headerShown: false }} 
       />
       <Stack.Screen 
-        name="ui/login" 
-        options={{ 
-          title: '로그인',
-          headerShown: false 
-        }} 
+        name="onboarding" 
+        options={{ headerShown: false }} 
       />
       <Stack.Screen 
-        name="ui/signup" 
-        options={{ 
-          title: '회원가입',
-          headerShown: false 
-        }} 
+        name="(tabs)" 
+        options={{ headerShown: false }} 
       />
     </Stack>
   );
