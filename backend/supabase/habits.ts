@@ -2,6 +2,34 @@ import { Plan, PlanForCreation } from '../../types/habit';
 import { supabase } from './client';
 
 /**
+ * Checks if the current user has any habits in the database.
+ * 
+ * @returns {Promise<boolean>} A promise that resolves to true if user has habits, false otherwise.
+ */
+export async function checkUserHasHabits(): Promise<boolean> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    console.warn('🔓 No authenticated user found, cannot check habits.');
+    return false;
+  }
+
+  const { data: habitsData, error } = await supabase
+    .from('habits')
+    .select('id')
+    .eq('user_id', user.id)
+    .limit(1);
+
+  if (error) {
+    console.error('Supabase error checking user habits:', error);
+    return false;
+  }
+
+  return habitsData && habitsData.length > 0;
+}
+
+/**
  * Fetches the currently active plan for the logged-in user.
  * It retrieves a nested structure of Plan -> Milestones -> Daily_Todos.
  *
