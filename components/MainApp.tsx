@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { checkUserHasHabits } from '../backend/supabase/habits';
 import GoalSettingStep1 from './GoalSettingStep1';
 import GoalSettingStep2 from './GoalSettingStep2';
 import GoalSettingStep3 from './GoalSettingStep3';
@@ -56,8 +57,23 @@ export default function MainApp() {
   };
 
   // Login Screen handlers
-  const handleLoginSuccess = () => {
-    setCurrentScreen('goalStep1');
+  const handleLoginSuccess = async () => {
+    try {
+      // 사용자의 habits 데이터가 있는지 확인
+      const hasHabits = await checkUserHasHabits();
+      
+      if (hasHabits) {
+        // 이미 habits 데이터가 있으면 바로 메인 화면으로
+        router.replace('/(tabs)');
+      } else {
+        // habits 데이터가 없으면 목표 설정으로
+        setCurrentScreen('goalStep1');
+      }
+    } catch (error) {
+      console.error('Error checking user habits:', error);
+      // 에러가 발생하면 기본적으로 목표 설정으로 이동
+      setCurrentScreen('goalStep1');
+    }
   };
 
   const handleSignUpPress = () => {
