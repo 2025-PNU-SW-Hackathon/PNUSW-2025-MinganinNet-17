@@ -1,9 +1,53 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { sendNotification } from '../backend/hwirang/notifications';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
+
+  // 알림 테스트 함수
+  const handleNotificationTest = async () => {
+    try {
+      const result = await sendNotification();
+      if (result.success) {
+        Alert.alert('테스트 성공', result.message);
+      } else {
+        Alert.alert('테스트 실패', result.message);
+      }
+    } catch (error) {
+      Alert.alert('오류', '알림 테스트 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 백그라운드 테스트용 예약 알림 함수
+  const handleScheduledNotificationTest = async () => {
+    try {
+      const result = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '백그라운드 테스트 알림',
+          body: '5초 후 알림입니다! 터치해서 리포트로 이동하세요 🎯',
+          data: { 
+            type: 'background_test',
+            route: 'report'
+          },
+        },
+        trigger: {
+          date: new Date(Date.now() + 5000), // 5초 후
+          type: 'date'
+        } as Notifications.NotificationTriggerInput,
+      });
+      
+      Alert.alert(
+        '예약 완료', 
+        '5초 후 알림이 옵니다!\n지금 앱을 백그라운드로 보내고 알림을 기다려주세요.',
+        [{ text: '확인' }]
+      );
+    } catch (error) {
+      Alert.alert('오류', '예약 알림 테스트 중 오류가 발생했습니다.');
+    }
+  };
 
   // Profile Header Component
   const ProfileHeader = () => (
@@ -104,6 +148,8 @@ export default function ProfileScreen() {
         <View style={styles.menuContainer}>
           <MenuItem icon="👤" title="계정 설정" />
           <MenuItem icon="🔔" title="알림" />
+          <MenuItem icon="🧪" title="알림 테스트" onPress={handleNotificationTest} />
+          <MenuItem icon="⏰" title="백그라운드 테스트" onPress={handleScheduledNotificationTest} />
           <MenuItem icon="🤖" title="AI 코치" />
           <MenuItem icon="🔒" title="개인정보 보호" />
           <MenuItem icon="❓" title="도움말 및 지원" />

@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 // 앱이 포그라운드에 있을 때 알림이 표시되도록 설정
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: true,
@@ -59,7 +58,10 @@ export const sendNotification = async () => {
       content: {
         title: '습관 관리 알림',
         body: aiResponse,
-        data: { type: 'habit_reminder' },
+        data: { 
+          type: 'habit_reminder',
+          route: 'report'
+        },
       },
       trigger: null,
     });
@@ -105,6 +107,7 @@ export const scheduleRoutineReminder = async (routineName: string, routineTime: 
           type: 'routine_reminder',
           routineName,
           scheduledTime: routineTime.toISOString(),
+          route: 'report'
         },
         sound: true,
         priority: Notifications.AndroidNotificationPriority.HIGH,
