@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
@@ -24,10 +25,17 @@ export default function ProfileScreen() {
   // 백그라운드 테스트용 예약 알림 함수
   const handleScheduledNotificationTest = async () => {
     try {
+      // AsyncStorage에 알림 상태 저장 (완전 종료 상태 대비)
+      await AsyncStorage.setItem('pending_notification', JSON.stringify({
+        route: 'report',
+        type: 'background_test',
+        timestamp: Date.now()
+      }));
+
       const result = await Notifications.scheduleNotificationAsync({
         content: {
           title: '백그라운드 테스트 알림',
-          body: '5초 후 알림입니다! 터치해서 리포트로 이동하세요 🎯',
+          body: '5초 후 알림입니다! 터치해서 Report로 이동하세요 🎯',
           data: { 
             type: 'background_test',
             route: 'report'

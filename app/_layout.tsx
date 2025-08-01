@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -9,11 +10,19 @@ export default function RootLayout() {
   const [isNavigationReady, setIsNavigationReady] = useState(false);
 
   // 알림 데이터로 네비게이션 처리하는 함수
-  const handleNotificationNavigation = (notificationData: any) => {
+  const handleNotificationNavigation = async (notificationData: any) => {
     console.log('알림 네비게이션 처리:', notificationData);
     
     if (notificationData?.route === 'report') {
-      console.log('리포트 화면으로 이동 시작...');
+      console.log('Report 화면으로 이동 시작...');
+      
+      // 포그라운드/백그라운드에서 처리되었으므로 AsyncStorage에서 제거
+      try {
+        await AsyncStorage.removeItem('pending_notification');
+        console.log('AsyncStorage에서 pending_notification 제거됨');
+      } catch (error) {
+        console.log('AsyncStorage 제거 중 오류 (무시됨):', error);
+      }
       
       // 네비게이션이 준비될 때까지 기다린 후 실행
       const navigate = () => {
@@ -40,7 +49,7 @@ export default function RootLayout() {
       console.log('Session:', session);
     });
 
-    // 앱이 종료된 상태에서 알림으로 시작되었는지 확인
+    // 앱이 종료된 상태에서 알림으로 시작되었는지 확인(expo go에서 사용안됨)
     const checkLastNotificationResponse = async () => {
       try {
         const lastNotificationResponse = await Notifications.getLastNotificationResponseAsync();
@@ -55,7 +64,7 @@ export default function RootLayout() {
           }, 1000);
         }
       } catch (error) {
-        console.error('마지막 알림 응답 확인 중 오류:', error);
+        console.error('마지막 알림 응답 확인 중 오류:', error); // 그래서 맨날 여기서 오류 발생
       }
     };
 

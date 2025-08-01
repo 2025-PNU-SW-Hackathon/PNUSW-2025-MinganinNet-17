@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -53,6 +54,13 @@ export const sendNotification = async () => {
     }
 
     const aiResponse = '습관 관리 시간입니다! 지금 바로 시작해보세요. 🎯';
+    
+    // AsyncStorage에 알림 상태 저장 (완전 종료 상태 대비)
+    await AsyncStorage.setItem('pending_notification', JSON.stringify({
+      route: 'report',
+      type: 'habit_reminder',
+      timestamp: Date.now()
+    }));
     
     await Notifications.scheduleNotificationAsync({
       content: {
