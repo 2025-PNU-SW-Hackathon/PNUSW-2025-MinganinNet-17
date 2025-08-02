@@ -8,15 +8,17 @@ import { supabase } from '../backend/supabase/client';
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
+  const [pendingNotificationRoute, setPendingNotificationRoute] = useState<string | null>(null);
+  const [isAutoNavigationHandled, setIsAutoNavigationHandled] = useState(false);
 
-  // 알림 데이터로 네비게이션 처리하는 함수
+  // 앱 실행 중 알림 클릭 시 즉시 네비게이션 처리 (세션 복원 불필요)
   const handleNotificationNavigation = async (notificationData: any) => {
-    console.log('알림 네비게이션 처리:', notificationData);
+    console.log('🔔 앱 실행 중 알림 클릭 - 즉시 네비게이션 처리:', notificationData);
     
     if (notificationData?.route === 'report') {
-      console.log('Report 화면으로 이동 시작...');
+      console.log('🔔 Report 화면으로 즉시 이동');
       
-      // 포그라운드/백그라운드에서 처리되었으므로 AsyncStorage에서 제거
+      // 실행 중이므로 AsyncStorage에서 제거
       try {
         await AsyncStorage.removeItem('pending_notification');
         console.log('AsyncStorage에서 pending_notification 제거됨');
@@ -38,6 +40,36 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
+    // 디버깅: 앱 시작 시 초기 세션 상태 확인
+    const checkInitialSession = async () => {
+      try {
+        console.log('🔍 === 초기 세션 상태 확인 시작 ===');
+        
+        // Supabase에서 현재 세션 확인
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('📋 초기 세션 상태:', session ? '✅ 세션 있음' : '❌ 세션 없음');
+        console.log('📋 세션 데이터:', session);
+        console.log('📋 세션 에러:', error);
+        
+        // AsyncStorage에서 Supabase 관련 키들 확인
+        const allKeys = await AsyncStorage.getAllKeys();
+        const supabaseKeys = allKeys.filter(key => key.includes('supabase') || key.includes('@supabase'));
+        console.log('🗂️  AsyncStorage의 Supabase 관련 키들:', supabaseKeys);
+        
+        // 각 키의 값 확인
+        for (const key of supabaseKeys) {
+          const value = await AsyncStorage.getItem(key);
+          console.log(`📦 ${key}:`, value ? '데이터 있음' : '데이터 없음');
+        }
+        
+        console.log('🔍 === 초기 세션 상태 확인 완료 ===');
+      } catch (error) {
+        console.error('❌ 초기 세션 확인 중 오류:', error);
+      }
+    };
+
+    checkInitialSession();
+
     // 네비게이션 준비 완료 표시 (약간의 지연 후)
     const timer = setTimeout(() => {
       setIsNavigationReady(true);
@@ -45,8 +77,51 @@ export default function RootLayout() {
 
     // 인증 상태 변경 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth event:', event);
-      console.log('Session:', session);
+      console.log('🔐 === 인증 상태 변경 감지 ===');
+      console.log('🔐 Auth event:', event);
+      console.log('🔐 Session 존재:', session ? '✅ 있음' : '❌ 없음');
+      console.log('🔐 Pending Route:', pendingNotificationRoute);
+      
+      if (session) {
+        console.log('📊 세션 정보:');
+        console.log('  - User ID:', session.user?.id);
+        console.log('  - Email:', session.user?.email);
+        console.log('  - Access Token 존재:', !!session.access_token);
+        console.log('  - Refresh Token 존재:', !!session.refresh_token);
+      }
+      
+      // 세션 복원 완료 시 자동 라우팅 처리 (알림 + 일반 접속 모두)
+      if (session && !isAutoNavigationHandled) {
+        console.log('🚀 === 세션 복원 완료 - 자동 네비게이션 시작 ===');
+        
+        const navigate = () => {
+          if (isNavigationReady) {
+            if (pendingNotificationRoute === 'report') {
+              // 알림을 통한 접속 → 리포트 화면
+              router.replace('/(tabs)/report');
+              console.log('✅ 알림을 통한 세션 복원 → Report 화면으로 이동');
+              
+              // AsyncStorage에서 알림 데이터 제거
+              AsyncStorage.removeItem('pending_notification').catch(err => 
+                console.log('AsyncStorage 제거 중 오류 (무시됨):', err)
+              );
+              setPendingNotificationRoute(null);
+            } else {
+              // 일반 접속 → 메인 화면 (홈 탭)
+              router.replace('/(tabs)');
+              console.log('✅ 일반 세션 복원 → 메인 화면으로 이동 (로그인 화면 우회)');
+            }
+            
+            // 자동 네비게이션 완료 플래그 설정 (중복 실행 방지)
+            setIsAutoNavigationHandled(true);
+            console.log('🚀 === 자동 네비게이션 완료 ===');
+          } else {
+            setTimeout(navigate, 100);
+          }
+        };
+        
+        navigate();
+      }
     });
 
     // 앱이 종료된 상태에서 알림으로 시작되었는지 확인(expo go에서 사용안됨 왜지?)
@@ -58,7 +133,7 @@ export default function RootLayout() {
           console.log('앱 시작 시 마지막 알림 응답:', lastNotificationResponse);
           const notificationData = lastNotificationResponse.notification.request.content.data;
           
-          // 일정 시간 후 네비게이션 실행 (앱 완전 로딩 대기)
+          // 1차 성공: 바로 처리 (세션 복원 불필요)
           setTimeout(() => {
             handleNotificationNavigation(notificationData);
           }, 1000);
@@ -78,12 +153,10 @@ export default function RootLayout() {
           // 5분 이내의 알림만 유효하다고 간주 (너무 오래된 알림은 무시)
           const timeDiff = Date.now() - notificationData.timestamp;
           if (timeDiff < 5 * 60 * 1000 && notificationData.route === 'report') {
-            console.log('저장된 알림으로 인한 앱 시작 - Report 화면으로 이동');
+            console.log('저장된 알림 발견 - 세션 복원 대기 후 Report 화면으로 이동 예정');
             
-            // 일정 시간 후 네비게이션 실행 (앱 완전 로딩 대기)
-            setTimeout(() => {
-              handleNotificationNavigation(notificationData);
-            }, 1000);
+            // 바로 이동하지 않고 플래그만 설정 (세션 복원 완료 대기)
+            setPendingNotificationRoute('report');
           }
         }
       } catch (storageError) {

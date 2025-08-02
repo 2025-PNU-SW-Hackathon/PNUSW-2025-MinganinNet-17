@@ -1,6 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { signIn } from '../backend/supabase/auth';
+import { supabase } from '../backend/supabase/client';
 import { AnimatedButton } from './AnimatedButton';
 import DebugNextButton from './DebugNextButton';
 
@@ -55,6 +57,55 @@ export default function LoginScreen({
       }
 
       if (user) {
+        console.log('🎉 === 로그인 성공! 세션 저장 상태 확인 ===');
+        console.log('🎉 로그인된 사용자:', user.email);
+        
+        // 로그인 성공 직후 세션 상태 확인
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          console.log('💾 로그인 후 세션 상태:', session ? '✅ 세션 저장됨' : '❌ 세션 없음');
+          
+          if (session) {
+            console.log('📊 저장된 세션 정보:');
+            console.log('  - User ID:', session.user?.id);
+            console.log('  - Email:', session.user?.email);
+            console.log('  - Access Token 존재:', !!session.access_token);
+            console.log('  - Refresh Token 존재:', !!session.refresh_token);
+          }
+          
+          // AsyncStorage에서 모든 키들 확인 (더 넓은 범위)
+          const allKeys = await AsyncStorage.getAllKeys();
+          console.log('🗂️  로그인 후 AsyncStorage의 모든 키들:', allKeys);
+          
+          // 다양한 패턴으로 Supabase 관련 키 찾기
+          const supabaseKeys = allKeys.filter(key => 
+            key.includes('supabase') || 
+            key.includes('@supabase') ||
+            key.includes('sb-') ||
+            key.includes('auth') ||
+            key.includes('token') ||
+            key.includes('session')
+          );
+          console.log('🔍 Supabase 관련 키들 (넓은 검색):', supabaseKeys);
+          
+          // 각 키의 실제 값도 확인
+          for (const key of allKeys) {
+            try {
+              const value = await AsyncStorage.getItem(key);
+              if (value && (key.includes('auth') || key.includes('token') || key.includes('supabase'))) {
+                console.log(`📦 ${key}: ${value.substring(0, 100)}...`);
+              }
+            } catch (err) {
+              console.log(`❌ ${key}: 읽기 실패`);
+            }
+          }
+          
+        } catch (sessionError) {
+          console.error('❌ 세션 확인 중 오류:', sessionError);
+        }
+        
+        console.log('🎉 === 세션 저장 상태 확인 완료 ===');
+        
         if (onLoginSuccess) {
           await onLoginSuccess();
         }
