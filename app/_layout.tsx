@@ -49,7 +49,7 @@ export default function RootLayout() {
       console.log('Session:', session);
     });
 
-    // 앱이 종료된 상태에서 알림으로 시작되었는지 확인(expo go에서 사용안됨)
+    // 앱이 종료된 상태에서 알림으로 시작되었는지 확인(expo go에서 사용안됨 왜지?)
     const checkLastNotificationResponse = async () => {
       try {
         const lastNotificationResponse = await Notifications.getLastNotificationResponseAsync();
@@ -62,9 +62,32 @@ export default function RootLayout() {
           setTimeout(() => {
             handleNotificationNavigation(notificationData);
           }, 1000);
+          return; // AsyncStorage 확인 건너뛰기
         }
       } catch (error) {
         console.error('마지막 알림 응답 확인 중 오류:', error); // 그래서 맨날 여기서 오류 발생
+      }
+
+      // Fallback: AsyncStorage에서 pending 알림 확인 (1차 시도 실패 시)
+      try {
+        const pendingNotification = await AsyncStorage.getItem('pending_notification');
+        if (pendingNotification) {
+          const notificationData = JSON.parse(pendingNotification);
+          console.log('AsyncStorage에서 발견된 저장된 알림 데이터:', notificationData);
+          
+          // 5분 이내의 알림만 유효하다고 간주 (너무 오래된 알림은 무시)
+          const timeDiff = Date.now() - notificationData.timestamp;
+          if (timeDiff < 5 * 60 * 1000 && notificationData.route === 'report') {
+            console.log('저장된 알림으로 인한 앱 시작 - Report 화면으로 이동');
+            
+            // 일정 시간 후 네비게이션 실행 (앱 완전 로딩 대기)
+            setTimeout(() => {
+              handleNotificationNavigation(notificationData);
+            }, 1000);
+          }
+        }
+      } catch (storageError) {
+        console.log('AsyncStorage 확인 중 오류 (무시됨):', storageError instanceof Error ? storageError.message : String(storageError));
       }
     };
 

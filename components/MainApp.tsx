@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -59,34 +58,7 @@ export default function MainApp() {
 
   // Login Screen handlers
   const handleLoginSuccess = async () => {
-    // AsyncStorage에서 pending 알림 확인 (완전 종료 상태 대비)
-    let isFromNotification = false;
-    try {
-      const pendingNotification = await AsyncStorage.getItem('pending_notification');
-      if (pendingNotification) {
-        const notificationData = JSON.parse(pendingNotification);
-        console.log('로그인 성공 시 저장된 알림 데이터:', notificationData);
-        
-        // 5분 이내의 알림만 유효하다고 간주 (너무 오래된 알림은 무시)
-        const timeDiff = Date.now() - notificationData.timestamp;
-        if (timeDiff < 5 * 60 * 1000 && notificationData.route === 'report') {
-          console.log('저장된 알림으로 인한 로그인 성공 - Report 화면으로 이동');
-          isFromNotification = true;
-          // 처리 완료 후 AsyncStorage에서 제거
-          await AsyncStorage.removeItem('pending_notification');
-        }
-      }
-    } catch (storageError) {
-      console.log('AsyncStorage 확인 중 오류 (무시됨):', storageError instanceof Error ? storageError.message : String(storageError));
-    }
-
-    // 알림으로 시작된 경우 Report 화면으로 이동
-    if (isFromNotification) {
-      router.replace('/(tabs)/report');
-      return;
-    }
-
-    // 일반 로그인인 경우 기존 로직 진행
+    // 일반 로그인 로직
     try {
       const hasHabits = await checkUserHasHabits();
       
