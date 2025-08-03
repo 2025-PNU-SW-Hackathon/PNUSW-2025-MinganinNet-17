@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
+import VoiceGoalSetting from './VoiceGoalSetting';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +28,8 @@ export default function GoalSettingStep1({
 }: GoalSettingStep1Props) {
   const [habitText, setHabitText] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showModeSelection, setShowModeSelection] = useState(true);
+  const [selectedMode, setSelectedMode] = useState<'text' | 'voice' | null>(null);
   const { setHabitName } = useHabitStore();
 
   const handleHabitSubmit = async () => {
@@ -89,6 +92,81 @@ export default function GoalSettingStep1({
     }
   };
 
+  // Handle voice goal setting completion
+  const handleVoiceGoalComplete = (goalData: any) => {
+    console.log('Voice goal setting completed:', goalData);
+    if (goalData.habitName && onNext) {
+      onNext(goalData.habitName);
+    }
+  };
+
+  // Mode selection screen
+  if (showModeSelection) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.stepIndicator}>1 / 6 단계</Text>
+        
+        {/* Back Button */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+        >
+          <Text style={styles.backButtonText}>← 이전</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>
+            목표 설정 방법을{'\n'}선택해주세요
+          </Text>
+          <Text style={styles.subtitle}>
+            텍스트로 입력하거나 AI와 음성 대화로 설정할 수 있어요
+          </Text>
+        </View>
+
+        <View style={styles.modeContainer}>
+          <TouchableOpacity
+            style={styles.modeOption}
+            onPress={() => {
+              setSelectedMode('text');
+              setShowModeSelection(false);
+            }}
+          >
+            <Text style={styles.modeIcon}>✏️</Text>
+            <Text style={styles.modeTitle}>텍스트 입력</Text>
+            <Text style={styles.modeDescription}>
+              키보드로 직접 목표를 입력해주세요
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.modeOption}
+            onPress={() => {
+              setSelectedMode('voice');
+              setShowModeSelection(false);
+            }}
+          >
+            <Text style={styles.modeIcon}>🎤</Text>
+            <Text style={styles.modeTitle}>음성 대화</Text>
+            <Text style={styles.modeDescription}>
+              AI와 대화하며 자연스럽게 목표를 설정해보세요
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Voice mode
+  if (selectedMode === 'voice') {
+    return (
+      <VoiceGoalSetting
+        onComplete={handleVoiceGoalComplete}
+        onBack={() => setShowModeSelection(true)}
+      />
+    );
+  }
+
+  // Text mode (original interface)
   return (
     <View style={styles.container}>
       <Text style={styles.stepIndicator}>1 / 6 단계</Text>
@@ -96,7 +174,7 @@ export default function GoalSettingStep1({
       {/* Back Button */}
       <TouchableOpacity
         style={styles.backButton}
-        onPress={onBack}
+        onPress={() => setShowModeSelection(true)}
         disabled={isSubmitting}
       >
         <Text style={styles.backButtonText}>← 이전</Text>
@@ -132,6 +210,14 @@ export default function GoalSettingStep1({
         <Text style={styles.nextButtonText}>
           {isSubmitting ? '저장 중...' : '저장하고 다음으로'}
         </Text>
+      </TouchableOpacity>
+      
+      {/* Mode switch button */}
+      <TouchableOpacity
+        style={styles.switchModeButton}
+        onPress={() => setSelectedMode('voice')}
+      >
+        <Text style={styles.switchModeText}>🎤 음성 모드로 전환</Text>
       </TouchableOpacity>
       
       {/* Floating Debug Button - does not interfere with layout */}
@@ -220,6 +306,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#a9a9c2',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#a9a9c2',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 24,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  modeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 20,
+  },
+  modeOption: {
+    backgroundColor: '#3a3a50',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  modeIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  modeTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  modeDescription: {
+    fontSize: 14,
+    color: '#a9a9c2',
+    textAlign: 'center',
+    lineHeight: 20,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  switchModeButton: {
+    position: 'absolute',
+    bottom: 100,
+    left: 24,
+    right: 24,
+    backgroundColor: '#3a3a50',
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  switchModeText: {
+    fontSize: 14,
+    color: '#6c63ff',
+    fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

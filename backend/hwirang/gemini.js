@@ -116,3 +116,64 @@ export const generateDailyFeedback = async (userSummary, achievementScore, todos
 
   return await sendMessage(prompt);
 };
+
+/**
+ * Generates an AI response for the goal-setting conversation.
+ * The AI will attempt to extract goal-related information from the user's message
+ * and will return both a conversational text response and a JSON object with the extracted data.
+ * @param {Array<object>} conversationHistory - The history of the conversation.
+ * @param {object} currentGoalData - The goal data collected so far.
+ * @returns {Promise<{textResponse: string, goalData: object}>}
+ */
+export const generateGoalSettingResponse = async (conversationHistory, currentGoalData) => {
+  const historyString = conversationHistory.map(turn => `${turn.type}: ${turn.content}`).join('\n');
+
+  const prompt = `
+    You are Routy, a friendly and professional AI coach helping a user set a goal. Your task is to have a natural, free-flowing conversation while extracting key information.
+
+    **Goal Information to Collect (as a JSON object):**
+    - goal (string): The user's specific, measurable goal.
+    - period (string): The timeframe for achieving the goal (e.g., "3 months", "end of the year").
+    - time_slot (string): When the user plans to work on the goal (e.g., "every morning", "weekends").
+    - difficulty (string): What challenges the user anticipates (e.g., "lack of motivation", "busy schedule").
+    - coaching_intensity ('high', 'medium', 'low'): The level of coaching the user wants.
+    - allDataCollected (boolean): Set to true ONLY when all other 5 fields are non-empty.
+    - confirmationStatus ('pending', 'confirmed', 'denied'): Your status for the final confirmation step.
+
+    **Current State:**
+    - Conversation History:
+    ${historyString}
+    - Data Collected So Far:
+    ${JSON.stringify(currentGoalData, null, 2)}
+
+    **Your Instructions:**
+    1.  Analyze the last user message to extract information for the JSON fields.
+    2.  If \`allDataCollected\` is false, ask a friendly, open-ended question to get the NEXT SINGLE piece of missing information.
+    3.  If \`allDataCollected\` is true, your ONLY job is to ask for final confirmation. Your \`textResponse\` MUST be a simple confirmation question like: "모든 정보가 수집되었어요! 이대로 목표를 확정할까요?"
+    4.  If the user's last message is a confirmation ("yes", "ok", "confirm"), set \`confirmationStatus\` to "confirmed".
+    5.  Your entire output MUST be a single, valid JSON object, starting with { and ending with }. Do NOT wrap it in markdown backticks or any other text.
+
+    **Response Format (MUST BE A SINGLE VALID JSON OBJECT):**
+    {
+      "textResponse": "Your conversational reply to the user. This is the ONLY part the user will see.",
+      "goalData": { ...updated goal data object... }
+    }
+  `;
+
+  const responseText = await sendMessage(prompt);
+  
+  try {
+    // Defensive parsing to handle markdown or other text
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error("No valid JSON object found in the response.");
+  } catch (error) {
+    console.error("Failed to parse AI response as JSON:", error, "Raw response:", responseText);
+    return {
+      textResponse: "죄송합니다, 답변을 처리하는 데 문제가 발생했어요. 다시 한 번 말씀해주시겠어요?",
+      goalData: currentGoalData,
+    };
+  }
+};
