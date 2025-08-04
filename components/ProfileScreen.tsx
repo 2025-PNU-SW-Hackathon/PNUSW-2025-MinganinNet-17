@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
 import { signOut } from '../backend/supabase/auth';
@@ -76,10 +75,8 @@ export default function ProfileScreen() {
               const { error } = await signOut();
               if (error) {
                 Alert.alert('오류', error.message);
-              } else {
-                // 로그아웃 성공 시 온보딩 화면으로 이동
-                router.replace('/onboarding');
               }
+              // 네비게이션은 app/_layout.tsx의 onAuthStateChange에서 자동 처리됨
             } catch (error) {
               Alert.alert('오류', '로그아웃 중 문제가 발생했습니다.');
             }
