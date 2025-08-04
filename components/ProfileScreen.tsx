@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
+import { signOut } from '../backend/supabase/auth';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
@@ -55,6 +56,34 @@ export default function ProfileScreen() {
     } catch (error) {
       Alert.alert('오류', '예약 알림 테스트 중 오류가 발생했습니다.');
     }
+  };
+
+  // 로그아웃 함수
+  const handleLogout = async () => {
+    Alert.alert(
+      '로그아웃',
+      '정말 로그아웃 하시겠습니까?',
+      [
+        { 
+          text: '취소', 
+          style: 'cancel' 
+        },
+        {
+          text: '로그아웃',
+          onPress: async () => {
+            try {
+              const { error } = await signOut();
+              if (error) {
+                Alert.alert('오류', error.message);
+              }
+              // 네비게이션은 app/_layout.tsx의 onAuthStateChange에서 자동 처리됨
+            } catch (error) {
+              Alert.alert('오류', '로그아웃 중 문제가 발생했습니다.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Profile Header Component
@@ -154,7 +183,7 @@ export default function ProfileScreen() {
 
         {/* Settings Menu */}
         <View style={styles.menuContainer}>
-          <MenuItem icon="👤" title="계정 설정" />
+          <MenuItem icon="👤" title="로그 아웃" onPress={handleLogout} />
           <MenuItem icon="🔔" title="알림" />
           <MenuItem icon="🧪" title="알림 테스트" onPress={handleNotificationTest} />
           <MenuItem icon="⏰" title="백그라운드 테스트" onPress={handleScheduledNotificationTest} />
