@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
 import { signOut } from '../backend/supabase/auth';
 import { Colors } from '../constants/Colors';
@@ -60,30 +60,46 @@ export default function ProfileScreen() {
 
   // 로그아웃 함수
   const handleLogout = async () => {
-    Alert.alert(
-      '로그아웃',
-      '정말 로그아웃 하시겠습니까?',
-      [
-        { 
-          text: '취소', 
-          style: 'cancel' 
-        },
-        {
-          text: '로그아웃',
-          onPress: async () => {
-            try {
-              const { error } = await signOut();
-              if (error) {
-                Alert.alert('오류', error.message);
+    if (Platform.OS === 'web') {
+      // 웹용: confirm() 사용
+      if (confirm('정말 로그아웃 하시겠습니까?')) {
+        try {
+          const { error } = await signOut();
+          if (error) {
+            alert('오류: ' + error.message);
+          }
+          // 네비게이션은 app/_layout.tsx의 onAuthStateChange에서 자동 처리됨
+        } catch (error) {
+          alert('오류: 로그아웃 중 문제가 발생했습니다.');
+        }
+      }
+    } else {
+      // 모바일용: Alert.alert 사용
+      Alert.alert(
+        '로그아웃',
+        '정말 로그아웃 하시겠습니까?',
+        [
+          { 
+            text: '취소', 
+            style: 'cancel' 
+          },
+          {
+            text: '로그아웃',
+            onPress: async () => {
+              try {
+                const { error } = await signOut();
+                if (error) {
+                  Alert.alert('오류', error.message);
+                }
+                // 네비게이션은 app/_layout.tsx의 onAuthStateChange에서 자동 처리됨
+              } catch (error) {
+                Alert.alert('오류', '로그아웃 중 문제가 발생했습니다.');
               }
-              // 네비게이션은 app/_layout.tsx의 onAuthStateChange에서 자동 처리됨
-            } catch (error) {
-              Alert.alert('오류', '로그아웃 중 문제가 발생했습니다.');
             }
           }
-        }
-      ]
-    );
+        ]
+      );
+    }
   };
 
   // Profile Header Component
