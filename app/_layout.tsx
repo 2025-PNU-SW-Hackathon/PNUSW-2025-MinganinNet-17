@@ -88,39 +88,59 @@ export default function RootLayout() {
         console.log('  - Email:', session.user?.email);
         console.log('  - Access Token 존재:', !!session.access_token);
         console.log('  - Refresh Token 존재:', !!session.refresh_token);
-      }
-      
-      // 세션 복원 완료 시 자동 라우팅 처리 (알림 + 일반 접속 모두)
-      if (session && !isAutoNavigationHandled) {
-        console.log('🚀 === 세션 복원 완료 - 자동 네비게이션 시작 ===');
         
-        const navigate = () => {
-          if (isNavigationReady) {
-            if (pendingNotificationRoute === 'report') {
-              // 알림을 통한 접속 → 리포트 화면
-              router.replace('/(tabs)/report');
-              console.log('✅ 알림을 통한 세션 복원 → Report 화면으로 이동');
+        // 세션 복원 완료 시 자동 라우팅 처리 (알림 + 일반 접속 모두)
+        if (!isAutoNavigationHandled) {
+          console.log('🚀 === 세션 복원 완료 - 자동 네비게이션 시작 ===');
+          
+          const navigate = () => {
+            if (isNavigationReady) {
+              if (pendingNotificationRoute === 'report') {
+                // 알림을 통한 접속 → 리포트 화면
+                router.replace('/(tabs)/report');
+                console.log('✅ 알림을 통한 세션 복원 → Report 화면으로 이동');
+                
+                // AsyncStorage에서 알림 데이터 제거
+                AsyncStorage.removeItem('pending_notification').catch(err => 
+                  console.log('AsyncStorage 제거 중 오류 (무시됨):', err)
+                );
+                setPendingNotificationRoute(null);
+              } else {
+                // 일반 접속 → 메인 화면 (홈 탭)
+                router.replace('/(tabs)');
+                console.log('✅ 일반 세션 복원 → 메인 화면으로 이동 (로그인 화면 우회)');
+              }
               
-              // AsyncStorage에서 알림 데이터 제거
-              AsyncStorage.removeItem('pending_notification').catch(err => 
-                console.log('AsyncStorage 제거 중 오류 (무시됨):', err)
-              );
+              // 자동 네비게이션 완료 플래그 설정 (중복 실행 방지)
+              setIsAutoNavigationHandled(true);
+              console.log('🚀 === 자동 네비게이션 완료 ===');
+            } else {
+              setTimeout(navigate, 100);
+            }
+          };
+          
+          navigate();
+        }
+      } else {
+        // 세션이 없을 때 (로그아웃 또는 세션 만료)
+        if (event === 'SIGNED_OUT') {
+          console.log('🚪 === 로그아웃 감지 - 온보딩 화면으로 이동 ===');
+          
+          const navigateToOnboarding = () => {
+            if (isNavigationReady) {
+              router.replace('/onboarding');
+              console.log('✅ 로그아웃 완료 → 온보딩 화면으로 이동');
+              
+              // 자동 네비게이션 플래그 리셋
+              setIsAutoNavigationHandled(false);
               setPendingNotificationRoute(null);
             } else {
-              // 일반 접속 → 메인 화면 (홈 탭)
-              router.replace('/(tabs)');
-              console.log('✅ 일반 세션 복원 → 메인 화면으로 이동 (로그인 화면 우회)');
+              setTimeout(navigateToOnboarding, 100);
             }
-            
-            // 자동 네비게이션 완료 플래그 설정 (중복 실행 방지)
-            setIsAutoNavigationHandled(true);
-            console.log('🚀 === 자동 네비게이션 완료 ===');
-          } else {
-            setTimeout(navigate, 100);
-          }
-        };
-        
-        navigate();
+          };
+          
+          navigateToOnboarding();
+        }
       }
     });
 
