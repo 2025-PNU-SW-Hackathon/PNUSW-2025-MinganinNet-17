@@ -14,7 +14,7 @@ import {
 import CalendarScreen from '../backend/calendar/calendar';
 import { getActivePlan } from '../backend/supabase/habits';
 import { DailyTodo, Plan } from '../types/habit';
-import AppSettingsScreen from './AppSettingsScreen';
+import ProfileScreen from './ProfileScreen';
 import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
 
 const { width } = Dimensions.get('window');
@@ -282,10 +282,6 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
     }
   };
 
-  if (currentScreen === 'settings') {
-    return <AppSettingsScreen onBack={() => setCurrentScreen('home')} />;
-  }
-
   const coachStatus = getCoachStatus();
   const calendarDates = getCalendarDates();
   const todosForSelectedDate = getTodosForSelectedDate();
@@ -335,6 +331,11 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
       ]).start();
     }
   }, [loading]);
+
+  // Show ProfileScreen if settings is selected
+  if (currentScreen === 'settings') {
+    return <ProfileScreen />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
