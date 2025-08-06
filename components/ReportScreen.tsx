@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { fetchReports, ReportFromSupabase } from '../backend/supabase/reports';
+import { aggregateWeeklyReports, createWeeklyReport, fetchReports, generateWeeklyInsights, ReportFromSupabase } from '../backend/supabase/reports';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import CreateDailyReportScreen from './CreateDailyReportScreen';
@@ -606,6 +606,78 @@ export default function ReportScreen() {
       console.log('🐛 DEBUG: Starting weekly report creation');
       setCurrentScreen('createWeekly');
     };
+
+    // 테스트 함수 추가
+    const handleTestWeeklyReport = async () => {
+      console.log('🧪 TEST: 주간 리포트 함수 테스트 시작');
+      
+      try {
+        // 1. 최근 7일간 일간 리포트 집계 테스트
+        console.log('📊 1단계: 일간 리포트 집계 테스트');
+        const weeklyData = await aggregateWeeklyReports();
+        
+        if (!weeklyData) {
+          console.log('❌ 일간 리포트 집계 실패: 데이터가 없거나 오류 발생');
+          return;
+        }
+        
+        console.log('✅ 일간 리포트 집계 성공:', {
+          weekStart: weeklyData.weekStart,
+          weekEnd: weeklyData.weekEnd,
+          averageScore: weeklyData.averageScore,
+          daysCompleted: weeklyData.daysCompleted,
+          dailyScores: weeklyData.dailyScores,
+          reportCount: weeklyData.dailyReports.length
+        });
+
+        // 2. AI 인사이트 생성 테스트
+        console.log('🤖 2단계: AI 인사이트 생성 테스트');
+        const weeklyStats = {
+          averageScore: weeklyData.averageScore,
+          daysCompleted: weeklyData.daysCompleted,
+          dailyScores: weeklyData.dailyScores
+        };
+        
+        const insights = await generateWeeklyInsights(weeklyData.dailyReports, weeklyStats);
+        console.log('✅ AI 인사이트 생성 성공:', insights);
+
+        // 3. 주간 리포트 데이터 구조 확인
+        console.log('📋 3단계: 주간 리포트 데이터 구조 확인');
+        const weeklyReportData = {
+          week_start: weeklyData.weekStart,
+          week_end: weeklyData.weekEnd,
+          average_score: weeklyData.averageScore,
+          days_completed: weeklyData.daysCompleted,
+          insights: insights,
+          daily_scores: weeklyData.dailyScores
+        };
+        
+        console.log('✅ 주간 리포트 데이터 구조:', weeklyReportData);
+
+        // 4. Supabase DB 저장 테스트
+        console.log('💾 4단계: Supabase DB 저장 테스트');
+        const savedReport = await createWeeklyReport(weeklyReportData);
+        
+        if (savedReport) {
+          console.log('✅ 주간 리포트 DB 저장 성공:', {
+            id: savedReport.id,
+            week_start: savedReport.week_start,
+            week_end: savedReport.week_end,
+            average_score: savedReport.average_score,
+            days_completed: savedReport.days_completed,
+            insights_count: savedReport.insights.length,
+            created_at: savedReport.created_at
+          });
+        } else {
+          console.log('❌ 주간 리포트 DB 저장 실패');
+        }
+        
+        console.log('🎉 모든 테스트 완료!');
+
+      } catch (error) {
+        console.error('❌ 테스트 중 오류 발생:', error);
+      }
+    };
     
     if (isEndOfWeek) {
       return (
@@ -622,6 +694,17 @@ export default function ReportScreen() {
             >
               <Text style={styles.weeklyReportButtonText}>
                 주간 리포트 시작하기
+              </Text>
+            </TouchableOpacity>
+            
+            {/* 테스트 버튼 추가 */}
+            <TouchableOpacity 
+              style={[styles.testButton, { backgroundColor: '#ff6b6b', marginTop: 10 }]}
+              onPress={handleTestWeeklyReport}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.testButtonText}>
+                🧪 주간 리포트 함수 테스트
               </Text>
             </TouchableOpacity>
           </View>
@@ -1554,6 +1637,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginTop: 8,
+    fontFamily: 'Inter',
+  },
+  testButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
   },
 }); 
