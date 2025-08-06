@@ -16,6 +16,7 @@ import { getActivePlan } from '../backend/supabase/habits';
 import { DailyTodo, Plan } from '../types/habit';
 import ProfileScreen from './ProfileScreen';
 import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
+import VoiceChatScreen from './VoiceChatScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -37,7 +38,7 @@ const parseDurationToDays = (duration: string): number => {
 };
 
 interface HomeScreenProps {
-  onDayPress?: (day: number) => void;
+  selectedDate?: string;
 }
 
 // Coach status based on achievement rate
@@ -148,16 +149,20 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
   );
 };
 
-export default function HomeScreen({ onDayPress }: HomeScreenProps) {
+export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [internalSelectedDate, setInternalSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
   const [effectiveStartDate, setEffectiveStartDate] = useState<string | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [voiceChatVisible, setVoiceChatVisible] = useState(false);
   
+  // Use selectedDate from props if provided, otherwise use internal state
+  const targetDate = selectedDate || internalSelectedDate;
+
   // Animation for coach status
   const coachScaleAnimation = useRef(new Animated.Value(1)).current;
   const [previousCoachStatus, setPreviousCoachStatus] = useState<CoachStatus | null>(null);
@@ -233,7 +238,7 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
 
   const getTodosForSelectedDate = (): DailyTodo[] => {
     if (!plan || !effectiveStartDate) return [];
-    const selected = new Date(selectedDate);
+    const selected = new Date(targetDate);
     const startDate = new Date(effectiveStartDate);
     if (selected < startDate) return [];
     const diffDays = Math.floor((selected.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -275,11 +280,21 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
   };
 
   const handleCalendarDatePress = (dateString: string): void => {
-    setSelectedDate(dateString);
-    if (onDayPress) {
-      const day = parseInt(dateString.split('-')[2], 10);
-      onDayPress(day);
-    }
+    setInternalSelectedDate(dateString);
+  };
+
+  const handleVoiceChatOpen = (): void => {
+    setVoiceChatVisible(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const handleVoiceChatClose = (): void => {
+    setVoiceChatVisible(false);
+  };
+
+  const handleVoiceInput = (text: string): void => {
+    console.log('Voice input received:', text);
+    // Here you would integrate with your AI backend
   };
 
   const coachStatus = getCoachStatus();
@@ -377,7 +392,7 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
           >
             {calendarDates.map((date, index) => {
               const dateInfo = formatCalendarDate(date);
-              const isSelected = selectedDate === dateInfo.dateString;
+              const isSelected = targetDate === dateInfo.dateString;
               return (
                 <TouchableOpacity
                   key={index}
@@ -441,6 +456,22 @@ export default function HomeScreen({ onDayPress }: HomeScreenProps) {
           </View>
         </View>
       </ScrollView>
+
+      {/* Floating Voice Chat Button */}
+      <TouchableOpacity
+        style={styles.floatingVoiceButton}
+        onPress={handleVoiceChatOpen}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.voiceButtonIcon}>🎤</Text>
+      </TouchableOpacity>
+
+      {/* Voice Chat Modal */}
+      <VoiceChatScreen
+        visible={voiceChatVisible}
+        onClose={handleVoiceChatClose}
+        onVoiceInput={handleVoiceInput}
+      />
 
       <Modal
         visible={calendarVisible}
@@ -513,5 +544,29 @@ const styles = StyleSheet.create({
   },
   goalSkeletonLine2: {
     marginBottom: 0,
+  },
+  floatingVoiceButton: {
+    position: 'absolute',
+    bottom: 100,
+    right: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#6c63ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#6c63ff',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  voiceButtonIcon: {
+    fontSize: 28,
+    textAlign: 'center',
+    lineHeight: 28,
   },
 }); 
