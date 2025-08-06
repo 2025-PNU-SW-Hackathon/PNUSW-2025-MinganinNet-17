@@ -8,7 +8,7 @@ import DebugNextButton from './DebugNextButton';
 import ScreenTransitionManager from './ScreenTransitionManager';
 
 type ReportView = 'daily' | 'weekly';
-type ScreenView = 'report' | 'create' | 'createWeekly' | 'generatingWeekly';
+type ScreenView = 'daily_report' | 'daily_create' | 'weekly_report' | 'weekly_create';
 
 interface DailyReportData {
   id: string;
@@ -146,7 +146,7 @@ const mockWeeklyReports: WeeklyReportData[] = [
 export default function ReportScreen() {
   const colorScheme = useColorScheme();
   const [selectedView, setSelectedView] = useState<ReportView>('daily');
-  const [currentScreen, setCurrentScreen] = useState<ScreenView>('report');
+  const [currentScreen, setCurrentScreen] = useState<ScreenView>('daily_report');
   
   const [todayReport, setTodayReport] = useState<ReportFromSupabase | null>(null);
   const [historicalReports, setHistoricalReports] = useState<ReportFromSupabase[]>([]);
@@ -172,24 +172,29 @@ export default function ReportScreen() {
 
   // Handle navigation to create daily report screen
   const handleCreateReport = () => {
-    setCurrentScreen('create');
+    setCurrentScreen('daily_create');
   };
 
   // Handle back navigation from create screen
   const handleBackToReport = () => {
-    setCurrentScreen('report');
+    setCurrentScreen('daily_report');
   };
 
-  // Render function for screen content
+  // Render function for screen content // 이놈이 일간/주간 기록 보기, 생성 전체 화면 전화 조작
   const renderScreen = () => {
     switch (currentScreen) {
-      case 'create':
+      case 'daily_create':
         return <CreateDailyReportScreen onBack={handleBackToReport} />;
-      case 'createWeekly':
+      case 'weekly_report':
         return <CreateWeeklyReportScreen />;
-      case 'generatingWeekly':
-        return <GeneratingWeeklyReportScreen />;
-      case 'report':
+      case 'weekly_create':
+        // Show weekly report results if generated, otherwise show generation screen
+        if (currentWeekReportGenerated) {
+          return <WeeklyReportResultScreen />;
+        } else {
+          return <GeneratingWeeklyReportScreen />;
+        }
+      case 'daily_report':
       default:
         return <ReportScreenContent />;
     }
@@ -205,6 +210,82 @@ export default function ReportScreen() {
       {selectedView === 'daily' ? <DailyReportContent /> : <WeeklyReportContent />}
     </SafeAreaView>
   );
+
+  // Weekly Report Result Screen Component (for showing generated weekly report)
+  const WeeklyReportResultScreen = () => {
+    // Get current week data
+    let currentWeekData: WeeklyReportData | null = null;
+    
+    if (currentWeekIndex === 0 && currentWeekReportGenerated) {
+      // Current week with generated report
+      currentWeekData = generateNewWeeklyReport();
+    }
+    
+    // Show error state if no data available
+    if (!currentWeekData) {
+      return (
+        <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+          <View style={styles.contentContainer}>
+            <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>
+              주간 리포트 데이터를 불러올 수 없습니다.
+            </Text>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
+    // Handle save button press
+    const handleSaveReport = () => {
+      console.log('💾 저장 버튼 클릭: 주간 리포트 저장');
+      setCurrentWeekReportGenerated(false);
+      setCurrentScreen('daily_report');
+      setSelectedView('weekly');
+    };
+    
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        {/* Header */}
+        <View style={styles.createWeeklyHeader}>
+          <Text style={[styles.createWeeklyTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+            주간 리포트
+          </Text>
+          <TouchableOpacity 
+            style={styles.saveButton}
+            onPress={handleSaveReport}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.saveButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
+              저장
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.newWeeklyContainer}>
+          {/* Week Navigation */}
+          <WeekNavigator />
+          
+          {/* Weekly Summary Title */}
+          <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+            {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
+          </Text>
+          
+          {/* Activity Section */}
+          <ActivitySection data={currentWeekData} />
+          
+          {/* Reviews Section */}
+          <ReviewsSection data={currentWeekData} />
+          
+          {/* Debug Button */}
+          <DebugNextButton
+            to="Next Weekly State"
+            onPress={handleDebugWeeklyNavigation}
+            label="Debug: Cycle Weeks"
+            disabled={false}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  };
 
   const ViewSelector = () => {
     return (
@@ -411,10 +492,10 @@ export default function ReportScreen() {
         setLoadingProgress(prev => {
           if (prev >= 100) {
             clearInterval(interval);
-            // Set report as generated and navigate back
+            // Set report as generated and stay in weekly_create to show results
             setTimeout(() => {
               setCurrentWeekReportGenerated(true);
-              setCurrentScreen('report');
+              // Stay in weekly_create state to show results
             }, 1000);
             return 100;
           }
@@ -428,7 +509,7 @@ export default function ReportScreen() {
     const handleDebugSkip = () => {
       console.log('🐛 DEBUG: Skipping weekly report generation');
       setCurrentWeekReportGenerated(true);
-      setCurrentScreen('report');
+      // Stay in weekly_create state to show results
     };
 
     return (
@@ -437,7 +518,7 @@ export default function ReportScreen() {
         <View style={styles.createWeeklyHeader}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => setCurrentScreen('createWeekly')}
+            onPress={() => setCurrentScreen('weekly_report')}
             activeOpacity={0.7}
           >
             <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
@@ -525,7 +606,7 @@ export default function ReportScreen() {
     );
   };
 
-  // Create Weekly Report Screen Component  
+  // Create Weekly Report Screen Component  // 이놈은 주간 리포트 시작하기 눌렀을때 보이는 화면 표시
   const CreateWeeklyReportScreen = () => {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
@@ -533,7 +614,7 @@ export default function ReportScreen() {
         <View style={styles.createWeeklyHeader}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => setCurrentScreen('report')}
+            onPress={() => setCurrentScreen('daily_report')}
             activeOpacity={0.7}
           >
             <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
@@ -584,7 +665,7 @@ export default function ReportScreen() {
             style={styles.generateReportButton}
             onPress={() => {
               console.log('🐛 DEBUG: Starting weekly report generation...');
-              setCurrentScreen('generatingWeekly');
+              setCurrentScreen('weekly_create');
             }}
             activeOpacity={0.8}
           >
@@ -597,14 +678,14 @@ export default function ReportScreen() {
     );
   };
 
-  // Empty Weekly Report Component
+  // Empty Weekly Report Component // 이놈이 주간 리포트 비어있으면 보이는 화면 표시
   const EmptyWeeklyReport = () => {
     // For dummy design, always show as end of week
     const isEndOfWeek = true;
     
     const handleStartWeeklyReport = () => {
       console.log('🐛 DEBUG: Starting weekly report creation');
-      setCurrentScreen('createWeekly');
+      setCurrentScreen('weekly_report');
     };
 
     // 테스트 함수 추가
@@ -720,6 +801,86 @@ export default function ReportScreen() {
             아직 주차가 끝나지 않았습니다.{'\n'}이번주가 끝나고 뵈어요!
           </Text>
         </View>
+      </View>
+    );
+  };
+
+  // 이놈이 주간 리포트 선택하면 보이는 화면을 조정하는 상위 컴포넌트
+  const WeeklyReportContent = () => {
+    // Weekly tab in main screen only shows empty state or previous weeks
+    // Generated current week report is shown in WeeklyReportResultScreen
+    
+    if (currentWeekIndex === 0 && !currentWeekReportGenerated) {
+      // Current week without generated report - show empty state
+      return (
+        <View style={styles.newWeeklyContainer}>
+          <WeekNavigator />
+          <EmptyWeeklyReport />
+          <DebugNextButton
+            to="Next Weekly State"
+            onPress={handleDebugWeeklyNavigation}
+            label="Debug: Cycle Weeks"
+            disabled={false}
+          />
+        </View>
+      );
+    } else if (currentWeekIndex === -1) {
+      // Next week - show creation screen
+      return (
+        <View style={styles.newWeeklyContainer}>
+          <WeekNavigator />
+          <EmptyWeeklyReport />
+          <DebugNextButton
+            to="Next Weekly State"
+            onPress={handleDebugWeeklyNavigation}
+            label="Debug: Cycle Weeks"
+            disabled={false}
+          />
+        </View>
+      );
+    } else if (currentWeekIndex > 0) {
+      // Previous weeks - show historical data
+      const currentWeekData = weeklyReports[currentWeekIndex - 1];
+      
+      if (!currentWeekData) {
+        return (
+          <View style={styles.contentContainer}>
+            <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>
+              주간 리포트 데이터를 불러올 수 없습니다.
+            </Text>
+          </View>
+        );
+      }
+      
+      return (
+        <View style={styles.newWeeklyContainer}>
+          <WeekNavigator />
+          <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+            {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
+          </Text>
+          <ActivitySection data={currentWeekData} />
+          <ReviewsSection data={currentWeekData} />
+          <DebugNextButton
+            to="Next Weekly State"
+            onPress={handleDebugWeeklyNavigation}
+            label="Debug: Cycle Weeks"
+            disabled={false}
+          />
+        </View>
+      );
+    }
+    
+    // Default case - show empty state
+    return (
+      <View style={styles.newWeeklyContainer}>
+        <WeekNavigator />
+        <EmptyWeeklyReport />
+        <DebugNextButton
+          to="Next Weekly State"
+          onPress={handleDebugWeeklyNavigation}
+          label="Debug: Cycle Weeks"
+          disabled={false}
+        />
       </View>
     );
   };
@@ -882,88 +1043,13 @@ export default function ReportScreen() {
     }
   };
 
-  const WeeklyReportContent = () => {
-    // Handle different week scenarios
-    let currentWeekData: WeeklyReportData | null = null;
-    
-    if (currentWeekIndex === 0 && currentWeekReportGenerated) {
-      // Current week with generated report
-      currentWeekData = generateNewWeeklyReport();
-    } else if (currentWeekIndex === 0 && !currentWeekReportGenerated) {
-      // Current week without generated report - show empty state
-      return (
-        <View style={styles.newWeeklyContainer}>
-          <WeekNavigator />
-          <EmptyWeeklyReport />
-          <DebugNextButton
-            to="Next Weekly State"
-            onPress={handleDebugWeeklyNavigation}
-            label="Debug: Cycle Weeks"
-            disabled={false}
-          />
-        </View>
-      );
-    } else if (currentWeekIndex === -1) {
-      // Next week - show creation screen
-      return (
-        <View style={styles.newWeeklyContainer}>
-          <WeekNavigator />
-          <EmptyWeeklyReport />
-          <DebugNextButton
-            to="Next Weekly State"
-            onPress={handleDebugWeeklyNavigation}
-            label="Debug: Cycle Weeks"
-            disabled={false}
-          />
-        </View>
-      );
-    } else if (currentWeekIndex > 0) {
-      // Previous weeks
-      currentWeekData = weeklyReports[currentWeekIndex - 1];
-    }
-    
-    // Show error state if no data available
-    if (!currentWeekData) {
-      return (
-        <View style={styles.contentContainer}>
-          <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>
-            주간 리포트 데이터를 불러올 수 없습니다.
-          </Text>
-        </View>
-      );
-    }
-    
-    return (
-      <View style={styles.newWeeklyContainer}>
-        {/* Week Navigation */}
-        <WeekNavigator />
-        
-        {/* Weekly Summary Title */}
-        <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-          {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
-        </Text>
-        
-        {/* Activity Section */}
-        <ActivitySection data={currentWeekData} />
-        
-        {/* Reviews Section */}
-        <ReviewsSection data={currentWeekData} />
-        
-        {/* Debug Button */}
-        <DebugNextButton
-          to="Next Weekly State"
-          onPress={handleDebugWeeklyNavigation}
-          label="Debug: Cycle Weeks"
-          disabled={false}
-        />
-      </View>
-    );
-  };
+
+
 
   return (
     <ScreenTransitionManager
       screenKey={currentScreen}
-      direction={currentScreen === 'create' ? 'forward' : 'backward'}
+      direction={currentScreen === 'daily_create' ? 'forward' : 'backward'}
       onTransitionComplete={() => {
         console.log('Report screen transition completed:', currentScreen);
       }}
@@ -1645,6 +1731,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  saveButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter',
   },
   testButtonText: {
     fontSize: 14,
