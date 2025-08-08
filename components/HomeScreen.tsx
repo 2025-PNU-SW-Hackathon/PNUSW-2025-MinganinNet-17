@@ -349,7 +349,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
 
   // Show ProfileScreen if settings is selected
   if (currentScreen === 'settings') {
-    return <ProfileScreen />;
+    return <ProfileScreen onBackToHome={() => setCurrentScreen('home')} />;
   }
 
   return (
