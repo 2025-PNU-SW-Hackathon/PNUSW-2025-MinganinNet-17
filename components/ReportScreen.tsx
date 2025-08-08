@@ -157,10 +157,10 @@ export default function ReportScreen() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Weekly report states
-  const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
-  const [weeklyReports] = useState<WeeklyReportData[]>(mockWeeklyReports);
-  const [currentWeekReportGenerated, setCurrentWeekReportGenerated] = useState(false);
-  const [currentWeeklyReport, setCurrentWeeklyReport] = useState<WeeklyReportFromSupabase | null>(null);
+  const [currentWeekIndex, setCurrentWeekIndex] = useState(0); // 몇주차 리포트인지 확인용
+  const [weeklyReports] = useState<WeeklyReportData[]>(mockWeeklyReports); // 과거 주차 하드코딩 데이터
+  const [currentWeekReportGenerated, setCurrentWeekReportGenerated] = useState(false); // 주간 리포트 생성 여부(현재 화면 전환 용, 수정 필요?)
+  const [currentWeeklyReport, setCurrentWeeklyReport] = useState<WeeklyReportFromSupabase | null>(null); // 주간 리포트 데이터
 
   useEffect(() => {
     const loadReports = async () => {
@@ -216,79 +216,7 @@ export default function ReportScreen() {
     </SafeAreaView>
   );
 
-  // 리포트 생성결과 화면 5
-  const WeeklyReportResultScreen = () => {
-    // Map backend data to UI
-    const currentWeekData: WeeklyReportData | null = currentWeeklyReport
-      ? mapWeeklyReportFromSupabase(currentWeeklyReport)
-      : null;
-    
-    // Show error state if no data available
-    if (!currentWeekData) {
-      return (
-        <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-          <View style={styles.contentContainer}>
-            <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>
-              주간 리포트 데이터를 불러올 수 없습니다.
-            </Text>
-          </View>
-        </SafeAreaView>
-      );
-    }
-
-    // Handle save button press
-    const handleSaveReport = () => {
-      console.log('💾 저장 버튼 클릭: 주간 리포트 저장');
-      setCurrentWeekReportGenerated(false);
-      setCurrentWeeklyReport(null);
-      setCurrentScreen('daily_report');
-      setSelectedView('weekly');
-    };
-    
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-        {/* Header */}
-        <View style={styles.createWeeklyHeader}>
-          <Text style={[styles.createWeeklyTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-            주간 리포트
-          </Text>
-          <TouchableOpacity 
-            style={styles.saveButton}
-            onPress={handleSaveReport}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.saveButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
-              저장
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.newWeeklyContainer}>
-          {/* Week Navigation */}
-          <WeekNavigator />
-          
-          {/* Weekly Summary Title */}
-          <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-            {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
-          </Text>
-          
-          {/* Activity Section */}
-          <ActivitySection data={currentWeekData} />
-          
-          {/* Reviews Section */}
-          <ReviewsSection data={currentWeekData} />
-          
-          {/* Debug Button */}
-          <DebugNextButton
-            to="Next Weekly State"
-            onPress={handleDebugWeeklyNavigation}
-            label="Debug: Cycle Weeks"
-            disabled={false}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  };
+  
 
   const ViewSelector = () => {
     return (
@@ -485,6 +413,81 @@ export default function ReportScreen() {
     );
   };
 
+  // 리포트 생성결과 화면 5
+  const WeeklyReportResultScreen = () => {
+    // Map backend data to UI
+    const currentWeekData: WeeklyReportData | null = currentWeeklyReport
+      ? mapWeeklyReportFromSupabase(currentWeeklyReport)
+      : null;
+    
+    // Show error state if no data available
+    if (!currentWeekData) {
+      return (
+        <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+          <View style={styles.contentContainer}>
+            <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>
+              주간 리포트 데이터를 불러올 수 없습니다.
+            </Text>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
+    // Handle save button press
+    const handleSaveReport = () => {
+      console.log('💾 저장 버튼 클릭: 주간 리포트 저장');
+      setCurrentWeekReportGenerated(true);
+      // setCurrentWeeklyReport(null)
+      setCurrentWeekIndex(0);
+      setCurrentScreen('daily_report');
+      setSelectedView('weekly');
+    };
+    
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        {/* Header */}
+        <View style={styles.createWeeklyHeader}>
+          <Text style={[styles.createWeeklyTitle, { color: Colors[colorScheme ?? 'light'].text }]}> 
+            주간 리포트
+          </Text>
+        </View>
+
+        <View style={styles.newWeeklyContainer}>
+
+          {/* Weekly Summary Title */}
+          <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+            {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
+          </Text>
+          
+          {/* Activity Section */}
+          <ActivitySection data={currentWeekData} />
+          
+          {/* Reviews Section */}
+          <ReviewsSection data={currentWeekData} />
+
+          {/* Save Button under reviews */}
+          <TouchableOpacity 
+            style={[styles.weeklyReportButton, { backgroundColor: '#1c1c2e', marginTop: 24 }]}
+            onPress={handleSaveReport}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.weeklyReportButtonText}>
+              저장
+            </Text>
+          </TouchableOpacity>
+          
+          {/* Debug Button */}
+          <DebugNextButton
+            to="Next Weekly State"
+            onPress={handleDebugWeeklyNavigation}
+            label="Debug: Cycle Weeks"
+            disabled={false}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  };
+
   // Generating Weekly Report Screen Component 로딩화면? yes 4
   const GeneratingWeeklyReportScreen = () => {
     const [loadingProgress, setLoadingProgress] = useState(0);
@@ -641,6 +644,8 @@ export default function ReportScreen() {
     const handleCreateWeeklyReport = async () => {
       try {
         console.log('🐛 DEBUG: Starting weekly report generation...');
+        // 생성 시작 직전 상태 초기화
+        setCurrentWeekReportGenerated(false);
         
         // 백엔드 통합 함수 호출
         const result = await generateAndSaveWeeklyReport();
@@ -815,6 +820,9 @@ export default function ReportScreen() {
     
     const handleStartWeeklyReport = () => {
       console.log('🐛 DEBUG: Starting weekly report creation');
+      // 새 생성 시작 시 상태 초기화
+      setCurrentWeekReportGenerated(false);
+      setCurrentWeeklyReport(null);
       setCurrentScreen('weekly_report');
     };
 
@@ -883,6 +891,47 @@ export default function ReportScreen() {
             label="Debug: Cycle Weeks"
             disabled={false}
           />
+        </View>
+      );
+    } else if (currentWeekIndex === 0 && currentWeekReportGenerated) {
+      // Current week and report is generated → show result in weekly tab too
+      const currentWeekData: WeeklyReportData | null = currentWeeklyReport
+        ? mapWeeklyReportFromSupabase(currentWeeklyReport)
+        : null;
+
+      if (!currentWeekData) {
+        return (
+          <View style={styles.contentContainer}>
+            <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>
+              주간 리포트 데이터를 불러올 수 없습니다.
+            </Text>
+          </View>
+        );
+      }
+
+      return (
+        <View style={styles.newWeeklyContainer}>
+          <WeekNavigator />
+          <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+            {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
+          </Text>
+          <ActivitySection data={currentWeekData} />
+          <ReviewsSection data={currentWeekData} />
+
+          <TouchableOpacity 
+            style={[styles.weeklyReportButton, { backgroundColor: '#1c1c2e', marginTop: 24 }]}
+            onPress={() => {
+              // 새 생성 시작 시 상태 초기화
+              setCurrentWeekReportGenerated(false);
+              setCurrentWeeklyReport(null);
+              setCurrentScreen('weekly_report');
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.weeklyReportButtonText}>
+              주간 리포트 시작하기
+            </Text>
+          </TouchableOpacity>
         </View>
       );
     } else if (currentWeekIndex > 0) {
@@ -1806,6 +1855,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Inter',
+  },
+  resultFooter: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)'
   },
   
   // Weekly Tasks Display Styles

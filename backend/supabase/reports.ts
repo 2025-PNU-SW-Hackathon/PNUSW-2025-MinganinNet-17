@@ -352,62 +352,62 @@ export const generateWeeklyInsights = async (
     console.log('✅ 임시 주간 인사이트 생성 완료:', insightsText);
     return insightsText;
 
-    /* ===== API 키 재발급 후 복원할 코드 =====
-    // 1. 일간 리포트 데이터를 분석용 텍스트로 변환
-    const dailyReportTexts = dailyReports.map(report => {
-      const date = new Date(report.report_date);
-      const dayName = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
-      const feedbackText = report.ai_coach_feedback.join(' ');
+    //  ===== API 키 재발급 후 복원할 코드 =====
+//     // 1. 일간 리포트 데이터를 분석용 텍스트로 변환
+//     const dailyReportTexts = dailyReports.map(report => {
+//       const date = new Date(report.report_date);
+//       const dayName = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+//       const feedbackText = report.ai_coach_feedback.join(' ');
       
-      return `${dayName}요일 (${report.report_date}): 점수 ${report.achievement_score}/10 - ${feedbackText}`;
-    }).join('\n\n');
+//       return `${dayName}요일 (${report.report_date}): 점수 ${report.achievement_score}/10 - ${feedbackText}`;
+//     }).join('\n\n');
 
-    // 2. 주간 통계 요약
-    const weekSummary = `
-주간 통계:
-- 평균 점수: ${weeklyStats.averageScore}/10
-- 완료된 일수: ${weeklyStats.daysCompleted}/7일
-- 요일별 점수: [${weeklyStats.dailyScores.join(', ')}] (월~일)
-    `.trim();
+//     // 2. 주간 통계 요약
+//     const weekSummary = `
+// 주간 통계:
+// - 평균 점수: ${weeklyStats.averageScore}/10
+// - 완료된 일수: ${weeklyStats.daysCompleted}/7일
+// - 요일별 점수: [${weeklyStats.dailyScores.join(', ')}] (월~일)
+//     `.trim();
 
-    // 3. AI 프롬프트 구성
-    const prompt = `
-당신은 사용자의 성장을 돕는 따뜻하고 통찰력 있는 AI 코치입니다. 사용자의 일주일간 활동 데이터를 바탕으로, 다음 주를 더 잘 보낼 수 있도록 구체적이고 긍정적인 주간 인사이트를 생성해주세요.
+//     // 3. AI 프롬프트 구성
+//     const prompt = `
+// 당신은 사용자의 성장을 돕는 따뜻하고 통찰력 있는 AI 코치입니다. 사용자의 일주일간 활동 데이터를 바탕으로, 다음 주를 더 잘 보낼 수 있도록 구체적이고 긍정적인 주간 인사이트를 생성해주세요.
 
-**인사이트 생성 규칙:**
-1. **긍정적 관점**: 사용자의 노력과 성과를 먼저 인정하고 칭찬하세요.
-2. **패턴 분석**: 일주일간의 점수 변화와 피드백을 바탕으로 패턴을 분석하세요.
-3. **구체적 조언**: 다음 주에 시도해볼 만한 구체적인 행동 1-2가지를 제안하세요.
-4. **동기 부여**: 희망적이고 격려하는 메시지로 마무리하세요.
-5. **형식**: 3-4개의 짧은 문장으로 구성하고, 각 문장은 50자 이내로 작성하세요.
+// **인사이트 생성 규칙:**
+// 1. **긍정적 관점**: 사용자의 노력과 성과를 먼저 인정하고 칭찬하세요.
+// 2. **패턴 분석**: 일주일간의 점수 변화와 피드백을 바탕으로 패턴을 분석하세요.
+// 3. **구체적 조언**: 다음 주에 시도해볼 만한 구체적인 행동 1-2가지를 제안하세요.
+// 4. **동기 부여**: 희망적이고 격려하는 메시지로 마무리하세요.
+// 5. **형식**: 3-4개의 짧은 문장으로 구성하고, 각 문장은 50자 이내로 작성하세요.
 
----
+// ---
 
-**사용자 일주일 데이터:**
-${weekSummary}
+// **사용자 일주일 데이터:**
+// ${weekSummary}
 
-**일별 상세 기록:**
-${dailyReportTexts}
+// **일별 상세 기록:**
+// ${dailyReportTexts}
 
----
+// ---
 
-위의 정보를 바탕으로 따뜻하고 통찰력 있는 주간 인사이트 2개를 작성해주세요. 각 인사이트는 별도의 줄로 구분해주세요.
-    `;
+// 위의 정보를 바탕으로 따뜻하고 통찰력 있는 주간 인사이트 2개를 작성해주세요. 각 인사이트는 별도의 줄로 구분해주세요.
+//     `;
 
-    // 4. AI API 호출 (기존 sendMessage 함수 사용)
-    const { sendMessage } = await import('../hwirang/gemini');
-    const aiResponse = await sendMessage(prompt);
+//     // 4. AI API 호출 (기존 sendMessage 함수 사용)
+//     const { sendMessage } = await import('../hwirang/gemini');
+//     const aiResponse = await sendMessage(prompt);
 
-    // 5. 응답을 배열로 변환
-    const insights = aiResponse
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.startsWith('---'))
-      .slice(0, 4); // 최대 4개까지만
+//     // 5. 응답을 배열로 변환
+//     const insights = aiResponse
+//       .split('\n')
+//       .map(line => line.trim())
+//       .filter(line => line.length > 0 && !line.startsWith('---'))
+//       .slice(0, 4); // 최대 4개까지만
 
-    console.log('주간 AI 인사이트 생성 완료:', insights);
-    return insights;
-    ===== API 키 재발급 후 복원할 코드 끝 ===== */
+//     console.log('주간 AI 인사이트 생성 완료:', insights);
+//     return insights.join('\n');
+    // ===== API 키 재발급 후 복원할 코드 끝 ===== 
 
   } catch (error) {
     console.error('주간 AI 인사이트 생성 중 오류:', error);
