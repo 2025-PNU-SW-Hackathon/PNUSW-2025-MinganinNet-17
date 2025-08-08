@@ -41,7 +41,7 @@ export interface WeeklyReportFromSupabase {
   week_end: string;
   average_score: number; // 7일간 평균 점수
   days_completed: number; // 완료된 일수
-  insights: string[];
+  insights: string; // 단일 문자열로 저장
   daily_scores: number[]; // [M, T, W, T, F, S, S] - scores for each day of the week
 }
 
@@ -53,7 +53,7 @@ export interface WeeklyReportInput {
   week_end: string;
   average_score: number;
   days_completed: number;
-  insights: string[];
+  insights: string; // 단일 문자열로 저장
   daily_scores: number[];
 }
 
@@ -307,8 +307,52 @@ export const generateWeeklyInsights = async (
     daysCompleted: number;
     dailyScores: number[];
   }
-): Promise<string[]> => {
+): Promise<string> => {
   try {
+    console.log('📊 주간 통계 분석:', {
+      averageScore: weeklyStats.averageScore,
+      daysCompleted: weeklyStats.daysCompleted,
+      dailyScores: weeklyStats.dailyScores,
+      reportCount: dailyReports.length
+    });
+
+    // API 키 사용량 한계로 인해 임시적으로 고정된 메시지 반환 // 복원 시 이 부분을 주석처리
+    console.log('⚠️ API 키 사용량 한계로 인해 임시 고정 메시지 사용');
+    
+    // 평균 점수와 완료된 일수에 따라 다른 메시지 반환
+    let insightsList: string[] = [];
+    
+    if (weeklyStats.averageScore >= 8) {
+      insightsList = [
+        '이번 주는 정말 뛰어난 성과를 거두셨네요! 높은 점수를 유지하신 모습이 인상적입니다.',
+        '꾸준한 노력이 좋은 결과로 이어지고 있습니다. 다음 주에도 이 기세를 유지해보세요.',
+        '목표 달성에 대한 강한 의지가 느껴집니다. 작은 성취들이 모여 큰 변화를 만들어가고 있어요.'
+      ];
+    } else if (weeklyStats.averageScore >= 6) {
+      insightsList = [
+        '이번 주도 꾸준히 노력하신 모습이 보기 좋습니다. 중간 이상의 점수를 유지하고 계시네요.',
+        '완료된 일수가 많아서 체계적으로 관리하고 계신 것 같습니다. 다음 주에는 더 높은 점수를 목표로 해보세요.',
+        '일관성 있는 활동이 인상적입니다. 작은 개선점들을 찾아 더 나은 결과를 만들어가보세요.'
+      ];
+    } else if (weeklyStats.daysCompleted >= 4) {
+      insightsList = [
+        '일주일 중 대부분의 날에 리포트를 작성하신 점이 훌륭합니다. 꾸준함이 가장 큰 장점이에요.',
+        '점수는 낮지만 꾸준히 기록하고 계시는 모습이 중요합니다. 다음 주에는 더 나은 결과를 기대해볼게요.',
+        '지속적인 노력이 성공의 열쇠입니다. 작은 진전도 큰 성장의 시작이 될 수 있어요.'
+      ];
+    } else {
+      insightsList = [
+        '이번 주는 바쁜 일정으로 인해 리포트 작성이 어려웠나 봅니다. 다음 주에는 조금 더 여유를 가져보세요.',
+        '완료된 일수가 적지만, 기록을 남기신 것 자체가 의미가 있습니다. 천천히 시작해도 괜찮아요.',
+        '모든 변화는 작은 시작에서 비롯됩니다. 다음 주에는 조금씩 개선해나가보세요.'
+      ];
+    }
+
+    const insightsText = insightsList.join('\n');
+    console.log('✅ 임시 주간 인사이트 생성 완료:', insightsText);
+    return insightsText;
+
+    /* ===== API 키 재발급 후 복원할 코드 =====
     // 1. 일간 리포트 데이터를 분석용 텍스트로 변환
     const dailyReportTexts = dailyReports.map(report => {
       const date = new Date(report.report_date);
@@ -363,16 +407,13 @@ ${dailyReportTexts}
 
     console.log('주간 AI 인사이트 생성 완료:', insights);
     return insights;
+    ===== API 키 재발급 후 복원할 코드 끝 ===== */
 
   } catch (error) {
     console.error('주간 AI 인사이트 생성 중 오류:', error);
     
     // 오류 발생 시 기본 인사이트 반환
-    return [
-      '이번 주도 꾸준히 노력하신 모습이 인상적입니다.',
-      '다음 주에는 더 나은 결과를 얻을 수 있을 것 같습니다.',
-      '작은 진전도 큰 성장의 시작입니다. 계속해서 도전해보세요.'
-    ];
+    return '이번 주도 꾸준히 노력하신 모습이 인상적입니다.\n다음 주에는 더 나은 결과를 얻을 수 있을 것 같습니다.\n작은 진전도 큰 성장의 시작입니다. 계속해서 도전해보세요.';
   }
 }; 
 
@@ -414,3 +455,63 @@ export const createWeeklyReport = async (
   console.log('Supabase에 주간 리포트가 성공적으로 저장되었습니다:', data);
   return data;
 }; 
+
+/**
+ * 주간 리포트를 생성하고 저장하는 통합 함수입니다.
+ * 일간 리포트 집계 → AI 인사이트 생성 → DB 저장까지 모든 과정을 수행합니다.
+ * @returns 생성된 주간 리포트 데이터 또는 null
+ */
+export const generateAndSaveWeeklyReport = async (): Promise<WeeklyReportFromSupabase | null> => {
+  try {
+    console.log('🔄 주간 리포트 생성 프로세스 시작...');
+    
+    // 1. 일간 리포트 집계
+    const weeklyData = await aggregateWeeklyReports();
+    if (!weeklyData) {
+      console.log('❌ 일간 리포트 데이터가 없어 주간 리포트를 생성할 수 없습니다.');
+      return null;
+    }
+
+    console.log('✅ 일간 리포트 집계 완료:', {
+      weekStart: weeklyData.weekStart,
+      weekEnd: weeklyData.weekEnd,
+      averageScore: weeklyData.averageScore,
+      daysCompleted: weeklyData.daysCompleted,
+      reportCount: weeklyData.dailyReports.length
+    });
+
+    // 2. AI 인사이트 생성
+    const weeklyStats = {
+      averageScore: weeklyData.averageScore,
+      daysCompleted: weeklyData.daysCompleted,
+      dailyScores: weeklyData.dailyScores
+    };
+    
+    const insights = await generateWeeklyInsights(weeklyData.dailyReports, weeklyStats);
+    console.log('✅ AI 인사이트 생성 완료:', insights);
+
+    // 3. 주간 리포트 데이터 구성
+    const weeklyReportData = {
+      week_start: weeklyData.weekStart,
+      week_end: weeklyData.weekEnd,
+      average_score: weeklyData.averageScore,
+      days_completed: weeklyData.daysCompleted,
+      insights: insights,
+      daily_scores: weeklyData.dailyScores
+    };
+
+    // 4. 주간 리포트 저장
+    const result = await createWeeklyReport(weeklyReportData);
+    
+    if (result) {
+      console.log('✅ 주간 리포트 생성 및 저장 완료:', result.id);
+      return result;
+    } else {
+      console.error('❌ 주간 리포트 저장 실패');
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ 주간 리포트 생성 중 오류:', error);
+    return null;
+  }
+};

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { aggregateWeeklyReports, createWeeklyReport, fetchReports, generateWeeklyInsights, ReportFromSupabase } from '../backend/supabase/reports';
+import { aggregateWeeklyReports, fetchReports, generateAndSaveWeeklyReport, ReportFromSupabase, WeeklyReportFromSupabase } from '../backend/supabase/reports';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import CreateDailyReportScreen from './CreateDailyReportScreen';
@@ -26,7 +26,7 @@ interface WeeklyReportData {
   achievementScore: number; // 0-10
   daysCompleted: number;
   totalDays: number;
-  insights: string[];
+  insights: string; // 단일 문자열
   bestDay: string;
   averageScore: number;
   dailyScores: number[]; // [M, T, W, T, F, S, S] - scores for each day of the week
@@ -64,30 +64,46 @@ const formatWeeklyDate = (weekStart: string, weekEnd: string): string => {
   }
 };
 
-// Newly generated report data
-const generateNewWeeklyReport = (): WeeklyReportData => {
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay()); // Get Sunday
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6); // Get Saturday
+// Backend → UI 데이터 매핑 함수
+const mapWeeklyReportFromSupabase = (report: WeeklyReportFromSupabase): WeeklyReportData => {
+  const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+  const dailyScores = report.daily_scores || [];
+  let bestDayIndex = 0;
+  let bestScore = -1;
+  dailyScores.forEach((score, idx) => {
+    if (score > bestScore) {
+      bestScore = score;
+      bestDayIndex = idx;
+    }
+  });
 
   return {
-    id: 'current-week-generated',
-    weekStart: startOfWeek.toISOString().split('T')[0],
-    weekEnd: endOfWeek.toISOString().split('T')[0],
-    achievementScore: 8,
-    daysCompleted: 5,
+    id: report.id,
+    weekStart: report.week_start,
+    weekEnd: report.week_end,
+    achievementScore: Math.round(report.average_score),
+    daysCompleted: report.days_completed,
     totalDays: 7,
-    averageScore: 7.8,
-    bestDay: '금요일',
-    dailyScores: [7, 8, 6, 9, 10, 8, 6], // M T W T F S S
-    insights: [
-      '이번 주는 전반적으로 좋은 성과를 거두었습니다.',
-      '특히 목요일과 금요일에 뛰어난 집중력을 보였습니다.',
-      '주말에도 꾸준히 목표를 달성했습니다.'
-    ]
+    insights: report.insights,
+    bestDay: dayNames[bestDayIndex] || '월',
+    averageScore: report.average_score,
+    dailyScores: report.daily_scores,
   };
+};
+
+const stripOuterBracketsAndQuotes = (text: string): string => {
+  if (!text) return '';
+  let result = text.trim();
+  if (result.startsWith('[') && result.endsWith(']')) {
+    result = result.slice(1, -1).trim();
+  }
+  if (
+    (result.startsWith('"') && result.endsWith('"')) ||
+    (result.startsWith("'") && result.endsWith("'"))
+  ) {
+    result = result.slice(1, -1).trim();
+  }
+  return result;
 };
 
 // Mock Weekly Data
@@ -102,11 +118,7 @@ const mockWeeklyReports: WeeklyReportData[] = [
     averageScore: 8.2,
     bestDay: '금요일',
     dailyScores: [8, 7, 9, 8, 10, 6, 9], // M T W T F S S
-    insights: [
-      '이번 주는 목표를 꾸준히 달성했습니다.',
-      '주 중 내용 2',
-      '주 중 내용 3'
-    ]
+    insights: '이번 주는 목표를 꾸준히 달성했습니다.\n주 중 내용 2\n주 중 내용 3'
   },
   {
     id: 'week-2',
@@ -118,11 +130,7 @@ const mockWeeklyReports: WeeklyReportData[] = [
     averageScore: 7.4,
     bestDay: '수요일',
     dailyScores: [6, 8, 9, 7, 6, 0, 8], // M T W T F S S
-    insights: [
-      '지난주 대비 향상된 성과를 보였습니다.',
-      '주말 활동이 부족했습니다.',
-      '전반적으로 안정적인 패턴을 유지했습니다.'
-    ]
+    insights: '지난주 대비 향상된 성과를 보였습니다.\n주말 활동이 부족했습니다.\n전반적으로 안정적인 패턴을 유지했습니다.'
   },
   {
     id: 'week-3',
@@ -134,11 +142,7 @@ const mockWeeklyReports: WeeklyReportData[] = [
     averageScore: 6.1,
     bestDay: '화요일',
     dailyScores: [5, 8, 6, 0, 7, 0, 0], // M T W T F S S
-    insights: [
-      '목표 달성에 어려움이 있었습니다.',
-      '새로운 도전에 적응하는 시간이 필요했습니다.',
-      '다음 주는 더 나은 결과를 기대합니다.'
-    ]
+    insights: '목표 달성에 어려움이 있었습니다.\n새로운 도전에 적응하는 시간이 필요했습니다.\n다음 주는 더 나은 결과를 기대합니다.'
   }
 ];
 
@@ -156,6 +160,7 @@ export default function ReportScreen() {
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [weeklyReports] = useState<WeeklyReportData[]>(mockWeeklyReports);
   const [currentWeekReportGenerated, setCurrentWeekReportGenerated] = useState(false);
+  const [currentWeeklyReport, setCurrentWeeklyReport] = useState<WeeklyReportFromSupabase | null>(null);
 
   useEffect(() => {
     const loadReports = async () => {
@@ -200,7 +205,7 @@ export default function ReportScreen() {
     }
   };
 
-  // Main Report Screen Content Component
+  // Main Report Screen Content Component 0
   const ReportScreenContent = () => (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
       {/* View Selector */}
@@ -211,15 +216,12 @@ export default function ReportScreen() {
     </SafeAreaView>
   );
 
-  // Weekly Report Result Screen Component (for showing generated weekly report)
+  // 리포트 생성결과 화면 5
   const WeeklyReportResultScreen = () => {
-    // Get current week data
-    let currentWeekData: WeeklyReportData | null = null;
-    
-    if (currentWeekIndex === 0 && currentWeekReportGenerated) {
-      // Current week with generated report
-      currentWeekData = generateNewWeeklyReport();
-    }
+    // Map backend data to UI
+    const currentWeekData: WeeklyReportData | null = currentWeeklyReport
+      ? mapWeeklyReportFromSupabase(currentWeeklyReport)
+      : null;
     
     // Show error state if no data available
     if (!currentWeekData) {
@@ -238,6 +240,7 @@ export default function ReportScreen() {
     const handleSaveReport = () => {
       console.log('💾 저장 버튼 클릭: 주간 리포트 저장');
       setCurrentWeekReportGenerated(false);
+      setCurrentWeeklyReport(null);
       setCurrentScreen('daily_report');
       setSelectedView('weekly');
     };
@@ -482,7 +485,7 @@ export default function ReportScreen() {
     );
   };
 
-  // Generating Weekly Report Screen Component
+  // Generating Weekly Report Screen Component 로딩화면? yes 4
   const GeneratingWeeklyReportScreen = () => {
     const [loadingProgress, setLoadingProgress] = useState(0);
 
@@ -606,8 +609,126 @@ export default function ReportScreen() {
     );
   };
 
-  // Create Weekly Report Screen Component  // 이놈은 주간 리포트 시작하기 눌렀을때 보이는 화면 표시
+  // Create Weekly Report Screen Component  // 이놈은 주간 리포트 시작하기 눌렀을때 보이는 화면 표시 3
   const CreateWeeklyReportScreen = () => {
+    const [weeklyData, setWeeklyData] = useState<{
+      weekStart: string;
+      weekEnd: string;
+      averageScore: number;
+      daysCompleted: number;
+      dailyScores: number[];
+      dailyReports: ReportFromSupabase[];
+    } | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      const loadWeeklyData = async () => {
+        try {
+          setLoading(true);
+          const data = await aggregateWeeklyReports();
+          setWeeklyData(data);
+        } catch (error) {
+          console.error('주간 데이터 로딩 실패:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadWeeklyData();
+    }, []);
+
+    // 주간 리포트 생성 핸들러
+    const handleCreateWeeklyReport = async () => {
+      try {
+        console.log('🐛 DEBUG: Starting weekly report generation...');
+        
+        // 백엔드 통합 함수 호출
+        const result = await generateAndSaveWeeklyReport();
+        
+        if (result) {
+          console.log('✅ 주간 리포트 생성 성공:', result.id);
+          // 생성된 리포트 상태에 저장
+          setCurrentWeeklyReport(result);
+          // 성공 시 로딩 화면으로 전환
+          setCurrentScreen('weekly_create');
+        } else {
+          console.error('❌ 주간 리포트 생성 실패');
+          // 에러 처리 - 사용자에게 알림
+          alert('주간 리포트 생성에 실패했습니다. 다시 시도해주세요.');
+        }
+      } catch (error) {
+        console.error('❌ 주간 리포트 생성 중 오류:', error);
+        // 에러 처리 - 사용자에게 알림
+        alert('주간 리포트 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+      }
+    };
+
+    // 요일별 할일 목록을 렌더링하는 함수
+    const renderDailyTasks = () => {
+      if (!weeklyData) return null;
+
+      const weekDays = ['월', '화', '수', '목', '금', '토', '일'];
+      const today = new Date();
+      
+      return weekDays.map((day, index) => {
+        const dayDate = new Date(today);
+        dayDate.setDate(today.getDate() - (6 - index)); // 최근 7일 계산
+        const dateStr = dayDate.toISOString().split('T')[0];
+        
+        // 해당 날짜의 리포트 찾기
+        const dayReport = weeklyData.dailyReports.find(report => report.report_date === dateStr);
+        const dayScore = weeklyData.dailyScores[index];
+        const hasReport = dayReport !== undefined;
+        
+        // 할일 목록 가져오기 (리포트가 있으면 실제 데이터, 없으면 빈 배열)
+        const tasks = hasReport && dayReport.daily_activities?.todos 
+          ? dayReport.daily_activities.todos 
+          : [];
+
+        // 날짜 포맷팅
+        const month = String(dayDate.getMonth() + 1).padStart(2, '0');
+        const date = String(dayDate.getDate()).padStart(2, '0');
+        const dateDisplay = `${month}월 ${date}일`;
+
+        return (
+          <View key={day} style={styles.analysisItem}>
+            <View style={styles.analysisItemHeader}>
+              <Text style={[styles.analysisItemDay, { color: Colors[colorScheme ?? 'light'].text }]}>
+                {day} ({dateDisplay})
+              </Text>
+            </View>
+            
+            {tasks.length > 0 ? (
+              tasks.map((task, taskIndex) => (
+                <View key={taskIndex} style={styles.analysisItemTask}>
+                  <Text style={[
+                    styles.analysisItemText, 
+                    { 
+                      color: Colors[colorScheme ?? 'light'].text,
+                      textDecorationLine: task.completed ? 'line-through' : 'none',
+                      opacity: task.completed ? 0.6 : 1
+                    }
+                  ]}>
+                    {task.description}
+                  </Text>
+                  <Text style={[
+                    styles.analysisItemIcon,
+                    { color: task.completed ? '#4CAF50' : '#F44336' }
+                  ]}>
+                    {task.completed ? '✓' : '✗'}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text style={[styles.analysisItemText, { color: Colors[colorScheme ?? 'light'].icon }]}>
+                {hasReport ? '할일이 없습니다' : '-'}
+              </Text>
+            )}
+          </View>
+        );
+      });
+    };
+
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
         {/* Header */}
@@ -635,42 +756,51 @@ export default function ReportScreen() {
             </Text>
           </View>
 
-          <View style={[styles.createWeeklyCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}>
-            <Text style={[styles.createWeeklyCardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-              분석 항목
-            </Text>
-            <View style={styles.analysisItems}>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisItemIcon}>✓</Text>
-                <Text style={[styles.analysisItemText, { color: Colors[colorScheme ?? 'light'].text }]}>
-                  일별 To-Do 리스트 달성 점수
-                </Text>
-              </View>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisItemIcon}>✓</Text>
-                <Text style={[styles.analysisItemText, { color: Colors[colorScheme ?? 'light'].text }]}>
-                  주간 목표 달성도
-                </Text>
-              </View>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisItemIcon}>✓</Text>
-                <Text style={[styles.analysisItemText, { color: Colors[colorScheme ?? 'light'].text }]}>
-                  코치와 당신과 나눈 면담
-                </Text>
-              </View>
+          {loading ? (
+            <View style={[styles.createWeeklyCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}>
+              <Text style={[styles.createWeeklyCardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+                데이터 로딩 중...
+              </Text>
             </View>
-          </View>
+          ) : weeklyData ? (
+            <View style={[styles.createWeeklyCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}>
+              <Text style={[styles.createWeeklyCardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+                최근 7일 활동 내역
+              </Text>
+              <View style={styles.weeklyTasksContainer}>
+                {renderDailyTasks()}
+              </View>
+              
+            </View>
+          ) : (
+            <View style={[styles.createWeeklyCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}>
+              <Text style={[styles.createWeeklyCardTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+                분석할 데이터가 없습니다
+              </Text>
+              <Text style={[styles.noDataText, { color: Colors[colorScheme ?? 'light'].icon }]}>
+                최근 7일간의 일간 리포트가 없습니다.{'\n'}먼저 일간 리포트를 작성해주세요.
+              </Text>
+            </View>
+          )}
 
           <TouchableOpacity 
-            style={styles.generateReportButton}
-            onPress={() => {
-              console.log('🐛 DEBUG: Starting weekly report generation...');
-              setCurrentScreen('weekly_create');
+            style={[
+              styles.generateReportButton,
+              (!weeklyData || weeklyData.daysCompleted === 0) && styles.generateReportButtonDisabled
+            ]}
+            onPress={async () => {
+              if (weeklyData && weeklyData.daysCompleted > 0) {
+                await handleCreateWeeklyReport();
+              }
             }}
             activeOpacity={0.8}
+            disabled={!weeklyData || weeklyData.daysCompleted === 0}
           >
-            <Text style={styles.generateReportButtonText}>
-              리포트 생성하기
+            <Text style={[
+              styles.generateReportButtonText,
+              (!weeklyData || weeklyData.daysCompleted === 0) && styles.generateReportButtonTextDisabled
+            ]}>
+              {!weeklyData || weeklyData.daysCompleted === 0 ? '리포트 생성 불가' : '리포트 생성하기'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -678,7 +808,7 @@ export default function ReportScreen() {
     );
   };
 
-  // Empty Weekly Report Component // 이놈이 주간 리포트 비어있으면 보이는 화면 표시
+  // Empty Weekly Report Component // 이놈이 주간 리포트 비어있으면 보이는 화면 표시 2
   const EmptyWeeklyReport = () => {
     // For dummy design, always show as end of week
     const isEndOfWeek = true;
@@ -688,78 +818,6 @@ export default function ReportScreen() {
       setCurrentScreen('weekly_report');
     };
 
-    // 테스트 함수 추가
-    const handleTestWeeklyReport = async () => {
-      console.log('🧪 TEST: 주간 리포트 함수 테스트 시작');
-      
-      try {
-        // 1. 최근 7일간 일간 리포트 집계 테스트
-        console.log('📊 1단계: 일간 리포트 집계 테스트');
-        const weeklyData = await aggregateWeeklyReports();
-        
-        if (!weeklyData) {
-          console.log('❌ 일간 리포트 집계 실패: 데이터가 없거나 오류 발생');
-          return;
-        }
-        
-        console.log('✅ 일간 리포트 집계 성공:', {
-          weekStart: weeklyData.weekStart,
-          weekEnd: weeklyData.weekEnd,
-          averageScore: weeklyData.averageScore,
-          daysCompleted: weeklyData.daysCompleted,
-          dailyScores: weeklyData.dailyScores,
-          reportCount: weeklyData.dailyReports.length
-        });
-
-        // 2. AI 인사이트 생성 테스트
-        console.log('🤖 2단계: AI 인사이트 생성 테스트');
-        const weeklyStats = {
-          averageScore: weeklyData.averageScore,
-          daysCompleted: weeklyData.daysCompleted,
-          dailyScores: weeklyData.dailyScores
-        };
-        
-        const insights = await generateWeeklyInsights(weeklyData.dailyReports, weeklyStats);
-        console.log('✅ AI 인사이트 생성 성공:', insights);
-
-        // 3. 주간 리포트 데이터 구조 확인
-        console.log('📋 3단계: 주간 리포트 데이터 구조 확인');
-        const weeklyReportData = {
-          week_start: weeklyData.weekStart,
-          week_end: weeklyData.weekEnd,
-          average_score: weeklyData.averageScore,
-          days_completed: weeklyData.daysCompleted,
-          insights: insights,
-          daily_scores: weeklyData.dailyScores
-        };
-        
-        console.log('✅ 주간 리포트 데이터 구조:', weeklyReportData);
-
-        // 4. Supabase DB 저장 테스트
-        console.log('💾 4단계: Supabase DB 저장 테스트');
-        const savedReport = await createWeeklyReport(weeklyReportData);
-        
-        if (savedReport) {
-          console.log('✅ 주간 리포트 DB 저장 성공:', {
-            id: savedReport.id,
-            week_start: savedReport.week_start,
-            week_end: savedReport.week_end,
-            average_score: savedReport.average_score,
-            days_completed: savedReport.days_completed,
-            insights_count: savedReport.insights.length,
-            created_at: savedReport.created_at
-          });
-        } else {
-          console.log('❌ 주간 리포트 DB 저장 실패');
-        }
-        
-        console.log('🎉 모든 테스트 완료!');
-
-      } catch (error) {
-        console.error('❌ 테스트 중 오류 발생:', error);
-      }
-    };
-    
     if (isEndOfWeek) {
       return (
         <View style={styles.emptyWeeklyContainer}>
@@ -775,17 +833,6 @@ export default function ReportScreen() {
             >
               <Text style={styles.weeklyReportButtonText}>
                 주간 리포트 시작하기
-              </Text>
-            </TouchableOpacity>
-            
-            {/* 테스트 버튼 추가 */}
-            <TouchableOpacity 
-              style={[styles.testButton, { backgroundColor: '#ff6b6b', marginTop: 10 }]}
-              onPress={handleTestWeeklyReport}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.testButtonText}>
-                🧪 주간 리포트 함수 테스트
               </Text>
             </TouchableOpacity>
           </View>
@@ -805,7 +852,7 @@ export default function ReportScreen() {
     );
   };
 
-  // 이놈이 주간 리포트 선택하면 보이는 화면을 조정하는 상위 컴포넌트
+  // 이놈이 주간 리포트 선택하면 보이는 화면을 조정하는 상위 컴포넌트 1
   const WeeklyReportContent = () => {
     // Weekly tab in main screen only shows empty state or previous weeks
     // Generated current week report is shown in WeeklyReportResultScreen
@@ -937,9 +984,13 @@ export default function ReportScreen() {
             Routy의 코멘트
           </Text>
           <View style={[styles.aiReportContent, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-            <Text style={[styles.aiReportText, { color: Colors[colorScheme ?? 'light'].text }]}>
-              여기에 주간 리포트 전문이 입력됩니다
-            </Text>
+            {data.insights && data.insights.trim().length > 0 ? (
+              <Text style={[styles.aiReportText, { color: Colors[colorScheme ?? 'light'].text }]}>
+                {stripOuterBracketsAndQuotes(data.insights)}
+              </Text>
+            ) : (
+              <Text style={[styles.aiReportText, { color: Colors[colorScheme ?? 'light'].icon }]}>코멘트가 없습니다</Text>
+            )}
           </View>
         </View>
       </View>
@@ -1042,9 +1093,6 @@ export default function ReportScreen() {
       console.error('🐛 DEBUG: WeeklyReport - Error in debug handler:', error);
     }
   };
-
-
-
 
   return (
     <ScreenTransitionManager
@@ -1631,6 +1679,28 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: 'Inter',
   },
+  analysisItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  analysisItemDay: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  analysisItemScore: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  analysisItemTask: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 24,
+    marginTop: 4,
+  },
   generateReportButton: {
     backgroundColor: '#1c1c2e',
     paddingVertical: 16,
@@ -1725,13 +1795,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: 'Inter',
   },
-  testButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   saveButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -1744,10 +1807,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'Inter',
   },
-  testButtonText: {
+  
+  // Weekly Tasks Display Styles
+  weeklyTasksContainer: {
+    marginBottom: 20,
+  },
+  weeklySummary: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  weeklySummaryText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '500',
+    marginBottom: 4,
     fontFamily: 'Inter',
+  },
+  noDataText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    fontFamily: 'Inter',
+  },
+  generateReportButtonDisabled: {
+    backgroundColor: '#cccccc',
+  },
+  generateReportButtonTextDisabled: {
+    color: '#666666',
   },
 }); 
