@@ -6,7 +6,11 @@ import { signOut } from '../backend/supabase/auth';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
-export default function ProfileScreen() {
+interface ProfileScreenProps {
+  onBackToHome?: () => void;
+}
+
+export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const colorScheme = useColorScheme();
 
   // 알림 테스트 함수
@@ -105,6 +109,19 @@ export default function ProfileScreen() {
   // Profile Header Component
   const ProfileHeader = () => (
     <View style={styles.profileHeader}>
+      {/* Back to Home Button */}
+      {onBackToHome && (
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={onBackToHome}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
+            ← 홈으로
+          </Text>
+        </TouchableOpacity>
+      )}
+      
       {/* Profile Info */}
       <TouchableOpacity style={styles.profileInfo} activeOpacity={0.7}>
         <View style={[styles.avatar, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}>
@@ -226,6 +243,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 80,
     paddingBottom: 24,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   profileInfo: {
     flexDirection: 'row',
