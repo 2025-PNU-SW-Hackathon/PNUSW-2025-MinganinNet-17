@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
-import { signOut } from '../backend/supabase/auth';
+import { getCurrentUser, signOut } from '../backend/supabase/auth';
 import { getCompletedGoalsCount, getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
@@ -17,11 +17,20 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const [streak, setStreak] = useState<number | null>(null);
   const [weeklyRate, setWeeklyRate] = useState<number | null>(null);
   const [completedGoals, setCompletedGoals] = useState<number | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
+        // 현재 사용자 이메일 로드
+        try {
+          const res = await getCurrentUser();
+          if (mounted && (res as any)?.user) {
+            setUserEmail((res as any).user.email ?? null);
+          }
+        } catch {}
+
         const [streakValue, weeklyRateValue, completedGoalsValue] = await Promise.all([
           getConsecutiveCompletionStreak(),
           getThisWeekTodosCompletionRate(),
@@ -164,7 +173,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
             사용자 이름
           </Text>
           <Text style={[styles.profileEmail, { color: Colors[colorScheme ?? 'light'].icon }]}>
-            user@example.com
+            {userEmail ?? '이메일 불러오는 중...'}
           </Text>
         </View>
         <Text style={[styles.chevron, { color: Colors[colorScheme ?? 'light'].icon }]}>
