@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { useEffect, useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
 import { signOut } from '../backend/supabase/auth';
+import { getConsecutiveCompletionStreak } from '../backend/supabase/profile';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
@@ -12,6 +14,22 @@ interface ProfileScreenProps {
 
 export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const colorScheme = useColorScheme();
+  const [streak, setStreak] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const value = await getConsecutiveCompletionStreak();
+        if (mounted) setStreak(value);
+      } catch (e) {
+        if (mounted) setStreak(0);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // 알림 테스트 함수
   const handleNotificationTest = async () => {
@@ -158,7 +176,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
     </TouchableOpacity>
   );
 
-  // Quick Access Card Component
+  // Quick Access Card Component 현재 활성 목표 포함
   const QuickAccessCard = () => (
     <TouchableOpacity 
       style={[styles.quickAccessCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}
@@ -202,9 +220,9 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
         {/* Profile Header */}
         <ProfileHeader />
 
-        {/* Stats Dashboard */}
+        {/* Stats Dashboard */} 
         <View style={styles.statsContainer}>
-          <StatsCard icon="🔥" value="7" label="일 연속" />
+          <StatsCard icon="🔥" value={streak === null ? '—' : String(streak)} label="일 연속" />
           <StatsCard icon="🎯" value="12" label="완료된 목표" />
           <StatsCard icon="📊" value="85%" label="이번 주" />
         </View>
