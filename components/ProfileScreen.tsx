@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
 import { signOut } from '../backend/supabase/auth';
-import { getConsecutiveCompletionStreak } from '../backend/supabase/profile';
+import { getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
@@ -15,15 +15,25 @@ interface ProfileScreenProps {
 export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const colorScheme = useColorScheme();
   const [streak, setStreak] = useState<number | null>(null);
+  const [weeklyRate, setWeeklyRate] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const value = await getConsecutiveCompletionStreak();
-        if (mounted) setStreak(value);
+        const [streakValue, weeklyRateValue] = await Promise.all([
+          getConsecutiveCompletionStreak(),
+          getThisWeekTodosCompletionRate(),
+        ]);
+        if (mounted) {
+          setStreak(streakValue);
+          setWeeklyRate(weeklyRateValue);
+        }
       } catch (e) {
-        if (mounted) setStreak(0);
+        if (mounted) {
+          setStreak((prev) => (prev ?? 0));
+          setWeeklyRate((prev) => (prev ?? 0));
+        }
       }
     })();
     return () => {
@@ -224,7 +234,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
         <View style={styles.statsContainer}>
           <StatsCard icon="🔥" value={streak === null ? '—' : String(streak)} label="일 연속" />
           <StatsCard icon="🎯" value="12" label="완료된 목표" />
-          <StatsCard icon="📊" value="85%" label="이번 주" />
+          <StatsCard icon="📊" value={weeklyRate === null ? '—' : `${weeklyRate}%`} label="이번 주" />
         </View>
 
         {/* Quick Access Card */}
