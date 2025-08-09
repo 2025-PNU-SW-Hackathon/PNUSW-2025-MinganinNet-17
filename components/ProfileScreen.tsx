@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
 import { getCurrentUser, signOut } from '../backend/supabase/auth';
+import { getActivePlan } from '../backend/supabase/habits';
 import { getCompletedGoalsCount, getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
@@ -18,6 +19,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const [weeklyRate, setWeeklyRate] = useState<number | null>(null);
   const [completedGoals, setCompletedGoals] = useState<number | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [activePlanTitle, setActivePlanTitle] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -31,21 +33,24 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
           }
         } catch {}
 
-        const [streakValue, weeklyRateValue, completedGoalsValue] = await Promise.all([
+        const [streakValue, weeklyRateValue, completedGoalsValue, activePlan] = await Promise.all([
           getConsecutiveCompletionStreak(),
           getThisWeekTodosCompletionRate(),
           getCompletedGoalsCount(),
+          getActivePlan(),
         ]);
         if (mounted) {
           setStreak(streakValue);
           setWeeklyRate(weeklyRateValue);
           setCompletedGoals(completedGoalsValue);
+          setActivePlanTitle(activePlan?.plan_title ?? null);
         }
       } catch (e) {
         if (mounted) {
           setStreak((prev) => (prev ?? 0));
           setWeeklyRate((prev) => (prev ?? 0));
           setCompletedGoals((prev) => (prev ?? 0));
+          setActivePlanTitle((prev) => (prev ?? null));
         }
       }
     })();
@@ -207,9 +212,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
     >
       <View style={styles.quickAccessContent}>
         <Text style={styles.quickAccessIcon}>🎯</Text>
-        <Text style={[styles.quickAccessTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-          현재 활성 목표
-        </Text>
+        <Text style={[styles.quickAccessTitle, { color: Colors[colorScheme ?? 'light'].text }]}> {`현재 활성 목표${activePlanTitle ? `: ${activePlanTitle}` : ''}`}</Text>
         <View style={styles.statusBadge}>
           <Text style={styles.statusText}>진행중</Text>
         </View>
