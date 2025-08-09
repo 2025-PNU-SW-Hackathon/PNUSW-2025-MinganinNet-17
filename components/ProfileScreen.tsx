@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
 import { signOut } from '../backend/supabase/auth';
-import { getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
+import { getCompletedGoalsCount, getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
@@ -16,23 +16,27 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const colorScheme = useColorScheme();
   const [streak, setStreak] = useState<number | null>(null);
   const [weeklyRate, setWeeklyRate] = useState<number | null>(null);
+  const [completedGoals, setCompletedGoals] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const [streakValue, weeklyRateValue] = await Promise.all([
+        const [streakValue, weeklyRateValue, completedGoalsValue] = await Promise.all([
           getConsecutiveCompletionStreak(),
           getThisWeekTodosCompletionRate(),
+          getCompletedGoalsCount(),
         ]);
         if (mounted) {
           setStreak(streakValue);
           setWeeklyRate(weeklyRateValue);
+          setCompletedGoals(completedGoalsValue);
         }
       } catch (e) {
         if (mounted) {
           setStreak((prev) => (prev ?? 0));
           setWeeklyRate((prev) => (prev ?? 0));
+          setCompletedGoals((prev) => (prev ?? 0));
         }
       }
     })();
@@ -233,7 +237,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
         {/* Stats Dashboard */} 
         <View style={styles.statsContainer}>
           <StatsCard icon="🔥" value={streak === null ? '—' : String(streak)} label="일 연속" />
-          <StatsCard icon="🎯" value="12" label="완료된 목표" />
+          <StatsCard icon="🎯" value={completedGoals === null ? '—' : String(completedGoals)} label="완료된 목표" />
           <StatsCard icon="📊" value={weeklyRate === null ? '—' : `${weeklyRate}%`} label="이번 주" />
         </View>
 

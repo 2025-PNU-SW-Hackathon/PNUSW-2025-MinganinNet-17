@@ -158,3 +158,29 @@ export async function getThisWeekTodosCompletionRate(): Promise<number> {
 }
 
 
+/**
+ * 사용자 기준으로 완료된 목표(Plan)의 개수를 반환합니다.
+ * - 정의: `plans.status = 'completed'` 인 레코드의 수
+ * - 주의: "목표"를 Habit 단위로 집계하고 싶다면, DISTINCT habit_id 카운트로 조정 가능
+ */
+export async function getCompletedGoalsCount(): Promise<number> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  // plans 테이블에서 현재 사용자이면서 완료 상태인 계획 수 카운트
+  const { count, error } = await supabase
+    .from('plans')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('status', 'completed');
+
+  if (error) {
+    console.warn('완료된 목표 수 조회 실패:', error);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
