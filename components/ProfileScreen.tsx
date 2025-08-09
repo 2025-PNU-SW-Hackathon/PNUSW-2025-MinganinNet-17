@@ -1,8 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { useEffect, useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { sendNotification } from '../backend/hwirang/notifications';
-import { signOut } from '../backend/supabase/auth';
+import { getCurrentUser, signOut } from '../backend/supabase/auth';
+import { getActivePlan } from '../backend/supabase/habits';
+import { getCompletedGoalsCount, getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
@@ -12,6 +15,49 @@ interface ProfileScreenProps {
 
 export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const colorScheme = useColorScheme();
+  const [streak, setStreak] = useState<number | null>(null);
+  const [weeklyRate, setWeeklyRate] = useState<number | null>(null);
+  const [completedGoals, setCompletedGoals] = useState<number | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [activePlanTitle, setActivePlanTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // 현재 사용자 이메일 로드
+        try {
+          const res = await getCurrentUser();
+          if (mounted && (res as any)?.user) {
+            setUserEmail((res as any).user.email ?? null);
+          }
+        } catch {}
+
+        const [streakValue, weeklyRateValue, completedGoalsValue, activePlan] = await Promise.all([
+          getConsecutiveCompletionStreak(),
+          getThisWeekTodosCompletionRate(),
+          getCompletedGoalsCount(),
+          getActivePlan(),
+        ]);
+        if (mounted) {
+          setStreak(streakValue);
+          setWeeklyRate(weeklyRateValue);
+          setCompletedGoals(completedGoalsValue);
+          setActivePlanTitle(activePlan?.plan_title ?? null);
+        }
+      } catch (e) {
+        if (mounted) {
+          setStreak((prev) => (prev ?? 0));
+          setWeeklyRate((prev) => (prev ?? 0));
+          setCompletedGoals((prev) => (prev ?? 0));
+          setActivePlanTitle((prev) => (prev ?? null));
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // 알림 테스트 함수
   const handleNotificationTest = async () => {
@@ -132,7 +178,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
             사용자 이름
           </Text>
           <Text style={[styles.profileEmail, { color: Colors[colorScheme ?? 'light'].icon }]}>
-            user@example.com
+            {userEmail ?? '이메일 불러오는 중...'}
           </Text>
         </View>
         <Text style={[styles.chevron, { color: Colors[colorScheme ?? 'light'].icon }]}>
@@ -158,7 +204,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
     </TouchableOpacity>
   );
 
-  // Quick Access Card Component
+  // Quick Access Card Component 현재 활성 목표 포함
   const QuickAccessCard = () => (
     <TouchableOpacity 
       style={[styles.quickAccessCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}
@@ -166,9 +212,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
     >
       <View style={styles.quickAccessContent}>
         <Text style={styles.quickAccessIcon}>🎯</Text>
-        <Text style={[styles.quickAccessTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-          현재 활성 목표
-        </Text>
+        <Text style={[styles.quickAccessTitle, { color: Colors[colorScheme ?? 'light'].text }]}> {`현재 활성 목표${activePlanTitle ? `: ${activePlanTitle}` : ''}`}</Text>
         <View style={styles.statusBadge}>
           <Text style={styles.statusText}>진행중</Text>
         </View>
@@ -202,11 +246,11 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
         {/* Profile Header */}
         <ProfileHeader />
 
-        {/* Stats Dashboard */}
+        {/* Stats Dashboard */} 
         <View style={styles.statsContainer}>
-          <StatsCard icon="🔥" value="7" label="일 연속" />
-          <StatsCard icon="🎯" value="12" label="완료된 목표" />
-          <StatsCard icon="📊" value="85%" label="이번 주" />
+          <StatsCard icon="🔥" value={streak === null ? '—' : String(streak)} label="일 연속" />
+          <StatsCard icon="🎯" value={completedGoals === null ? '—' : String(completedGoals)} label="완료된 목표" />
+          <StatsCard icon="📊" value={weeklyRate === null ? '—' : `${weeklyRate}%`} label="이번 주" />
         </View>
 
         {/* Quick Access Card */}
