@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
-import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { sendNotification } from '../backend/hwirang/notifications';
+import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { disableAllNotifications, enableAllNotifications, isNotificationsEnabled, sendNotification } from '../backend/hwirang/notifications';
 import { getCurrentUser, signOut } from '../backend/supabase/auth';
 import { getActivePlan } from '../backend/supabase/habits';
 import { getCompletedGoalsCount, getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
@@ -20,6 +20,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const [completedGoals, setCompletedGoals] = useState<number | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [activePlanTitle, setActivePlanTitle] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
 
   useEffect(() => {
     let mounted = true;
@@ -59,6 +60,18 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
     };
   }, []);
 
+  // 알림 설정 초기 로드
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const enabled = await isNotificationsEnabled();
+        if (mounted) setNotificationsEnabled(enabled);
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   // 알림 테스트 함수
   const handleNotificationTest = async () => {
     try {
@@ -76,6 +89,13 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   // 백그라운드 테스트용 예약 알림 함수
   const handleScheduledNotificationTest = async () => {
     try {
+      // 비활성화 시 차단
+      const enabled = await isNotificationsEnabled();
+      if (!enabled) {
+        Alert.alert('알림 비활성화', '알림이 비활성화되어 있어 예약할 수 없습니다.');
+        return;
+      }
+
       // AsyncStorage에 알림 상태 저장 (완전 종료 상태 대비)
       await AsyncStorage.setItem('pending_notification', JSON.stringify({
         route: 'report',
@@ -105,6 +125,31 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
       );
     } catch (error) {
       Alert.alert('오류', '예약 알림 테스트 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 알림 토글 핸들러
+  const handleNotificationToggle = async () => {
+    try {
+      if (notificationsEnabled) {
+        const result = await disableAllNotifications();
+        if (!result.success) {
+          Alert.alert('오류', result.message ?? '알림 비활성화 중 문제가 발생했습니다.');
+          return;
+        }
+        setNotificationsEnabled(false);
+        Alert.alert('알림 비활성화', result.message);
+      } else {
+        const result = await enableAllNotifications();
+        if (!result.success) {
+          Alert.alert('오류', result.message ?? '알림 활성화 중 문제가 발생했습니다.');
+          return;
+        }
+        setNotificationsEnabled(true);
+        Alert.alert('알림 활성화', result.message);
+      }
+    } catch (error) {
+      Alert.alert('오류', '알림 설정 변경 중 문제가 발생했습니다.');
     }
   };
 
@@ -240,6 +285,25 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
     </TouchableOpacity>
   );
 
+  // 알림 설정 전용 Row (우측 토글 포함)
+  const NotificationSettingsRow = () => (
+    <View
+      style={[
+        styles.menuItem,
+        { borderBottomColor: Colors[colorScheme ?? 'light'].icon, borderBottomWidth: 0.3 }
+      ]}
+    >
+      <Text style={styles.menuIcon}>🔔</Text>
+      <Text style={[styles.menuTitle, { color: Colors[colorScheme ?? 'light'].text }]}>알림</Text>
+      <Switch
+        value={notificationsEnabled}
+        onValueChange={handleNotificationToggle}
+        trackColor={{ false: '#C6C6C8', true: Colors[colorScheme ?? 'light'].tint }}
+        thumbColor={Platform.OS === 'android' ? '#ffffff' : undefined}
+      />
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -261,7 +325,7 @@ export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
         {/* Settings Menu */}
         <View style={styles.menuContainer}>
           <MenuItem icon="👤" title="로그 아웃" onPress={handleLogout} />
-          <MenuItem icon="🔔" title="알림" />
+          <NotificationSettingsRow />
           <MenuItem icon="🧪" title="알림 테스트" onPress={handleNotificationTest} />
           <MenuItem icon="⏰" title="백그라운드 테스트" onPress={handleScheduledNotificationTest} />
           <MenuItem icon="🤖" title="AI 코치" />
