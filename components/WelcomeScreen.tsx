@@ -1,5 +1,8 @@
 import React from 'react';
 import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -8,6 +11,10 @@ interface WelcomeScreenProps {
 }
 
 export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
+  
   const handleGetStarted = () => {
     if (onGetStarted) {
       onGetStarted();
@@ -41,41 +48,41 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   contentContainer: {
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: Spacing.screen.paddingHorizontal,
     width: width,
   },
   welcomeTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontSize: colors.typography.fontSize['3xl'],
+    fontWeight: colors.typography.fontWeight.bold,
+    color: colors.text,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: Spacing['3xl'],
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   welcomeSubtitle: {
-    fontSize: 18,
-    color: '#a9a9c2',
+    fontSize: colors.typography.fontSize.lg,
+    color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 26,
+    lineHeight: colors.typography.lineHeight.relaxed * colors.typography.fontSize.lg,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-    marginBottom: 48,
+    marginBottom: Spacing['6xl'],
   },
   getStartedButton: {
-    backgroundColor: '#6c5ce7',
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 12,
-    marginTop: 32,
-    elevation: 3,
+    backgroundColor: colors.primary,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing['6xl'],
+    borderRadius: Spacing.layout.borderRadius.md,
+    marginTop: Spacing['4xl'],
+    elevation: Spacing.layout.elevation.sm,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -85,9 +92,9 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   getStartedButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
+    color: colors.text,
+    fontSize: colors.typography.fontSize.lg,
+    fontWeight: colors.typography.fontWeight.semibold,
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },

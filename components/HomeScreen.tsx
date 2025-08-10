@@ -14,6 +14,9 @@ import {
 import CalendarScreen from '../backend/calendar/calendar';
 import { getActivePlan } from '../backend/supabase/habits';
 import { DailyTodo, Plan } from '../types/habit';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 import ProfileScreen from './ProfileScreen';
 import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
 import VoiceChatScreen from './VoiceChatScreen';
@@ -59,53 +62,93 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   const checkmarkScale = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
   const textOpacity = useRef(new Animated.Value(isCompleted ? 0.6 : 1)).current;
+  const checkboxColorAnimation = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
+  const strikethroughWidth = useRef(new Animated.Value(isCompleted ? 100 : 0)).current;
+  const itemElevation = useRef(new Animated.Value(0)).current;
+
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
 
   const handlePress = () => {
-    // Scale animation for the whole item
+    // Enhanced scale animation with bounce
     Animated.sequence([
       Animated.spring(scaleAnimation, {
-        toValue: 1.05,
+        toValue: 1.02,
         useNativeDriver: true,
-        tension: 300,
-        friction: 8,
+        tension: 400,
+        friction: 6,
       }),
       Animated.spring(scaleAnimation, {
         toValue: 1,
         useNativeDriver: true,
-        tension: 300,
+        tension: 400,
         friction: 8,
       })
     ]).start();
 
-    // Checkmark and text animations
+    // Subtle elevation animation for press feedback
+    Animated.sequence([
+      Animated.timing(itemElevation, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: false,
+      }),
+      Animated.timing(itemElevation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      })
+    ]).start();
+
+    // Enhanced completion/incompletion animations
     if (!isCompleted) {
-      // Completing task
+      // Completing task - enhanced animations
       Animated.parallel([
         Animated.spring(checkmarkScale, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 300,
-          friction: 6,
+          tension: 500,
+          friction: 4, // Bouncier animation
+        }),
+        Animated.timing(checkboxColorAnimation, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: false,
         }),
         Animated.timing(textOpacity, {
           toValue: 0.6,
-          duration: 200,
+          duration: 300,
           useNativeDriver: true,
+        }),
+        Animated.timing(strikethroughWidth, {
+          toValue: 100,
+          duration: 400,
+          useNativeDriver: false,
         })
       ]).start();
     } else {
-      // Uncompleting task
+      // Uncompleting task - reverse animations
       Animated.parallel([
         Animated.spring(checkmarkScale, {
           toValue: 0,
           useNativeDriver: true,
-          tension: 300,
+          tension: 400,
           friction: 6,
+        }),
+        Animated.timing(checkboxColorAnimation, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
         }),
         Animated.timing(textOpacity, {
           toValue: 1,
           duration: 200,
           useNativeDriver: true,
+        }),
+        Animated.timing(strikethroughWidth, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
         })
       ]).start();
     }
@@ -113,14 +156,51 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
     onToggle();
   };
 
+  // Interpolate checkbox background color
+  const checkboxBackgroundColor = checkboxColorAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['transparent', colors.primary]
+  });
+
+  const checkboxBorderColor = checkboxColorAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.textSecondary, colors.primary]
+  });
+
+  const itemShadowOpacity = itemElevation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.05, 0.15]
+  });
+
+  const strikethroughWidthPercentage = strikethroughWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%']
+  });
+
   return (
-    <Animated.View style={[{ transform: [{ scale: scaleAnimation }] }]}>
+    <Animated.View 
+      style={[
+        styles.todoItemContainer,
+        { 
+          transform: [{ scale: scaleAnimation }],
+          shadowOpacity: itemShadowOpacity,
+        }
+      ]}
+    >
       <TouchableOpacity
         style={styles.todoItem}
         onPress={handlePress}
-        activeOpacity={0.8}
+        activeOpacity={0.9}
       >
-        <View style={[styles.todoCheckbox, isCompleted && styles.todoCheckedBox]}>
+        <Animated.View 
+          style={[
+            styles.todoCheckbox, 
+            { 
+              backgroundColor: checkboxBackgroundColor,
+              borderColor: checkboxBorderColor,
+            }
+          ]}
+        >
           <Animated.Text 
             style={[
               styles.checkmarkText,
@@ -132,24 +212,41 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
           >
             ✓
           </Animated.Text>
+        </Animated.View>
+        
+        <View style={styles.todoTextContainer}>
+          <Animated.Text 
+            style={[
+              styles.todoText, 
+              isCompleted && styles.todoTextCompleted,
+              { opacity: textOpacity }
+            ]} 
+            numberOfLines={2} 
+            ellipsizeMode="tail"
+          >
+            {todo.description}
+          </Animated.Text>
+          
+          {/* Animated strikethrough line */}
+          <Animated.View 
+            style={[
+              styles.strikethroughLine,
+              {
+                width: strikethroughWidthPercentage,
+                backgroundColor: colors.textSecondary,
+              }
+            ]}
+          />
         </View>
-        <Animated.Text 
-          style={[
-            styles.todoText, 
-            isCompleted && styles.todoTextCompleted,
-            { opacity: textOpacity }
-          ]} 
-          numberOfLines={2} 
-          ellipsizeMode="tail"
-        >
-          {todo.description}
-        </Animated.Text>
       </TouchableOpacity>
     </Animated.View>
   );
 };
 
 export default function HomeScreen({ selectedDate }: HomeScreenProps) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
   const [internalSelectedDate, setInternalSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -384,27 +481,51 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
             </Animated.View>
           )}
 
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.calendarScroll}
-            contentContainerStyle={styles.calendarContainer}
-          >
-            {calendarDates.map((date, index) => {
-              const dateInfo = formatCalendarDate(date);
-              const isSelected = targetDate === dateInfo.dateString;
-              return (
-                <TouchableOpacity
-                  key={index}
-                  style={[styles.calendarDate, dateInfo.isToday && styles.calendarDateToday, isSelected && styles.calendarDateSelected]}
-                  onPress={() => handleCalendarDatePress(dateInfo.dateString)}
-                >
-                  <Text style={styles.calendarDayName}>{dateInfo.dayName}</Text>
-                  <Text style={[styles.calendarDayNumber, (dateInfo.isToday || isSelected) && styles.calendarTextActive]}>{dateInfo.dayNumber}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.calendarWrapper}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.calendarScroll}
+              contentContainerStyle={styles.calendarContainer}
+            >
+              {calendarDates.map((date, index) => {
+                const dateInfo = formatCalendarDate(date);
+                const isSelected = targetDate === dateInfo.dateString;
+                // Mock achievement data (in real app, this would come from habit completion data)
+                const hasAchievement = Math.random() > 0.6; // 40% chance for demo
+                const hasStreak = Math.random() > 0.7; // 30% chance for demo
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.calendarDate, 
+                      dateInfo.isToday && styles.calendarDateToday, 
+                      isSelected && styles.calendarDateSelected,
+                      hasAchievement && styles.calendarDateWithAchievement
+                    ]}
+                    onPress={() => handleCalendarDatePress(dateInfo.dateString)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.calendarDayName}>{dateInfo.dayName}</Text>
+                    <Text style={[styles.calendarDayNumber, (dateInfo.isToday || isSelected) && styles.calendarTextActive]}>
+                      {dateInfo.dayNumber}
+                    </Text>
+                    
+                    {/* Achievement indicator dot */}
+                    {hasAchievement && !dateInfo.isToday && (
+                      <View style={styles.achievementIndicator} />
+                    )}
+                    
+                    {/* Streak indicator bar */}
+                    {hasStreak && !dateInfo.isToday && (
+                      <View style={styles.streakIndicator} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
         </View>
 
         <View style={styles.mainContent}>
@@ -413,14 +534,49 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
             <SkeletonCard type="coach" />
           ) : (
             <Animated.View style={[styles.coachCard, { opacity: coachFadeAnimation }]}>
-              <Text style={styles.cardTitle}>Coach's Status</Text>
-              <View style={styles.coachContent}>
-                <Animated.View style={{ transform: [{ scale: coachScaleAnimation }] }}>
-                  <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
-                </Animated.View>
-                <Text style={styles.coachMessage}>{coachStatus.message}</Text>
-                <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
+              <View style={styles.coachHeader}>
+                <Text style={styles.cardTitle}>Coach's Status</Text>
+                <View style={[styles.statusBadge, { backgroundColor: coachStatus.color }]}>
+                  <Text style={styles.statusBadgeText}>Live</Text>
+                </View>
               </View>
+              
+              <View style={styles.coachContent}>
+                <View style={styles.coachAvatarContainer}>
+                  <Animated.View 
+                    style={[
+                      styles.coachAvatar, 
+                      { 
+                        transform: [{ scale: coachScaleAnimation }],
+                        backgroundColor: coachStatus.color + '20', // 20% opacity
+                      }
+                    ]}
+                  >
+                    <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
+                  </Animated.View>
+                  <View style={[styles.coachPulse, { backgroundColor: coachStatus.color }]} />
+                </View>
+                
+                <View style={styles.coachMessageContainer}>
+                  <Text style={styles.coachMessage}>{coachStatus.message}</Text>
+                  <View style={styles.coachMetrics}>
+                    <View style={styles.metricItem}>
+                      <Text style={styles.metricLabel}>Today</Text>
+                      <View style={[styles.metricIndicator, { backgroundColor: coachStatus.color }]} />
+                    </View>
+                  </View>
+                </View>
+              </View>
+              
+              {/* Interactive coach footer */}
+              <TouchableOpacity 
+                style={styles.coachInteraction}
+                onPress={() => console.log('Coach interaction tapped')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.coachInteractionText}>💬 Ask Coach</Text>
+                <Text style={styles.coachInteractionArrow}>→</Text>
+              </TouchableOpacity>
             </Animated.View>
           )}
 
@@ -495,74 +651,530 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1c1c2e' },
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
-  headerArea: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 20 },
-  profileHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  logoContainer: { flexDirection: 'row', alignItems: 'center' },
-  logoText: { fontSize: 36, color: '#6c63ff', fontWeight: 'bold' },
-  profileButton: { padding: 8 },
-  profileIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#3a3a50', justifyContent: 'center', alignItems: 'center' },
-  profileIconText: { fontSize: 24, color: '#a9a9c2' },
-  greetingText: { fontSize: 24, fontWeight: 'bold', color: '#ffffff', marginBottom: 10, fontFamily: 'Inter' },
-  goalText: { fontSize: 18, fontWeight: '600', color: '#a9a9c2', marginBottom: 20, fontFamily: 'Inter' },
-  calendarScroll: { marginTop: 10 },
-  calendarContainer: { paddingHorizontal: 10 },
-  calendarDate: { width: 60, height: 80, borderRadius: 12, backgroundColor: '#3a3a50', justifyContent: 'center', alignItems: 'center', marginHorizontal: 5, paddingVertical: 10 },
-  calendarDateToday: { backgroundColor: '#6c63ff' },
-  calendarDateSelected: { borderWidth: 2, borderColor: '#6c63ff' },
-  calendarDayName: { fontSize: 12, color: '#a9a9c2', fontFamily: 'Inter' },
-  calendarDayNumber: { fontSize: 20, fontWeight: 'bold', color: '#ffffff', fontFamily: 'Inter' },
-  calendarTextActive: { color: '#ffffff' },
-  mainContent: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingBottom: 40 },
-  coachCard: { flex: 1, backgroundColor: '#3a3a50', borderRadius: 16, padding: 20, marginRight: 10 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginBottom: 15, fontFamily: 'Inter' },
-  coachContent: { alignItems: 'center', justifyContent: 'center', flex: 1 },
-  coachEmoji: { fontSize: 100, marginBottom: 10 },
-  coachMessage: { fontSize: 16, color: '#a9a9c2', textAlign: 'center', marginBottom: 10, fontFamily: 'Inter' },
-  coachIndicator: { width: 60, height: 8, borderRadius: 4 },
-  todoCard: { flex: 1, backgroundColor: '#3a3a50', borderRadius: 16, padding: 20, marginLeft: 10, minHeight: 250 },
+  headerArea: { 
+    paddingHorizontal: Spacing.screen.paddingHorizontal, 
+    paddingTop: Spacing['5xl'], 
+    paddingBottom: Spacing.xl 
+  },
+  profileHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: Spacing['3xl'],
+    paddingTop: Spacing.md,
+  },
+  logoContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    // Enhanced visual container
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Spacing.layout.borderRadius.lg,
+    backgroundColor: colors.primaryOpacity[10],
+  },
+  logoText: { 
+    fontSize: 40, 
+    color: colors.primary, 
+    fontWeight: colors.typography.fontWeight.bold,
+    // Enhanced shadow for depth
+    textShadowColor: colors.primaryOpacity[20],
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    // Add subtle scaling transform for better visual impact
+    transform: [{ scale: 1.1 }],
+  },
+  profileButton: { 
+    padding: Spacing.md,
+    borderRadius: Spacing.layout.borderRadius.full,
+    // Add subtle hover/press state preparation
+    backgroundColor: 'transparent',
+  },
+  profileIcon: { 
+    width: 48, 
+    height: 48, 
+    borderRadius: 24, 
+    backgroundColor: colors.card, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    // Enhanced modern styling
+    borderWidth: 2,
+    borderColor: colors.neutral[200],
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: Spacing.xs },
+    shadowOpacity: 0.1,
+    shadowRadius: Spacing.md,
+    elevation: Spacing.layout.elevation.sm,
+  },
+  profileIconText: { 
+    fontSize: 28, 
+    color: colors.primary,
+    // Add subtle transform for better visual balance
+    transform: [{ scale: 0.9 }],
+  },
+  greetingText: { 
+    fontSize: colors.typography.fontSize['3xl'], 
+    fontWeight: colors.typography.fontWeight.bold, 
+    color: colors.text, 
+    marginBottom: Spacing.xl,
+    fontFamily: 'Inter',
+    lineHeight: colors.typography.fontSize['3xl'] * colors.typography.lineHeight.tight,
+    letterSpacing: colors.typography.letterSpacing.tight,
+    // Add subtle gradient text effect preparation
+    textAlign: 'left',
+  },
+  goalText: { 
+    fontSize: colors.typography.fontSize.lg, 
+    fontWeight: colors.typography.fontWeight.medium, 
+    color: colors.textSecondary, 
+    marginBottom: Spacing['3xl'],
+    fontFamily: 'Inter',
+    lineHeight: colors.typography.fontSize.lg * colors.typography.lineHeight.relaxed,
+    // Enhanced visual styling for goal display
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: colors.neutral[50],
+    borderRadius: Spacing.layout.borderRadius.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+  },
+  calendarScroll: { 
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
+  },
+  calendarContainer: { 
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  calendarDate: { 
+    width: Spacing['6xl'] + Spacing.sm, // ~64px for better proportion
+    height: 88, 
+    borderRadius: Spacing.layout.borderRadius.lg, 
+    backgroundColor: colors.card, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginHorizontal: Spacing.sm, 
+    paddingVertical: Spacing.md,
+    // Enhanced modern styling
+    borderWidth: 1.5,
+    borderColor: colors.neutral[100],
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: Spacing.md,
+    elevation: 2,
+    // Add subtle transform for better visual impact
+    transform: [{ scale: 1 }],
+    // Preparation for achievement indicators
+    overflow: 'visible',
+  },
+  calendarDateToday: { 
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryLight,
+    borderWidth: 2,
+    // Enhanced today styling
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: Spacing.lg,
+    elevation: 6,
+    // Add subtle pulse effect preparation
+    transform: [{ scale: 1.05 }],
+  },
+  calendarDateSelected: { 
+    borderWidth: 2.5, 
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryOpacity[10],
+    // Enhanced selection styling
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: Spacing.md,
+    elevation: 3,
+    transform: [{ scale: 1.02 }],
+  },
+  calendarDayName: { 
+    fontSize: colors.typography.fontSize.xs, 
+    color: colors.textMuted, 
+    fontFamily: 'Inter',
+    fontWeight: colors.typography.fontWeight.medium,
+    letterSpacing: colors.typography.letterSpacing.wide,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.xs,
+  },
+  calendarDayNumber: { 
+    fontSize: colors.typography.fontSize.xl, 
+    fontWeight: colors.typography.fontWeight.bold, 
+    color: colors.text, 
+    fontFamily: 'Inter',
+    lineHeight: colors.typography.fontSize.xl * colors.typography.lineHeight.tight,
+  },
+  calendarTextActive: { 
+    color: '#ffffff', // White text for active states
+  },
+  
+  // Achievement indicators for calendar dates
+  calendarDateWithAchievement: {
+    borderTopRightRadius: Spacing.layout.borderRadius.lg,
+    // Add achievement indicator dot
+    position: 'relative',
+  },
+  achievementIndicator: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.success,
+    borderWidth: 2,
+    borderColor: colors.card,
+    // Achievement glow effect
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+  },
+  streakIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    left: '50%',
+    marginLeft: -8,
+    width: 16,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.warning,
+    // Streak glow effect
+    shadowColor: colors.warning,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
+  },
+  
+  // Enhanced calendar hover states (for future interactivity)
+  calendarDateHover: {
+    backgroundColor: colors.neutral[100],
+    borderColor: colors.neutral[300],
+    transform: [{ scale: 1.02 }],
+  },
+  
+  // Enhanced calendar container with better visual separation
+  calendarWrapper: {
+    backgroundColor: colors.surface,
+    borderRadius: Spacing.layout.borderRadius.lg,
+    paddingVertical: Spacing.lg,
+    marginHorizontal: -Spacing.md, // Extend to screen edges
+    paddingHorizontal: Spacing.md,
+    // Subtle container styling
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: Spacing.lg,
+    elevation: 1,
+  },
+  mainContent: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: Spacing.screen.paddingHorizontal, 
+    paddingBottom: Spacing['5xl'],
+    gap: Spacing.xl,
+  },
+  coachCard: { 
+    flex: 1, 
+    backgroundColor: colors.card, 
+    borderRadius: Spacing.layout.borderRadius.xl, 
+    padding: Spacing.xl, 
+    minHeight: 320, // Increased minimum height for more engaging layout
+    // Enhanced shadows and elevation
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: Spacing.sm },
+    shadowOpacity: 0.1,
+    shadowRadius: Spacing.lg,
+    elevation: Spacing.layout.elevation.sm,
+    // Subtle border for definition
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    // Better internal organization
+    justifyContent: 'space-between',
+  },
+  
+  // New coach header with title and status badge
+  coachHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  cardTitle: { 
+    fontSize: colors.typography.fontSize.lg, 
+    fontWeight: colors.typography.fontWeight.bold, 
+    color: colors.text, 
+    fontFamily: 'Inter',
+    letterSpacing: colors.typography.letterSpacing.wide,
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Spacing.layout.borderRadius.full,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  statusBadgeText: {
+    fontSize: colors.typography.fontSize.sm,
+    fontWeight: colors.typography.fontWeight.bold,
+    color: '#ffffff',
+    fontFamily: 'Inter',
+    textTransform: 'uppercase',
+    letterSpacing: colors.typography.letterSpacing.wide,
+  },
+  
+  // Enhanced coach content with avatar and message sections
+  coachContent: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flex: 1, 
+    paddingVertical: Spacing.lg,
+  },
+  
+  // Coach avatar container with pulse animation
+  coachAvatarContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.xl,
+    position: 'relative',
+  },
+  coachAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Enhanced styling with subtle glow
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: Spacing.md,
+    elevation: 4,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+  },
+  coachPulse: {
+    position: 'absolute',
+    width: 96, // 80 + 16px padding
+    height: 96,
+    borderRadius: 48,
+    opacity: 0.2,
+    // Pulse animation preparation
+    transform: [{ scale: 1 }],
+  },
+  coachEmoji: { 
+    fontSize: 40, 
+    lineHeight: 40,
+  },
+  
+  // Enhanced message and metrics section
+  coachMessageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  coachMessage: { 
+    fontSize: colors.typography.fontSize.lg, 
+    color: colors.text, 
+    fontWeight: colors.typography.fontWeight.medium,
+    marginBottom: Spacing.md, 
+    fontFamily: 'Inter',
+    lineHeight: colors.typography.fontSize.lg * colors.typography.lineHeight.relaxed,
+  },
+  coachMetrics: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metricLabel: {
+    fontSize: colors.typography.fontSize.sm,
+    color: colors.textSecondary,
+    fontFamily: 'Inter',
+    marginRight: Spacing.sm,
+  },
+  metricIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  
+  // Interactive coach footer
+  coachInteraction: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: colors.neutral[50],
+    borderRadius: Spacing.layout.borderRadius.lg,
+    marginTop: Spacing.md,
+    // Subtle hover state preparation
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+  },
+  coachInteractionText: {
+    fontSize: colors.typography.fontSize.base,
+    color: colors.text,
+    fontWeight: colors.typography.fontWeight.medium,
+    fontFamily: 'Inter',
+  },
+  coachInteractionArrow: {
+    fontSize: colors.typography.fontSize.lg,
+    color: colors.primary,
+    fontWeight: colors.typography.fontWeight.bold,
+  },
+  todoCard: { 
+    flex: 1, 
+    backgroundColor: colors.card, 
+    borderRadius: Spacing.layout.borderRadius.xl, 
+    padding: Spacing.xl, 
+    minHeight: 250,
+    // Enhanced shadows and elevation
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: Spacing.sm },
+    shadowOpacity: 0.05,
+    shadowRadius: Spacing.lg,
+    elevation: Spacing.layout.elevation.sm,
+    // Subtle border for definition
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+  },
   todoScrollView: { flex: 1 },
-  todoItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#4a4a60' },
-  todoCheckbox: { width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: '#a9a9c2', marginRight: 10, justifyContent: 'center', alignItems: 'center' },
-  todoCheckedBox: { backgroundColor: '#6c63ff', borderColor: '#6c63ff' },
-  checkmarkText: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
-  todoText: { fontSize: 14, fontWeight: '500', color: '#ffffff', flex: 1, fontFamily: 'Inter' },
-  todoTextCompleted: { textDecorationLine: 'line-through', color: '#a9a9c2' },
+  
+  // Enhanced todo item container with elevation support
+  todoItemContainer: {
+    backgroundColor: 'transparent',
+    borderRadius: Spacing.layout.borderRadius.md,
+    marginVertical: Spacing.xs,
+    // Shadow preparation for elevation animation
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: Spacing.sm,
+    elevation: 1,
+  },
+  
+  todoItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: Spacing.lg, 
+    paddingHorizontal: Spacing.sm,
+    borderBottomWidth: 1, 
+    borderBottomColor: colors.neutral[100],
+    backgroundColor: colors.card,
+    borderRadius: Spacing.layout.borderRadius.md,
+    // Enhanced spacing and alignment
+    minHeight: 60,
+  },
+  
+  // Enhanced checkbox with better proportions and styling
+  todoCheckbox: { 
+    width: 24, 
+    height: 24, 
+    borderRadius: Spacing.layout.borderRadius.sm, 
+    borderWidth: 2.5, 
+    marginRight: Spacing.lg, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    // Enhanced shadow and styling
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  
+  checkmarkText: { 
+    color: '#ffffff', 
+    fontSize: 14, 
+    fontWeight: colors.typography.fontWeight.bold,
+    lineHeight: 14,
+  },
+  
+  // New text container for strikethrough effect
+  todoTextContainer: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  
+  todoText: { 
+    fontSize: colors.typography.fontSize.base, 
+    fontWeight: colors.typography.fontWeight.medium, 
+    color: colors.text, 
+    fontFamily: 'Inter',
+    lineHeight: colors.typography.fontSize.base * colors.typography.lineHeight.relaxed,
+    // Remove default text decoration - we'll use custom animated line
+  },
+  
+  todoTextCompleted: { 
+    color: colors.textSecondary,
+    // Remove textDecorationLine - using custom animated strikethrough
+  },
+  
+  // Custom animated strikethrough line
+  strikethroughLine: {
+    position: 'absolute',
+    height: 2,
+    top: '50%',
+    left: 0,
+    borderRadius: 1,
+    // Enhanced visual styling
+    opacity: 0.8,
+  },
   emptyTodoContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyTodoText: { fontSize: 14, color: '#a9a9c2', fontFamily: 'Inter' },
+  emptyTodoText: { fontSize: 14, color: colors.textSecondary, fontFamily: 'Inter' },
   modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#1c1c2e', borderRadius: 20, padding: 20, elevation: 5, minWidth: 350, maxWidth: '90%', maxHeight: '90%' },
-  closeButton: { marginTop: 16, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20, backgroundColor: '#6c63ff', borderRadius: 20 },
+  modalContent: { backgroundColor: colors.background, borderRadius: 20, padding: 20, elevation: 5, minWidth: 350, maxWidth: '90%', maxHeight: '90%' },
+  closeButton: { marginTop: 16, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20, backgroundColor: colors.primary, borderRadius: 20 },
   closeButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   goalLoadingContainer: {
-    marginBottom: 20,
+    marginBottom: Spacing['3xl'],
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: colors.neutral[50],
+    borderRadius: Spacing.layout.borderRadius.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.neutral[300],
   },
   goalSkeletonLine1: {
-    marginBottom: 8,
+    marginBottom: Spacing.md,
   },
   goalSkeletonLine2: {
     marginBottom: 0,
   },
   floatingVoiceButton: {
     position: 'absolute',
-    bottom: 100,
-    right: 24,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#6c63ff',
+    bottom: Spacing['7xl'] + Spacing['4xl'], // ~100px
+    right: Spacing.screen.paddingHorizontal,
+    width: Spacing.layout.floatingButton,
+    height: Spacing.layout.floatingButton,
+    borderRadius: Spacing.layout.floatingButton / 2,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#6c63ff',
+    // Enhanced floating effect
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: Spacing.md,
     },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 12,
+    shadowOpacity: 0.3,
+    shadowRadius: Spacing.xl,
+    elevation: Spacing.layout.elevation.lg,
+    // Add subtle gradient effect preparation
+    borderWidth: 2,
+    borderColor: colors.primaryLight,
   },
   voiceButtonIcon: {
     fontSize: 28,

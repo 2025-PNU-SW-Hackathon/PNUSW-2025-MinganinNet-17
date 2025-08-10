@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { signIn } from '../backend/supabase/auth';
 import { supabase } from '../backend/supabase/client';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../hooks/useColorScheme';
 import { AnimatedButton } from './AnimatedButton';
 import DebugNextButton from './DebugNextButton';
 
@@ -15,6 +17,9 @@ export default function LoginScreen({
   onLoginSuccess, 
   onSignUpPress 
 }: LoginScreenProps) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -155,7 +160,7 @@ export default function LoginScreen({
           value={email}
           onChangeText={setEmail}
           placeholder="example@email.com"
-          placeholderTextColor="#a9a9c2"
+          placeholderTextColor={colors.textMuted}
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
@@ -168,7 +173,7 @@ export default function LoginScreen({
           value={password}
           onChangeText={setPassword}
           placeholder="비밀번호 입력"
-          placeholderTextColor="#a9a9c2"
+          placeholderTextColor={colors.textMuted}
           secureTextEntry
           autoComplete="password"
           editable={!isLoading}
@@ -205,24 +210,24 @@ export default function LoginScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
+    backgroundColor: colors.background,
     paddingHorizontal: 24,
     paddingTop: 80,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 8,
     fontFamily: 'Inter',
   },
   subtitle: {
     fontSize: 16,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
     fontFamily: 'Inter',
@@ -233,23 +238,23 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.text,
     marginBottom: 8,
     marginTop: 16,
     fontFamily: 'Inter',
   },
   input: {
-    backgroundColor: '#3a3a50',
+    backgroundColor: colors.inputBackground,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#ffffff',
+    color: colors.text,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: colors.inputBorder,
     fontFamily: 'Inter',
   },
   inputError: {
-    borderColor: '#ff4757',
+    borderColor: colors.error,
   },
   loginButton: {
     marginBottom: 16,

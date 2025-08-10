@@ -9,6 +9,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +25,9 @@ export default function SignUpStep0({
   onBack, 
   initialValue = '' 
 }: SignUpStep0Props) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const [email, setEmail] = useState(initialValue);
 
   const handleNext = () => {
@@ -68,7 +73,7 @@ export default function SignUpStep0({
           value={email}
           onChangeText={setEmail}
           placeholder="아이디 (이메일) 입력"
-          placeholderTextColor="#a9a9c2"
+          placeholderTextColor={colors.textMuted}
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
@@ -87,10 +92,10 @@ export default function SignUpStep0({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
+    backgroundColor: colors.background,
     paddingHorizontal: 24,
     paddingTop: 60,
   },
@@ -102,7 +107,7 @@ const styles = StyleSheet.create({
   },
   backArrow: {
     fontSize: 24,
-    color: '#ffffff',
+    color: colors.text,
     fontWeight: 'bold',
   },
   progressBar: {
@@ -115,12 +120,12 @@ const styles = StyleSheet.create({
   progressStep: {
     width: 60,
     height: 4,
-    backgroundColor: '#3a3a50',
+    backgroundColor: colors.border,
     marginHorizontal: 4,
     borderRadius: 2,
   },
   progressStepActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primary,
   },
   titleContainer: {
     marginBottom: 60,
@@ -128,7 +133,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'left',
     lineHeight: 40,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -137,17 +142,17 @@ const styles = StyleSheet.create({
     marginBottom: 200,
   },
   emailInput: {
-    backgroundColor: '#3a3a50',
+    backgroundColor: colors.inputBackground,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#ffffff',
+    color: colors.text,
     height: 52,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   nextButton: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: colors.buttonPrimary,
     borderRadius: 28,
     paddingVertical: 19,
     alignItems: 'center',
@@ -159,7 +164,7 @@ const styles = StyleSheet.create({
     right: 24,
   },
   nextButtonDisabled: {
-    backgroundColor: '#4a47cc',
+    backgroundColor: colors.buttonSecondary,
     opacity: 0.5,
   },
   nextButtonText: {

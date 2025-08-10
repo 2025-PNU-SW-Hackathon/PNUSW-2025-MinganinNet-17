@@ -7,6 +7,9 @@ import {
     Text,
     View
 } from 'react-native';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -15,6 +18,9 @@ interface SplashScreenProps {
 }
 
 export default function SplashScreen({ onLoadingComplete }: SplashScreenProps) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const loadingAnim = useRef(new Animated.Value(0)).current;
@@ -100,47 +106,47 @@ export default function SplashScreen({ onLoadingComplete }: SplashScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 100,
+    marginBottom: Spacing['7xl'], // 100 -> 64px
   },
   logoText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#6c5ce7',
+    fontSize: colors.typography.fontSize['5xl'],
+    fontWeight: colors.typography.fontWeight.bold,
+    color: colors.primary,
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-    letterSpacing: 2,
+    letterSpacing: colors.typography.letterSpacing.widest,
   },
   logoSubtext: {
-    fontSize: 16,
-    color: '#a9a9c2',
+    fontSize: colors.typography.fontSize.base,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: Spacing.md,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   loadingContainer: {
     position: 'absolute',
-    bottom: 100,
+    bottom: Spacing['7xl'],
     alignItems: 'center',
   },
   loadingDots: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: Spacing.xl,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#6c5ce7',
-    marginHorizontal: 4,
+    width: Spacing.md,
+    height: Spacing.md,
+    borderRadius: Spacing.sm,
+    backgroundColor: colors.primary,
+    marginHorizontal: Spacing.sm,
   },
   dot1: {
     opacity: 0.3,
@@ -152,8 +158,8 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
   loadingText: {
-    fontSize: 14,
-    color: '#a9a9c2',
+    fontSize: colors.typography.fontSize.sm,
+    color: colors.textSecondary,
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },

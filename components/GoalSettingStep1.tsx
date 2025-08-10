@@ -11,6 +11,9 @@ import {
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +28,9 @@ export default function GoalSettingStep1({
   onBack, 
   initialValue = '' 
 }: GoalSettingStep1Props) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const [habitText, setHabitText] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setHabitName } = useHabitStore();
@@ -114,7 +120,7 @@ export default function GoalSettingStep1({
           value={habitText}
           onChangeText={setHabitText}
           placeholder="예) 책 10권 읽기"
-          placeholderTextColor="#a9a9c2"
+          placeholderTextColor={colors.textSecondary}
           multiline
           textAlignVertical="top"
           autoFocus
@@ -145,48 +151,52 @@ export default function GoalSettingStep1({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
-    paddingHorizontal: 24,
-    paddingTop: 100,
+    backgroundColor: colors.background,
+    paddingHorizontal: Spacing.screen.paddingHorizontal,
+    paddingTop: Spacing['7xl'] + Spacing['4xl'], // 100px
   },
   stepIndicator: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#a9a9c2',
+    fontSize: colors.typography.fontSize.base,
+    fontWeight: colors.typography.fontWeight.bold,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 40,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    marginBottom: Spacing['5xl'],
+    fontFamily: 'Inter',
   },
   titleContainer: {
-    marginBottom: 60,
+    marginBottom: Spacing['6xl'] + Spacing.md, // ~60px
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontSize: colors.typography.fontSize['3xl'],
+    fontWeight: colors.typography.fontWeight.bold,
+    color: colors.text,
     textAlign: 'center',
-    lineHeight: 40,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    lineHeight: colors.typography.fontSize['3xl'] * colors.typography.lineHeight.snug,
+    fontFamily: 'Inter',
   },
   inputContainer: {
-    marginBottom: 160,
+    marginBottom: Spacing['7xl'] * 2 + Spacing['4xl'], // ~160px
   },
   habitInput: {
-    backgroundColor: '#3a3a50',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    fontSize: 16,
-    color: '#ffffff',
+    backgroundColor: colors.inputBackground,
+    borderRadius: Spacing.layout.borderRadius.lg,
+    borderWidth: 2,
+    borderColor: colors.inputBorder,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.xl,
+    fontSize: colors.typography.fontSize.base,
+    color: colors.text,
     height: 100,
     textAlignVertical: 'top',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontFamily: 'Inter',
+    lineHeight: colors.typography.fontSize.base * colors.typography.lineHeight.normal,
+    // Focus states will be handled via state management
   },
   nextButton: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: colors.primary,
     borderRadius: 28,
     paddingVertical: 19,
     alignItems: 'center',
@@ -198,13 +208,13 @@ const styles = StyleSheet.create({
     right: 24,
   },
   nextButtonDisabled: {
-    backgroundColor: '#4a47cc',
+    backgroundColor: colors.buttonDisabled,
     opacity: 0.5,
   },
   nextButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   backButton: {
@@ -219,7 +229,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

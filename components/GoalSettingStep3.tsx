@@ -9,6 +9,9 @@ import {
     View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 interface GoalSettingStep3Props {
   onNext?: (difficulty: string) => void;
@@ -21,6 +24,9 @@ export default function GoalSettingStep3({
   onBack,
   initialValue = ''
 }: GoalSettingStep3Props) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const [selectedDifficulty, setSelectedDifficulty] = useState(initialValue || '의지 부족');
   const [customDifficulty, setCustomDifficulty] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(initialValue === '기타' || false);
@@ -128,7 +134,7 @@ export default function GoalSettingStep3({
             value={customDifficulty}
             onChangeText={setCustomDifficulty}
             placeholder="어려운 점을 직접 입력해주세요"
-            placeholderTextColor="#a9a9c2"
+            placeholderTextColor={colors.textSecondary}
             multiline
             textAlignVertical="top"
             autoFocus
@@ -150,17 +156,17 @@ export default function GoalSettingStep3({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
-    paddingHorizontal: 24,
-    paddingTop: 100,
+    backgroundColor: colors.background,
+    paddingHorizontal: Spacing.screen.paddingHorizontal,
+    paddingTop: Spacing['7xl'] + Spacing['4xl'], // 100px
   },
   stepIndicator: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -171,7 +177,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     lineHeight: 40,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -183,7 +189,7 @@ const styles = StyleSheet.create({
     marginBottom: 20, // Reduced when custom input is shown
   },
   optionButton: {
-    backgroundColor: '#3a3a50',
+    backgroundColor: colors.card,
     borderRadius: 16,
     paddingVertical: 20,
     paddingHorizontal: 20,
@@ -192,35 +198,38 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   optionButtonSelected: {
-    borderColor: '#6c63ff',
-    backgroundColor: '#3a3a50',
+    borderColor: colors.primary,
+    backgroundColor: colors.card,
   },
   optionButtonText: {
     fontSize: 16,
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   optionButtonTextSelected: {
-    color: '#ffffff',
+    color: colors.text,
     fontWeight: '600',
   },
   customInputContainer: {
     marginBottom: 120, // Increased to provide more space from next button
   },
   customInput: {
-    backgroundColor: '#3a3a50',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    fontSize: 16,
-    color: '#ffffff',
+    backgroundColor: colors.inputBackground,
+    borderRadius: Spacing.layout.borderRadius.lg,
+    borderWidth: 2,
+    borderColor: colors.inputBorder,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.xl,
+    fontSize: colors.typography.fontSize.base,
+    color: colors.text,
     height: 100,
     textAlignVertical: 'top',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontFamily: 'Inter',
+    lineHeight: colors.typography.fontSize.base * colors.typography.lineHeight.normal,
   },
   nextButton: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: colors.primary,
     borderRadius: 28,
     paddingVertical: 19,
     alignItems: 'center',
@@ -232,13 +241,13 @@ const styles = StyleSheet.create({
     right: 24,
   },
   nextButtonDisabled: {
-    backgroundColor: '#4a47cc',
+    backgroundColor: colors.buttonDisabled,
     opacity: 0.5,
   },
   nextButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   backButton: {
@@ -253,7 +262,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

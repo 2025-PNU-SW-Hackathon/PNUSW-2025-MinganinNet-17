@@ -8,6 +8,9 @@ import {
     View,
     ViewStyle,
 } from 'react-native';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 interface AnimatedButtonProps {
   title: string;
@@ -17,7 +20,8 @@ interface AnimatedButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   loadingText?: string;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
@@ -29,7 +33,11 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   textStyle,
   loadingText = '로딩 중...',
   variant = 'primary',
+  size = 'md',
 }) => {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const pulseAnimation = useRef(new Animated.Value(1)).current;
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   const opacityAnimation = useRef(new Animated.Value(1)).current;
@@ -90,13 +98,21 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
 
   const buttonStyle = [
     styles.button,
+    styles[`${size}Button` as keyof typeof styles],
     variant === 'secondary' && styles.secondaryButton,
+    variant === 'outline' && styles.outlineButton,
+    variant === 'ghost' && styles.ghostButton,
+    variant === 'link' && styles.linkButton,
     style,
   ];
 
   const buttonTextStyle = [
     styles.buttonText,
+    styles[`${size}ButtonText` as keyof typeof styles],
     variant === 'secondary' && styles.secondaryButtonText,
+    variant === 'outline' && styles.outlineButtonText,
+    variant === 'ghost' && styles.ghostButtonText,
+    variant === 'link' && styles.linkButtonText,
     textStyle,
   ];
 
@@ -180,42 +196,122 @@ const LoadingDots: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+  // Base button styles
   button: {
-    backgroundColor: '#6c63ff',
-    borderRadius: 28,
-    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#6c63ff',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    borderRadius: Spacing.layout.borderRadius.lg,
+    flexDirection: 'row',
+    // Primary variant styles (default)
+    backgroundColor: colors.buttonPrimary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: Spacing.sm },
+    shadowOpacity: 0.2,
+    shadowRadius: Spacing.md,
+    elevation: Spacing.layout.elevation.sm,
   },
+  
+  // Size variants
+  smButton: {
+    height: Spacing.layout.button.height.sm,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Spacing.layout.borderRadius.md,
+  },
+  mdButton: {
+    height: Spacing.layout.button.height.md,
+    paddingHorizontal: Spacing['3xl'],
+    borderRadius: Spacing.layout.borderRadius.lg,
+  },
+  lgButton: {
+    height: Spacing.layout.button.height.lg,
+    paddingHorizontal: Spacing['4xl'],
+    borderRadius: Spacing.layout.borderRadius.xl,
+  },
+  xlButton: {
+    height: Spacing.layout.button.height.xl,
+    paddingHorizontal: Spacing['5xl'],
+    borderRadius: Spacing.layout.borderRadius.xl,
+  },
+  
+  // Button variants
   secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#6c63ff',
+    backgroundColor: colors.buttonSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowOpacity: 0,
     elevation: 0,
   },
+  outlineButton: {
+    backgroundColor: colors.buttonOutline,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  ghostButton: {
+    backgroundColor: colors.buttonGhost,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  linkButton: {
+    backgroundColor: colors.buttonGhost,
+    shadowOpacity: 0,
+    elevation: 0,
+    borderRadius: 0,
+  },
+  
+  // Button content container
   buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  
+  // Base text styles
   buttonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
     fontFamily: 'Inter',
+    fontWeight: colors.typography.fontWeight.semibold,
+    color: '#ffffff',
+    textAlign: 'center',
   },
+  
+  // Size-specific text styles
+  smButtonText: {
+    fontSize: colors.typography.fontSize.sm,
+    lineHeight: colors.typography.fontSize.sm * colors.typography.lineHeight.tight,
+  },
+  mdButtonText: {
+    fontSize: colors.typography.fontSize.base,
+    lineHeight: colors.typography.fontSize.base * colors.typography.lineHeight.tight,
+  },
+  lgButtonText: {
+    fontSize: colors.typography.fontSize.lg,
+    lineHeight: colors.typography.fontSize.lg * colors.typography.lineHeight.tight,
+  },
+  xlButtonText: {
+    fontSize: colors.typography.fontSize.xl,
+    lineHeight: colors.typography.fontSize.xl * colors.typography.lineHeight.tight,
+  },
+  
+  // Variant-specific text styles
   secondaryButtonText: {
-    color: '#6c63ff',
+    color: colors.text,
   },
+  outlineButtonText: {
+    color: colors.primary,
+  },
+  ghostButtonText: {
+    color: colors.primary,
+  },
+  linkButtonText: {
+    color: colors.primary,
+    textDecorationLine: 'underline',
+  },
+  
+  // Loading dots
   loadingDots: {
-    marginLeft: 12,
+    marginLeft: Spacing.md,
   },
   dotsContainer: {
     flexDirection: 'row',
@@ -223,10 +319,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: Spacing.sm + 2, // 6px
+    height: Spacing.sm + 2, // 6px
+    borderRadius: Spacing.xs + 1, // 3px
     backgroundColor: '#ffffff',
-    marginHorizontal: 2,
+    marginHorizontal: Spacing.xs,
   },
 }); 

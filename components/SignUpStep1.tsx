@@ -9,6 +9,8 @@ import {
     View
 } from 'react-native';
 import { AnimatedButton } from './AnimatedButton';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +29,9 @@ export default function SignUpStep1({
   initialValue = '',
   isLoading = false
 }: SignUpStep1Props) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const [password, setPassword] = useState(initialValue);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isPasswordValid, setIsPasswordValid] = useState(false);
@@ -86,7 +91,7 @@ export default function SignUpStep1({
           value={password}
           onChangeText={handlePasswordChange}
           placeholder="비밀번호 입력"
-          placeholderTextColor="#a9a9c2"
+          placeholderTextColor="colors.textSecondary"
           secureTextEntry
           editable={!isLoading}
         />
@@ -104,7 +109,7 @@ export default function SignUpStep1({
           value={confirmPassword}
           onChangeText={handleConfirmPasswordChange}
           placeholder="비밀번호 확인"
-          placeholderTextColor="#a9a9c2"
+          placeholderTextColor="colors.textSecondary"
           secureTextEntry
           editable={!isLoading}
         />
@@ -128,16 +133,16 @@ export default function SignUpStep1({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
+    backgroundColor: colors.background,
     paddingHorizontal: 24,
     paddingTop: 60,
   },
   stepIndicator: {
     fontSize: 14,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
     fontFamily: 'Inter',
@@ -155,14 +160,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 8,
     fontFamily: 'Inter',
   },
   subtitle: {
     fontSize: 16,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
     fontFamily: 'Inter',
@@ -176,31 +181,31 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.text,
     marginBottom: 8,
     fontFamily: 'Inter',
   },
   input: {
-    backgroundColor: '#3a3a50',
+    backgroundColor: colors.inputBackground,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#ffffff',
+    color: colors.text,
     borderWidth: 2,
     borderColor: 'transparent',
     fontFamily: 'Inter',
   },
   validInput: {
-    borderColor: '#4CAF50',
+    borderColor: colors.success,
   },
   validationText: {
     fontSize: 12,
-    color: '#ff4757',
+    color: colors.error,
     marginTop: 4,
     fontFamily: 'Inter',
   },
   validText: {
-    color: '#4CAF50',
+    color: colors.success,
   },
   nextButton: {
     marginTop: 20,

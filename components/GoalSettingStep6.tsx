@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 interface GoalSettingStep6Props {
   onComplete: () => void;
@@ -12,6 +15,9 @@ export default function GoalSettingStep6({
   onComplete,
   onBack,
 }: GoalSettingStep6Props) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { plan, setPlan } = useHabitStore();
 
@@ -169,10 +175,10 @@ export default function GoalSettingStep6({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
+    backgroundColor: colors.background,
     paddingHorizontal: 24,
     paddingTop: 80,
     paddingBottom: 120, // 버튼을 위한 공간 확보
@@ -180,7 +186,7 @@ const styles = StyleSheet.create({
   stepIndicator: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 10,
   },
@@ -190,7 +196,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     lineHeight: 32,
   },
@@ -215,12 +221,12 @@ const styles = StyleSheet.create({
   milestoneTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     flex: 1,
   },
   milestoneDuration: {
     fontSize: 14,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
   },
   todoContainer: {
     flexDirection: 'row',
@@ -238,10 +244,10 @@ const styles = StyleSheet.create({
   todoTime: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#6c63ff',
+    color: colors.primary,
   },
   submitButton: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: colors.primary,
     borderRadius: 28,
     height: 56,
     justifyContent: 'center',
@@ -258,7 +264,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
   },
   backButton: {
     position: 'absolute',
@@ -269,12 +275,12 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#a9a9c2',
+    color: colors.textSecondary,
   },
   summaryValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     marginTop: 20,
   },

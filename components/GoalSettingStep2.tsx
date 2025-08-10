@@ -11,6 +11,9 @@ import {
     View,
 } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +28,9 @@ export default function GoalSettingStep2({
   onBack,
   initialValue = {}
 }: GoalSettingStep2Props) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   // Duration state
   const [selectedDuration, setSelectedDuration] = useState(initialValue.duration || '3개월');
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -409,24 +415,24 @@ export default function GoalSettingStep2({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
-    paddingHorizontal: 24,
-    paddingTop: 100,
+    backgroundColor: colors.background,
+    paddingHorizontal: Spacing.screen.paddingHorizontal,
+    paddingTop: Spacing['7xl'] + Spacing['4xl'], // 100px
   },
   scrollContainer: {
     flex: 1,
     marginBottom: 20,
   },
   stepIndicator: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#a9a9c2',
+    fontSize: colors.typography.fontSize.base,
+    fontWeight: colors.typography.fontWeight.bold,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 40,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    marginBottom: Spacing['5xl'],
+    fontFamily: 'Inter',
   },
   backButton: {
     position: 'absolute',
@@ -441,7 +447,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 
@@ -454,16 +460,16 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontSize: colors.typography.fontSize['2xl'],
+    fontWeight: colors.typography.fontWeight.bold,
+    color: colors.text,
     textAlign: 'center',
-    marginBottom: 8,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    marginBottom: Spacing.md,
+    fontFamily: 'Inter',
   },
   sectionSubtitle: {
     fontSize: 16,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
@@ -474,29 +480,29 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   durationButton: {
-    backgroundColor: '#3a3a50',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    backgroundColor: colors.card,
+    borderRadius: Spacing.layout.borderRadius.md,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.md,
     width: '48%',
     borderWidth: 2,
     borderColor: 'transparent',
-    minHeight: 60,
+    minHeight: Spacing['6xl'] + Spacing.md, // ~60px
     justifyContent: 'center',
   },
   durationButtonSelected: {
-    borderColor: '#6c63ff',
-    backgroundColor: '#3a3a50',
+    borderColor: colors.primary,
+    backgroundColor: colors.card,
   },
   durationButtonText: {
     fontSize: 14,
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
     lineHeight: 18,
   },
   durationButtonTextSelected: {
-    color: '#ffffff',
+    color: colors.text,
     fontWeight: '600',
   },
 
@@ -516,13 +522,13 @@ const styles = StyleSheet.create({
   },
   timeLabel: {
     fontSize: 16,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     marginBottom: 8,
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   timeDisplayButton: {
-    backgroundColor: '#3a3a50',
+    backgroundColor: colors.card,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 12,
@@ -532,12 +538,12 @@ const styles = StyleSheet.create({
   },
   timeDisplayText: {
     fontSize: 16,
-    color: '#ffffff',
+    color: colors.text,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   timeWindowSummary: {
-    backgroundColor: '#4a4a60',
+    backgroundColor: colors.cardSecondary,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -546,7 +552,7 @@ const styles = StyleSheet.create({
   },
   timeWindowSummaryText: {
     fontSize: 14,
-    color: '#6c63ff',
+    color: colors.primary,
     fontWeight: '500',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
@@ -555,10 +561,10 @@ const styles = StyleSheet.create({
   bottomButtonContainer: {
     paddingBottom: 40,
     paddingTop: 20,
-    backgroundColor: '#1c1c2e',
+    backgroundColor: colors.background,
   },
   nextButton: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: colors.primary,
     borderRadius: 28,
     paddingVertical: 19,
     alignItems: 'center',
@@ -568,7 +574,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 
@@ -591,7 +597,7 @@ const styles = StyleSheet.create({
   },
   monthPickerItemText: {
     fontSize: 18,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 
@@ -603,7 +609,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timePickerModal: {
-    backgroundColor: '#3a3a50',
+    backgroundColor: colors.card,
     borderRadius: 24,
     width: width - 60,
     maxWidth: 400,
@@ -613,7 +619,7 @@ const styles = StyleSheet.create({
   timePickerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 20,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -639,21 +645,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pickerItemSelected: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: colors.primary,
     borderRadius: 8,
   },
   pickerItemText: {
     fontSize: 24,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   pickerItemTextSelected: {
-    color: '#ffffff',
+    color: colors.text,
     fontWeight: 'bold',
   },
   timeSeparator: {
     fontSize: 24,
-    color: '#ffffff',
+    color: colors.text,
     fontWeight: 'bold',
     marginHorizontal: 20,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -664,7 +670,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cancelButton: {
-    backgroundColor: '#5a5a70',
+    backgroundColor: colors.modalBackground,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -672,12 +678,12 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 16,
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   confirmButton: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -685,7 +691,7 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     fontSize: 16,
-    color: '#ffffff',
+    color: colors.text,
     fontWeight: 'bold',
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',

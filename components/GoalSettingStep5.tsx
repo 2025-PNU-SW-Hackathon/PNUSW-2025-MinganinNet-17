@@ -5,6 +5,9 @@ import { createNewHabitAndPlan } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
 import { PlanForCreation } from '../types/habit'; // Import the new type
 import DebugNextButton from './DebugNextButton';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 // Temporary PersonaType definition to fix the type error locally
 type PersonaType = 'Easy' | 'Medium' | 'Hard' | 'System';
@@ -18,6 +21,9 @@ export default function GoalSettingStep5({
   onComplete,
   onBack,
 }: GoalSettingStep5Props) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Use all the necessary states from the store
   const {
@@ -152,17 +158,17 @@ export default function GoalSettingStep5({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
+    backgroundColor: colors.background,
     paddingHorizontal: 24,
     paddingTop: 100,
   },
   stepIndicator: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -173,7 +179,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     textAlign: 'center',
     lineHeight: 40,
     marginBottom: 16,
@@ -181,13 +187,13 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   submitButton: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: colors.primary,
     borderRadius: 28,
     paddingVertical: 19,
     alignItems: 'center',
@@ -199,13 +205,13 @@ const styles = StyleSheet.create({
     right: 24,
   },
   submitButtonDisabled: {
-    backgroundColor: '#4a47cc',
+    backgroundColor: colors.buttonDisabled,
     opacity: 0.5,
   },
   submitButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   backButton: {
@@ -220,7 +226,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#a9a9c2',
+    color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 
