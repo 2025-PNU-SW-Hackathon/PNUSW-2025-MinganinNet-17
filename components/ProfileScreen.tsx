@@ -1,13 +1,76 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { sendNotification } from '../backend/hwirang/notifications';
-import { signOut } from '../backend/supabase/auth';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { disableAllNotifications, enableAllNotifications, isNotificationsEnabled, sendNotification } from '../backend/hwirang/notifications';
+import { getCurrentUser, signOut } from '../backend/supabase/auth';
+import { getActivePlan } from '../backend/supabase/habits';
+import { getCompletedGoalsCount, getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 
-export default function ProfileScreen() {
+interface ProfileScreenProps {
+  onBackToHome?: () => void;
+}
+
+export default function ProfileScreen({ onBackToHome }: ProfileScreenProps) {
   const colorScheme = useColorScheme();
+  const [streak, setStreak] = useState<number | null>(null);
+  const [weeklyRate, setWeeklyRate] = useState<number | null>(null);
+  const [completedGoals, setCompletedGoals] = useState<number | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [activePlanTitle, setActivePlanTitle] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // 현재 사용자 이메일 로드
+        try {
+          const res = await getCurrentUser();
+          if (mounted && (res as any)?.user) {
+            setUserEmail((res as any).user.email ?? null);
+          }
+        } catch {}
+
+        const [streakValue, weeklyRateValue, completedGoalsValue, activePlan] = await Promise.all([
+          getConsecutiveCompletionStreak(),
+          getThisWeekTodosCompletionRate(),
+          getCompletedGoalsCount(),
+          getActivePlan(),
+        ]);
+        if (mounted) {
+          setStreak(streakValue);
+          setWeeklyRate(weeklyRateValue);
+          setCompletedGoals(completedGoalsValue);
+          setActivePlanTitle(activePlan?.plan_title ?? null);
+        }
+      } catch (e) {
+        if (mounted) {
+          setStreak((prev) => (prev ?? 0));
+          setWeeklyRate((prev) => (prev ?? 0));
+          setCompletedGoals((prev) => (prev ?? 0));
+          setActivePlanTitle((prev) => (prev ?? null));
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // 알림 설정 초기 로드
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const enabled = await isNotificationsEnabled();
+        if (mounted) setNotificationsEnabled(enabled);
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   // 알림 테스트 함수
   const handleNotificationTest = async () => {
@@ -26,6 +89,13 @@ export default function ProfileScreen() {
   // 백그라운드 테스트용 예약 알림 함수
   const handleScheduledNotificationTest = async () => {
     try {
+      // 비활성화 시 차단
+      const enabled = await isNotificationsEnabled();
+      if (!enabled) {
+        Alert.alert('알림 비활성화', '알림이 비활성화되어 있어 예약할 수 없습니다.');
+        return;
+      }
+
       // AsyncStorage에 알림 상태 저장 (완전 종료 상태 대비)
       await AsyncStorage.setItem('pending_notification', JSON.stringify({
         route: 'report',
@@ -55,6 +125,31 @@ export default function ProfileScreen() {
       );
     } catch (error) {
       Alert.alert('오류', '예약 알림 테스트 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 알림 토글 핸들러
+  const handleNotificationToggle = async () => {
+    try {
+      if (notificationsEnabled) {
+        const result = await disableAllNotifications();
+        if (!result.success) {
+          Alert.alert('오류', result.message ?? '알림 비활성화 중 문제가 발생했습니다.');
+          return;
+        }
+        setNotificationsEnabled(false);
+        Alert.alert('알림 비활성화', result.message);
+      } else {
+        const result = await enableAllNotifications();
+        if (!result.success) {
+          Alert.alert('오류', result.message ?? '알림 활성화 중 문제가 발생했습니다.');
+          return;
+        }
+        setNotificationsEnabled(true);
+        Alert.alert('알림 활성화', result.message);
+      }
+    } catch (error) {
+      Alert.alert('오류', '알림 설정 변경 중 문제가 발생했습니다.');
     }
   };
 
@@ -105,6 +200,19 @@ export default function ProfileScreen() {
   // Profile Header Component
   const ProfileHeader = () => (
     <View style={styles.profileHeader}>
+      {/* Back to Home Button */}
+      {onBackToHome && (
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={onBackToHome}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
+            ← 홈으로
+          </Text>
+        </TouchableOpacity>
+      )}
+      
       {/* Profile Info */}
       <TouchableOpacity style={styles.profileInfo} activeOpacity={0.7}>
         <View style={[styles.avatar, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}>
@@ -115,7 +223,7 @@ export default function ProfileScreen() {
             사용자 이름
           </Text>
           <Text style={[styles.profileEmail, { color: Colors[colorScheme ?? 'light'].icon }]}>
-            user@example.com
+            {userEmail ?? '이메일 불러오는 중...'}
           </Text>
         </View>
         <Text style={[styles.chevron, { color: Colors[colorScheme ?? 'light'].icon }]}>
@@ -141,7 +249,7 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  // Quick Access Card Component
+  // Quick Access Card Component 현재 활성 목표 포함
   const QuickAccessCard = () => (
     <TouchableOpacity 
       style={[styles.quickAccessCard, { backgroundColor: Colors[colorScheme ?? 'light'].card }]}
@@ -149,9 +257,7 @@ export default function ProfileScreen() {
     >
       <View style={styles.quickAccessContent}>
         <Text style={styles.quickAccessIcon}>🎯</Text>
-        <Text style={[styles.quickAccessTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-          현재 활성 목표
-        </Text>
+        <Text style={[styles.quickAccessTitle, { color: Colors[colorScheme ?? 'light'].text }]}> {`현재 활성 목표${activePlanTitle ? `: ${activePlanTitle}` : ''}`}</Text>
         <View style={styles.statusBadge}>
           <Text style={styles.statusText}>진행중</Text>
         </View>
@@ -179,17 +285,36 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
+  // 알림 설정 전용 Row (우측 토글 포함)
+  const NotificationSettingsRow = () => (
+    <View
+      style={[
+        styles.menuItem,
+        { borderBottomColor: Colors[colorScheme ?? 'light'].icon, borderBottomWidth: 0.3 }
+      ]}
+    >
+      <Text style={styles.menuIcon}>🔔</Text>
+      <Text style={[styles.menuTitle, { color: Colors[colorScheme ?? 'light'].text }]}>알림</Text>
+      <Switch
+        value={notificationsEnabled}
+        onValueChange={handleNotificationToggle}
+        trackColor={{ false: '#C6C6C8', true: Colors[colorScheme ?? 'light'].tint }}
+        thumbColor={Platform.OS === 'android' ? '#ffffff' : undefined}
+      />
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <ProfileHeader />
 
-        {/* Stats Dashboard */}
+        {/* Stats Dashboard */} 
         <View style={styles.statsContainer}>
-          <StatsCard icon="🔥" value="7" label="일 연속" />
-          <StatsCard icon="🎯" value="12" label="완료된 목표" />
-          <StatsCard icon="📊" value="85%" label="이번 주" />
+          <StatsCard icon="🔥" value={streak === null ? '—' : String(streak)} label="일 연속" />
+          <StatsCard icon="🎯" value={completedGoals === null ? '—' : String(completedGoals)} label="완료된 목표" />
+          <StatsCard icon="📊" value={weeklyRate === null ? '—' : `${weeklyRate}%`} label="이번 주" />
         </View>
 
         {/* Quick Access Card */}
@@ -200,7 +325,7 @@ export default function ProfileScreen() {
         {/* Settings Menu */}
         <View style={styles.menuContainer}>
           <MenuItem icon="👤" title="로그 아웃" onPress={handleLogout} />
-          <MenuItem icon="🔔" title="알림" />
+          <NotificationSettingsRow />
           <MenuItem icon="🧪" title="알림 테스트" onPress={handleNotificationTest} />
           <MenuItem icon="⏰" title="백그라운드 테스트" onPress={handleScheduledNotificationTest} />
           <MenuItem icon="🤖" title="AI 코치" />
@@ -226,6 +351,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 80,
     paddingBottom: 24,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   profileInfo: {
     flexDirection: 'row',
