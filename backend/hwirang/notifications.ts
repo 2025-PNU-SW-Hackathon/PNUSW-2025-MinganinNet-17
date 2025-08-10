@@ -56,7 +56,7 @@ export const restoreSavedNotifications = async () => {
     }
     const saved: any[] = JSON.parse(raw);
     let restored = 0;
-    const now = Date.now();
+    const now = Date.now(); // 현재 시간을 1970년 1월 1일 00:00:00 UTC 이후 밀리초 단위로 변환
 
     for (const item of saved) {
       const content = item?.content;
@@ -66,13 +66,13 @@ export const restoreSavedNotifications = async () => {
 
       // date 트리거만 안전하게 복구
       if (trigger?.type === 'date') {
-        let triggerDate: any = trigger?.date;
-        if (typeof triggerDate === 'string' || typeof triggerDate === 'number') {
-          triggerDate = new Date(triggerDate).getTime();
+        let triggerDate: any = trigger?.date; 
+        if (typeof triggerDate === 'string' || typeof triggerDate === 'number') { // 문자열 또는 숫자 형식인 경우 날짜 객체로 변환
+          triggerDate = new Date(triggerDate).getTime(); // 이후 1970년 1월 1일 00:00:00 UTC 이후 밀리초 단위로 변환
         } else if (triggerDate instanceof Date) {
           triggerDate = triggerDate.getTime();
         }
-        if (typeof triggerDate === 'number' && triggerDate > now) {
+        if (typeof triggerDate === 'number' && triggerDate > now) { // 현재 시간보다 미래인 경우 알림 예약
           await Notifications.scheduleNotificationAsync({
             // Expo SDK는 identifier를 명시적으로 받지 않을 수 있음. 기존 코드와 호환 위해 존재 시 전달
             identifier: item?.identifier,
@@ -99,7 +99,7 @@ export const disableAllNotifications = async () => {
       return { success: false, message: saveResult.message ?? '알림 저장 실패' };
     }
     await Notifications.cancelAllScheduledNotificationsAsync();
-    await AsyncStorage.setItem('notifications_enabled', 'false');
+    await AsyncStorage.setItem('notifications_enabled', 'false'); // pair 처럼 알림 활성화 여부 저장
     return { success: true, message: '모든 알림이 비활성화되었습니다.' };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : String(error) };
