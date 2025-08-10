@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
     StyleSheet,
@@ -8,6 +8,7 @@ import {
     View,
     ViewStyle,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
@@ -41,6 +42,9 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   const pulseAnimation = useRef(new Animated.Value(1)).current;
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   const opacityAnimation = useRef(new Animated.Value(1)).current;
+  const shadowAnimation = useRef(new Animated.Value(0)).current;
+  const backgroundAnimation = useRef(new Animated.Value(0)).current;
+  const [isPressed, setIsPressed] = useState(false);
 
   // Pulse animation for loading state
   useEffect(() => {
@@ -76,23 +80,65 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
     }).start();
   }, [disabled]);
 
-  const handlePress = () => {
+  const handlePressIn = () => {
     if (disabled || isLoading) return;
-
-    // Press animation
-    Animated.sequence([
+    
+    setIsPressed(true);
+    
+    // Enhanced press feedback with haptics
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Press animations
+    Animated.parallel([
       Animated.timing(scaleAnimation, {
-        toValue: 0.95,
-        duration: 100,
+        toValue: 0.96,
+        duration: 150,
         useNativeDriver: true,
       }),
-      Animated.timing(scaleAnimation, {
+      Animated.timing(shadowAnimation, {
         toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
+        duration: 150,
+        useNativeDriver: false,
+      }),
+      Animated.timing(backgroundAnimation, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: false,
       }),
     ]).start();
+  };
 
+  const handlePressOut = () => {
+    if (disabled || isLoading) return;
+    
+    setIsPressed(false);
+    
+    // Release animations
+    Animated.parallel([
+      Animated.spring(scaleAnimation, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+      Animated.timing(shadowAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+      Animated.timing(backgroundAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  const handlePress = () => {
+    if (disabled || isLoading) return;
+    
+    // Success haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onPress();
   };
 
@@ -118,12 +164,33 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
 
   const displayText = isLoading ? loadingText : title;
 
+  // Dynamic style interpolations
+  const animatedShadowOpacity = shadowAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.2, 0.35]
+  });
+
+  const animatedShadowRadius = shadowAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [Spacing.md, Spacing.lg + 2]
+  });
+
+  const animatedBackgroundColor = backgroundAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      variant === 'primary' ? colors.buttonPrimary : colors.buttonSecondary,
+      variant === 'primary' ? colors.primary + 'E6' : colors.buttonSecondary + 'E6' // Slightly darker
+    ]
+  });
+
   return (
     <TouchableOpacity
       style={buttonStyle}
       onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={disabled || isLoading}
-      activeOpacity={0.8}
+      activeOpacity={1} // We handle opacity via animations
     >
       <Animated.View
         style={[
@@ -134,6 +201,18 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
               { scale: isLoading ? pulseAnimation : 1 },
             ],
             opacity: opacityAnimation,
+            backgroundColor: animatedBackgroundColor,
+            shadowOpacity: animatedShadowOpacity,
+            shadowRadius: animatedShadowRadius,
+            shadowColor: variant === 'primary' ? colors.primary : colors.text,
+            shadowOffset: { width: 0, height: shadowAnimation.interpolate({
+              inputRange: [0, 1],
+              outputRange: [Spacing.sm, Spacing.md]
+            })},
+            elevation: shadowAnimation.interpolate({
+              inputRange: [0, 1],
+              outputRange: [Spacing.layout.elevation.sm, Spacing.layout.elevation.md]
+            }),
           },
         ]}
       >
@@ -203,13 +282,10 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: 'center',
     borderRadius: Spacing.layout.borderRadius.lg,
     flexDirection: 'row',
-    // Primary variant styles (default)
-    backgroundColor: colors.buttonPrimary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: Spacing.sm },
-    shadowOpacity: 0.2,
-    shadowRadius: Spacing.md,
-    elevation: Spacing.layout.elevation.sm,
+    // Background color handled by animation
+    backgroundColor: 'transparent',
+    // Shadow handled by animation
+    overflow: 'visible',
   },
   
   // Size variants
@@ -266,6 +342,10 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    flex: 1,
+    borderRadius: Spacing.layout.borderRadius.lg, // Match button border radius
+    // Remove individual button background colors - handled by animation
+    backgroundColor: 'transparent',
   },
   
   // Base text styles

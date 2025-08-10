@@ -1,5 +1,6 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
@@ -25,7 +26,15 @@ export default function GoalSetupCompleteScreen({ onGoHome }: GoalSetupCompleteS
           </View>
         </View>
         
-        <TouchableOpacity style={styles.homeButton} onPress={onGoHome}>
+        <TouchableOpacity 
+          style={styles.homeButton} 
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onGoHome();
+          }}
+          activeOpacity={0.8}
+          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+        >
           <Text style={styles.homeButtonText}>홈으로 가서 시작하기</Text>
         </TouchableOpacity>
       </View>

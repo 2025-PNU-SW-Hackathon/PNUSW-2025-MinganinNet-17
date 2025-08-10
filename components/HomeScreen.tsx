@@ -268,6 +268,11 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const goalFadeAnimation = useRef(new Animated.Value(0)).current;
   const todoFadeAnimation = useRef(new Animated.Value(0)).current;
   const coachFadeAnimation = useRef(new Animated.Value(0)).current;
+  
+  // Progress and celebration animations
+  const progressBarAnimation = useRef(new Animated.Value(0)).current;
+  const celebrationScale = useRef(new Animated.Value(1)).current;
+  const completionGlow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -397,6 +402,25 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const coachStatus = getCoachStatus();
   const calendarDates = getCalendarDates();
   const todosForSelectedDate = getTodosForSelectedDate();
+  
+  // Calculate progress statistics
+  const getProgressStats = () => {
+    const todos = todosForSelectedDate;
+    if (todos.length === 0) return { completed: 0, total: 0, percentage: 0, isComplete: false };
+    
+    const completedCount = todos.filter(todo => todoCompletion[todo.id.toString()]).length;
+    const percentage = Math.round((completedCount / todos.length) * 100);
+    const isComplete = percentage === 100;
+    
+    return {
+      completed: completedCount,
+      total: todos.length,
+      percentage,
+      isComplete
+    };
+  };
+  
+  const progressStats = getProgressStats();
 
   // Animate coach when status changes
   useEffect(() => {
@@ -443,6 +467,56 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       ]).start();
     }
   }, [loading]);
+
+  // Animate progress bar based on completion percentage
+  useEffect(() => {
+    Animated.timing(progressBarAnimation, {
+      toValue: progressStats.percentage,
+      duration: 800,
+      useNativeDriver: false,
+    }).start();
+  }, [progressStats.percentage]);
+
+  // Trigger celebration animation when 100% complete
+  useEffect(() => {
+    if (progressStats.isComplete && progressStats.total > 0) {
+      // Celebration sequence
+      Animated.sequence([
+        Animated.spring(celebrationScale, {
+          toValue: 1.05,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 6,
+        }),
+        Animated.spring(celebrationScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 8,
+        }),
+      ]).start();
+
+      // Glow effect for completion
+      Animated.sequence([
+        Animated.timing(completionGlow, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(completionGlow, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Enhanced haptic feedback for completion
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      // Reset completion glow when not complete
+      completionGlow.setValue(0);
+    }
+  }, [progressStats.isComplete, progressStats.total]);
 
   // Show ProfileScreen if settings is selected
   if (currentScreen === 'settings') {
@@ -571,8 +645,12 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
               {/* Interactive coach footer */}
               <TouchableOpacity 
                 style={styles.coachInteraction}
-                onPress={() => console.log('Coach interaction tapped')}
-                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  console.log('Coach interaction tapped');
+                }}
+                activeOpacity={0.8}
+                onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
               >
                 <Text style={styles.coachInteractionText}>💬 Ask Coach</Text>
                 <Text style={styles.coachInteractionArrow}>→</Text>
@@ -581,8 +659,64 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
           )}
 
           {/* Enhanced Todo Card Loading */}
-          <View style={styles.todoCard}>
-            <Text style={styles.cardTitle}>Today's To-Do</Text>
+          <Animated.View 
+            style={[
+              styles.todoCard,
+              { transform: [{ scale: celebrationScale }] },
+              progressStats.isComplete && {
+                borderColor: colors.success,
+                borderWidth: 2,
+              }
+            ]}
+          >
+            <View style={styles.todoCardHeader}>
+              <Text style={[styles.cardTitle, progressStats.isComplete && styles.cardTitleComplete]}>
+                Today's To-Do
+              </Text>
+              
+              {progressStats.total > 0 && (
+                <View style={styles.progressContainer}>
+                  <Text style={styles.progressText}>
+                    {progressStats.completed}/{progressStats.total}
+                  </Text>
+                  <View style={styles.progressBarContainer}>
+                    <Animated.View 
+                      style={[
+                        styles.progressBar,
+                        {
+                          width: progressBarAnimation.interpolate({
+                            inputRange: [0, 100],
+                            outputRange: ['0%', '100%'],
+                            extrapolate: 'clamp'
+                          }),
+                          backgroundColor: progressStats.isComplete ? colors.success : colors.primary,
+                        }
+                      ]}
+                    />
+                    
+                    {/* Completion glow effect */}
+                    {progressStats.isComplete && (
+                      <Animated.View 
+                        style={[
+                          styles.progressGlow,
+                          {
+                            opacity: completionGlow,
+                            backgroundColor: colors.success,
+                          }
+                        ]}
+                      />
+                    )}
+                  </View>
+                  
+                  {progressStats.isComplete && (
+                    <View style={styles.completionBadge}>
+                      <Text style={styles.completionText}>🎉 Perfect!</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+            
             <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
               {loading ? (
                 <SkeletonTodoList count={3} />
@@ -609,15 +743,19 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
                 </Animated.View>
               )}
             </ScrollView>
-          </View>
+          </Animated.View>
         </View>
       </ScrollView>
 
       {/* Floating Voice Chat Button */}
       <TouchableOpacity
         style={styles.floatingVoiceButton}
-        onPress={handleVoiceChatOpen}
-        activeOpacity={0.8}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          handleVoiceChatOpen();
+        }}
+        activeOpacity={0.85}
+        onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
       >
         <Text style={styles.voiceButtonIcon}>🎤</Text>
       </TouchableOpacity>
@@ -640,7 +778,12 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
             <CalendarScreen />
             <TouchableOpacity 
               style={styles.closeButton} 
-              onPress={() => setCalendarVisible(false)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setCalendarVisible(false);
+              }}
+              activeOpacity={0.8}
+              onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
             >
               <Text style={styles.closeButtonText}>닫기</Text>
             </TouchableOpacity>
@@ -1019,9 +1162,17 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: colors.neutral[50],
     borderRadius: Spacing.layout.borderRadius.lg,
     marginTop: Spacing.md,
-    // Subtle hover state preparation
+    // Enhanced interaction feedback
     borderWidth: 1,
     borderColor: colors.neutral[100],
+    // Better shadow for press feedback
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    // Touch target size
+    minHeight: 44,
   },
   coachInteractionText: {
     fontSize: colors.typography.fontSize.base,
@@ -1039,7 +1190,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: colors.card, 
     borderRadius: Spacing.layout.borderRadius.xl, 
     padding: Spacing.xl, 
-    minHeight: 250,
+    minHeight: 280, // Increased for progress elements
     // Enhanced shadows and elevation
     shadowColor: colors.text,
     shadowOffset: { width: 0, height: Spacing.sm },
@@ -1049,6 +1200,78 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     // Subtle border for definition
     borderWidth: 1,
     borderColor: colors.neutral[200],
+    // Animation support
+    overflow: 'visible',
+  },
+  
+  // Todo card header with progress
+  todoCardHeader: {
+    marginBottom: Spacing.lg,
+  },
+  
+  cardTitleComplete: {
+    color: colors.success,
+  },
+  
+  // Progress container and elements
+  progressContainer: {
+    marginTop: Spacing.md,
+    alignItems: 'flex-end',
+  },
+  
+  progressText: {
+    fontSize: colors.typography.fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: colors.typography.fontWeight.medium,
+    fontFamily: 'Inter',
+    marginBottom: Spacing.xs,
+  },
+  
+  progressBarContainer: {
+    width: '100%',
+    height: 6,
+    backgroundColor: colors.neutral[200],
+    borderRadius: 3,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: Spacing.xs,
+  },
+  
+  progressBar: {
+    height: '100%',
+    borderRadius: 3,
+    // Smooth transitions
+    transition: 'width 0.8s ease-in-out',
+  },
+  
+  // Glow effect for completion
+  progressGlow: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 5,
+    // Subtle glow effect
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+  
+  // Completion badge
+  completionBadge: {
+    backgroundColor: colors.success,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Spacing.layout.borderRadius.full,
+    alignSelf: 'flex-end',
+  },
+  
+  completionText: {
+    color: '#ffffff',
+    fontSize: colors.typography.fontSize.sm,
+    fontWeight: colors.typography.fontWeight.bold,
+    fontFamily: 'Inter',
   },
   todoScrollView: { flex: 1 },
   
@@ -1163,18 +1386,23 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    // Enhanced floating effect
+    // Enhanced floating effect with better shadows
     shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
-      height: Spacing.md,
+      height: Spacing.md + 2, // Slightly higher shadow
     },
-    shadowOpacity: 0.3,
-    shadowRadius: Spacing.xl,
-    elevation: Spacing.layout.elevation.lg,
-    // Add subtle gradient effect preparation
-    borderWidth: 2,
+    shadowOpacity: 0.35,
+    shadowRadius: Spacing.xl + 4,
+    elevation: Spacing.layout.elevation.lg + 2,
+    // Better border for press feedback
+    borderWidth: 3,
     borderColor: colors.primaryLight,
+    // Ensure touch target is large enough
+    minWidth: 56,
+    minHeight: 56,
+    // Prepare for press animations
+    overflow: 'visible',
   },
   voiceButtonIcon: {
     fontSize: 28,
