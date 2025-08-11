@@ -54,7 +54,7 @@ export default function RoutineResultScreen({
         <View style={styles.contentContainer}>
           <Text style={styles.title}>🎉 루틴이 생성되었습니다!</Text>
           <Text style={styles.subtitle}>
-            AI 코치 'Routy'가 당신만의 맞춤형 루틴을 만들었어요
+            AI 코치 &apos;Routy&apos;가 당신만의 맞춤형 루틴을 만들었어요
           </Text>
 
           <View style={styles.routineContainer}>
