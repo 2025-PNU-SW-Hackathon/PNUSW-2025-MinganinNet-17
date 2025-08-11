@@ -128,7 +128,7 @@ export default function DailyReportResultScreen({
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Today's Daily Report</Text>
+        <Text style={styles.headerTitle}>Today&apos;s Daily Report</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -140,7 +140,7 @@ export default function DailyReportResultScreen({
             {/* Left Half - Coach's Status */}
             <View style={styles.leftHalf}>
               <View style={styles.coachCard}>
-                <Text style={styles.cardTitle}>Coach's Status</Text>
+                <Text style={styles.cardTitle}>Coach&apos;s Status</Text>
                 <View style={styles.coachContent}>
                   <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
                   <Text style={styles.coachMessage}>{coachStatus.message}</Text>

@@ -30,12 +30,10 @@ export default function ScreenTransitionWrapper({
   const opacity = useSharedValue(1);
   const prevScreenKey = useRef<string>(screenKey);
 
-  // If animations are disabled, render children directly
-  if (!AnimationConfig.ENABLE_SCREEN_TRANSITIONS) {
-    return <View style={styles.container}>{children}</View>;
-  }
-
   useEffect(() => {
+    if (!AnimationConfig.ENABLE_SCREEN_TRANSITIONS) {
+      return;
+    }
     // Detect screen change
     const screenChanged = prevScreenKey.current !== screenKey;
     
@@ -87,7 +85,7 @@ export default function ScreenTransitionWrapper({
     }
     
     prevScreenKey.current = screenKey;
-  }, [screenKey, direction, isActive]);
+  }, [screenKey, direction, isActive, onAnimationComplete, translateX, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -95,6 +93,10 @@ export default function ScreenTransitionWrapper({
       opacity: opacity.value,
     };
   });
+
+  if (!AnimationConfig.ENABLE_SCREEN_TRANSITIONS) {
+    return <View style={styles.container}>{children}</View>;
+  }
 
   return (
     <View style={styles.container}>

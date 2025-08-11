@@ -5,7 +5,7 @@ import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import { DailyTodo } from '../types/habit'; // Import the correct type
 import DailyReportResultScreen from './DailyReportResultScreen';
-import VoiceDailyReport from './VoiceDailyReport';
+import VoiceChatScreen from './VoiceChatScreen';
 
 // Removed local TodoItem interface
 
@@ -118,25 +118,26 @@ const CreateDailyReportStep2View = ({
 
 export default function CreateDailyReportStep2Screen({ onBack, achievementScore, todos }: CreateDailyReportStep2ScreenProps) {
   const colorScheme = useColorScheme() ?? 'light';
-  const [currentScreen, setCurrentScreen] = useState<'mode-selection' | 'step2' | 'voice' | 'result'>('mode-selection');
+  const [currentScreen, setCurrentScreen] = useState<'mode-selection' | 'step2' | 'result'>('mode-selection');
   const [userSummary, setUserSummary] = useState<string>('');
   const [aiFeedback, setAiFeedback] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [voiceChatVisible, setVoiceChatVisible] = useState(false);
 
 
   // Handle navigation to result screen
-  const handleSubmit = async () => {
+  const handleSubmit = async (summary: string) => {
     setIsLoading(true);
     setError(null);
     try {
       const feedbackTodos = todos.map(t => ({
         id: t.id.toString(),
         description: t.description,
-        completed: t.is_completed, // Use is_completed from the incoming data
+        completed: t.is_completed,
       }));
       
-      const feedbackResult = await generateDailyFeedback(userSummary, achievementScore, feedbackTodos);
+      const feedbackResult = await generateDailyFeedback(summary, achievementScore, feedbackTodos);
 
       setAiFeedback(feedbackResult);
       setCurrentScreen('result');
@@ -148,18 +149,13 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
     }
   };
 
-  // Handle back from result screen
-  const handleBackFromResult = () => {
-    setCurrentScreen('step2');
-    setAiFeedback(''); // Reset feedback when returning
-  };
-
-  // Handle voice report completion
-  const handleVoiceReportComplete = (reportData: { reflection: string; feedback: string }) => {
-    console.log('Voice report completed:', reportData);
-    setUserSummary(reportData.reflection);
-    setAiFeedback(reportData.feedback);
-    setCurrentScreen('result');
+  const handleVoiceComplete = (data: any) => {
+    setVoiceChatVisible(false);
+    if (data && data.transcript) {
+      setUserSummary(data.transcript);
+      // Automatically trigger submission after voice input
+      handleSubmit(data.transcript);
+    }
   };
 
   // Mode selection screen
@@ -196,7 +192,7 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
 
             <TouchableOpacity
               style={styles.modeOption}
-              onPress={() => setCurrentScreen('voice')}
+              onPress={() => setVoiceChatVisible(true)}
             >
               <Text style={styles.modeIcon}>🎤</Text>
               <Text style={[styles.modeOptionTitle, { color: Colors[colorScheme].text }]}>음성 대화</Text>
@@ -206,7 +202,6 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
             </TouchableOpacity>
           </View>
 
-          {/* Achievement Summary */}
           <View style={styles.achievementSummary}>
             <Text style={[styles.summaryTitle, { color: Colors[colorScheme].text }]}>오늘의 성과</Text>
             <Text style={[styles.summaryText, { color: Colors[colorScheme].icon }]}>
@@ -214,21 +209,20 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
             </Text>
           </View>
         </View>
+
+        {voiceChatVisible && (
+          <VoiceChatScreen
+            visible={voiceChatVisible}
+            mode="report"
+            onClose={() => setVoiceChatVisible(false)}
+            onComplete={handleVoiceComplete}
+          />
+        )}
       </SafeAreaView>
     );
   }
 
-  // Voice mode
-  if (currentScreen === 'voice') {
-    return (
-      <VoiceDailyReport
-        onComplete={handleVoiceReportComplete}
-        onBack={() => setCurrentScreen('mode-selection')}
-        achievementScore={achievementScore}
-        todos={todos.map(t => ({ description: t.description, completed: t.is_completed }))}
-      />
-    );
-  }
+
 
   // Show result screen
   if (currentScreen === 'result') {
@@ -246,7 +240,7 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
       onBack={() => setCurrentScreen('mode-selection')}
       userSummary={userSummary}
       setUserSummary={setUserSummary}
-      handleSubmit={handleSubmit}
+      handleSubmit={() => handleSubmit(userSummary)}
       isLoading={isLoading}
       error={error}
       colorScheme={colorScheme}
@@ -400,4 +394,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+
 }); 

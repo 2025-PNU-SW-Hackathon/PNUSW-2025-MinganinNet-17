@@ -1,15 +1,36 @@
 import Constants from 'expo-constants';
 import { addSafetyInstructions } from './aiSafety';
+import { generateNativeAudio } from './geminiLiveAudio';
 
-// Get the API key from the app configuration
+// API 설정
 const API_KEY = Constants.expoConfig?.extra?.geminiApiKey;
 
-// Gemini 2.5 Pro Model API URL (supports multimodal including audio)
-const GEMINI_AUDIO_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+// Gemini API 엔드포인트들 - 용도별 모델 분리
+const GEMINI_PRO_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent';
+const GEMINI_FLASH_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_2_5_TTS_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-live-2.5-flash-preview:generateContent';
+// Live API는 geminiLiveAudio.js에서 처리
 
-// TTS API URLs
-const GEMINI_2_5_TTS_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-tts:generateContent?key=${API_KEY}`;
-const GOOGLE_TTS_URL = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${API_KEY}`;
+// Google Cloud TTS API 엔드포인트
+const GOOGLE_TTS_URL = 'https://texttospeech.googleapis.com/v1/text:synthesize';
+
+// 요청 제한을 위한 변수들
+let lastRequestTime = 0;
+const MIN_REQUEST_INTERVAL = 100; // 0.1초 간격으로 요청 제한 (매우 빠르게)
+
+/**
+ * 요청 제한 함수 - API 할당량 초과 방지
+ */
+function checkRequestLimit() {
+  const now = Date.now();
+  if (now - lastRequestTime < MIN_REQUEST_INTERVAL) {
+    const waitTime = MIN_REQUEST_INTERVAL - (now - lastRequestTime);
+    console.log(`⏳ 요청 제한: ${waitTime}ms 대기 중...`);
+    return new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  lastRequestTime = now;
+  return Promise.resolve();
+}
 
 /**
  * Converts audio file to base64 string
@@ -61,70 +82,31 @@ export const sendAudioMessage = async (audioUri, conversationContext, step, text
   }
 
   try {
-    console.log('Gemini 2.5 Pro 모델에 메시지 전송 중...');
+    console.log('Gemini 2.5 Flash Live 모델에 메시지 전송 중...');
 
-    const parts = [
-      {
-        text: addSafetyInstructions(getConversationPrompt(conversationContext, step))
-      }
-    ];
-
-    // Add audio if provided
-    if (audioUri) {
-      const audioBase64 = await audioToBase64(audioUri);
-      parts.push({
-        inlineData: {
-          mimeType: "audio/wav",
-          data: audioBase64
-        }
-      });
-    }
-
-    // Add text input if provided
+    // Live API를 사용하여 음성 처리
+    const systemInstruction = addSafetyInstructions(getConversationPrompt(conversationContext, step));
+    
+    let userInput = '';
     if (textInput) {
-      parts.push({
-        text: `사용자 입력: ${textInput}`
-      });
+      userInput = textInput;
+    } else if (audioUri) {
+      // 오디오가 있는 경우 텍스트로 변환 (음성 인식 결과 사용)
+      userInput = "음성 입력이 제공되었습니다.";
     }
 
-    const requestData = {
-      contents: [
-        {
-          role: "user",
-          parts: parts
-        }
-      ],
-      generationConfig: {
-        maxOutputTokens: 8192,
-        temperature: 0.7,
-      }
-    };
-
-    const response = await fetch(`${GEMINI_AUDIO_API_URL}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestData)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API 응답 오류:', response.status, errorText);
-      throw new Error(`API 요청 실패: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('Gemini 2.5 Native Audio 응답을 받았습니다.');
-
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (aiResponse) {
+    // Live API를 사용하여 네이티브 오디오 생성
+    const audioData = await generateNativeAudio(userInput, systemInstruction);
+    
+    if (audioData && audioData.text) {
+      console.log('Gemini 2.5 Flash Live 응답을 받았습니다.');
       return {
-        text: aiResponse,
+        text: audioData.text,
+        audioData: audioData.audioData,
         error: false
       };
     } else {
-      console.error('응답 형식 오류:', data);
+      console.error('Live API 응답 형식 오류:', audioData);
       return {
         text: '죄송합니다, 응답을 처리하는 데 실패했습니다.',
         error: true
@@ -287,7 +269,29 @@ const getWeeklyReportPrompt = (step) => {
  * Base prompt for all conversations
  */
 const getBasePrompt = () => {
-  return "당신은 사용자의 습관 관리와 목표 달성을 돕는 친근하고 따뜻한 AI 코치입니다. 사용자와 자연스러운 대화를 통해 정보를 수집하고 조언을 제공해주세요. 응답은 한국어로 하며, 친근하고 격려하는 톤을 유지해주세요.";
+  return `당신의 이름은 "루티(Routy)"이고, 사용자의 습관 관리와 목표 달성을 돕는 친근하고 따뜻한 여성 AI 어시스턴트입니다.
+
+  톤과 스타일(자연스러움 우선):
+  - 과장하지 말고 담백하게, 그러나 따뜻하게
+  - 억양은 부드럽고 자연스럽게, 문장 끝을 살짝 올려 친근함 전달
+  - 불필요한 반복과 과도한 감탄사는 지양
+  - 상황에 맞는 짧은 감탄사만 가볍게 사용 (예: 좋네요, 와, 오, 음)
+
+  말하기 가이드(사용자 불편 최소화):
+  - 2~3문장으로 간결하게 말하기
+  - 핵심만 또박또박 전달하고, 다음 행동을 제안
+  - 위로/격려는 짧고 진심 있게 (예: 괜찮아요. 천천히 해봐요)
+
+  발화 예시(자연스럽고 담백하게):
+  - "안녕하세요, 저는 루티예요. 오늘은 어떤 걸 도와드릴까요?"
+  - "좋아요. 지금 목표에 한 걸음 더 가까워졌어요. 계속 같이 가요"
+  - "괜찮아요. 가끔은 쉬어가는 것도 필요해요"
+
+  표기 규칙(ASR/전사 안전):
+  - 특수문자를 남발하지 말고, 필요하면 단어로 대체 (예: 정말요?, 너무 좋아요)
+  - 텍스트 기호는 결과에 꼭 필요할 때만 최소한으로 사용
+
+  당신은 사용자의 든든한 친구이자 코치 루티입니다. 자연스럽고 편안한 음성으로, 사용자가 부담 없게 느끼도록 말해 주세요.`;
 };
 
 /**
@@ -369,9 +373,9 @@ export const sendAudioMessageWithVoice = async (audioUri, conversationContext, s
     // }
     
     // 현재는 텍스트만 요청하고 Web TTS로 처리
-    console.log('Gemini 2.5 Flash 텍스트 응답 요청 중... (오디오는 Web TTS로 처리)');
+    console.log('Gemini 2.5 Flash Live 텍스트 응답 요청 중... (오디오는 Web TTS로 처리)');
 
-    const response = await fetch(`${GEMINI_AUDIO_API_URL}?key=${API_KEY}`, {
+    const response = await fetch(`${GEMINI_LIVE_API_URL}?key=${API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -462,8 +466,8 @@ export const generateWebSpeech = async (text, lang = 'ko-KR') => {
     return new Promise((resolve, reject) => {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
-      utterance.rate = 0.8; // 약간 더 천천히
-      utterance.pitch = 1.1; // 약간 더 높은 톤
+      utterance.rate = 1.0; // 정상 속도 (절어서 들리는 문제 해결)
+      utterance.pitch = 1.0; // 자연스러운 톤
       utterance.volume = 1;
       
       // 더 나은 음성 품질을 위한 설정
@@ -521,18 +525,76 @@ export async function generateNativeTTS(text, voiceName = 'Aoede') {
     return null;
   }
   
-  console.log(`🎤 Gemini 2.5 Pro TTS 요청 (${voiceName}): "${text}"`);
+  // 텍스트 길이 제한 없음 - 전체 응답을 음성으로 변환
+  const shortText = text;
+  
+  const startTime = Date.now();
+  // 1) Live API 우선 (빠른 시작)
+  try {
+    const { generateNativeAudio } = await import('./geminiLiveAudio');
+    const liveResult = await generateNativeAudio(shortText, `한국어로만 자연스럽게 말해주세요. 영어를 섞지 마세요. 내용: "${shortText}"`);
+    if (liveResult && !liveResult.error && liveResult.audioData) {
+      const endTime = Date.now();
+      return {
+        audioData: liveResult.audioData,
+        // Live API는 16-bit PCM (주로 24kHz mono)
+        mimeType: 'audio/pcm;rate=24000;channels=1;encoding=signed-integer;bits=16'
+      };
+    }
+    console.warn('⚠️ Live API 응답에 오디오 데이터가 없습니다. Pro TTS로 시도');
+  } catch (error) {
+    console.warn('⚠️ Live API TTS 오류, Pro TTS로 시도:', error?.message);
+  }
 
+  // 2) Pro TTS 시도 (고품질)
+  try {
+    const proAudio = await generateProTTS(shortText, voiceName);
+    if (proAudio) {
+      if (typeof proAudio === 'string') {
+        return { audioData: proAudio, mimeType: undefined };
+      } else {
+        return proAudio;
+      }
+    }
+    console.warn('⚠️ Pro TTS에서 오디오를 받지 못했습니다. Google TTS로 시도');
+  } catch (e) {
+    console.warn('⚠️ Pro TTS 오류, Google TTS로 시도:', e?.message);
+  }
+
+  // 3) Google Cloud TTS 최종 fallback (가장 안정적)
+  const textToUse = shortText;
+  const googleAudio = await generateSpeechFromText(textToUse, 'ko-KR-Wavenet-A');
+  return googleAudio ? { audioData: googleAudio, mimeType: 'audio/mpeg' } : null;
+}
+
+/**
+ * Gemini 2.5 Pro TTS 함수 (Flash TTS 실패 시 fallback용)
+ * @param {string} text - 음성으로 변환할 텍스트
+ * @param {string} voiceName - 사용할 음성 이름
+ * @returns {Promise<string|null>} Base64 인코딩된 오디오 데이터 또는 실패 시 null
+ */
+async function generateProTTS(text, voiceName = 'Aoede') {
+  if (!text) {
+    console.error('TTS를 위한 텍스트가 없습니다.');
+    return null;
+  }
+  
+  const startTime = Date.now();
   const requestBody = {
     contents: [{
-      parts: [{ text: `다음 텍스트를 친근하고 자연스러운 톤으로, 마치 친구와 대화하는 것처럼 따뜻하게 말해주세요. 감정을 담아서 생동감 있게 표현해주세요: ${text}` }]
+      parts: [{ text: `한국어로 자연스럽고 또렷하게 읽어주세요. 영어는 사용하지 마세요. 텍스트: ${text}` }]
     }],
     generationConfig: {
+      // 속도/자연스러움 튜닝
+      maxOutputTokens: 4096, // 충분한 길이 허용 (전체 발화 보장 시도)
+      temperature: 0.4, // 낮은 온도 → 안정적 발화
+      topK: 20,
+      topP: 0.8,
       responseModalities: ["AUDIO"],
       speechConfig: {
         voiceConfig: {
           prebuiltVoiceConfig: {
-            voiceName: voiceName // Aoede는 더 자연스럽고 친근한 음성
+            voiceName: voiceName
           }
         }
       }
@@ -540,7 +602,7 @@ export async function generateNativeTTS(text, voiceName = 'Aoede') {
   };
 
   try {
-    const response = await fetch(GEMINI_2_5_TTS_URL, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-tts:generateContent?key=${API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -552,56 +614,83 @@ export async function generateNativeTTS(text, voiceName = 'Aoede') {
       const errorText = await response.text();
       console.error('Gemini 2.5 Pro TTS API 오류:', response.status, errorText);
       
-      // 429 오류면 할당량 초과
+      // 429 오류면 할당량 초과 - Google Cloud TTS로 fallback
       if (response.status === 429) {
-        console.warn('⚠️ Gemini TTS 할당량 초과, Google Cloud TTS로 fallback');
+        console.warn('⚠️ Gemini Pro TTS 할당량 초과, Google Cloud TTS로 fallback');
         return await generateSpeechFromText(text, 'ko-KR-Wavenet-A');
       }
       
-      throw new Error(`TTS API 요청 실패: ${response.status}`);
+      // 기타 오류는 Google Cloud TTS로 fallback
+      console.warn('⚠️ Gemini Pro TTS API 오류, Google Cloud TTS로 fallback');
+      return await generateSpeechFromText(text, 'ko-KR-Wavenet-A');
     }
 
     const data = await response.json();
     
-    console.log('🔍 Gemini TTS API 전체 응답:', JSON.stringify(data, null, 2));
+    // Pro TTS 응답 처리
     
     let audioData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    let audioMimeType = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType;
     
     // 다른 위치에서도 오디오 데이터 찾기
     if (!audioData) {
-      // parts 배열에서 오디오 찾기
       const parts = data.candidates?.[0]?.content?.parts || [];
       for (const part of parts) {
         if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.includes('audio')) {
           audioData = part.inlineData.data;
-          console.log('🎵 다른 parts에서 오디오 데이터 발견');
+          audioMimeType = part.inlineData.mimeType;
           break;
         }
       }
     }
 
     if (audioData && audioData.length > 0) {
-      console.log('✅ Gemini 2.5 Pro TTS 음성 생성 성공', {
-        dataLength: audioData.length,
-        preview: audioData.substring(0, 50) + '...'
-      });
-      return audioData; // Base64-encoded PCM audio
+      const endTime = Date.now();
+      // Pro TTS 성공
+      return { audioData, mimeType: audioMimeType };
     } else {
       console.warn('⚠️ Gemini 2.5 Pro TTS 응답에 오디오 데이터가 없습니다.');
-      console.warn('📋 전체 응답 구조:', JSON.stringify(data, null, 2));
-      return null;
+      const g = await generateSpeechFromText(text, 'ko-KR-Wavenet-A');
+      return g ? { audioData: g, mimeType: 'audio/mpeg' } : null;
     }
   } catch (error) {
     console.error('Gemini 2.5 Pro TTS 음성 생성 중 오류 발생:', error);
     
     // 오류 발생 시 Google Cloud TTS로 fallback
     console.log('🔄 Google Cloud TTS로 fallback...');
-    return await generateSpeechFromText(text, 'ko-KR-Wavenet-A');
+    const g = await generateSpeechFromText(text, 'ko-KR-Wavenet-A');
+    return g ? { audioData: g, mimeType: 'audio/mpeg' } : null;
   }
 }
 
 /**
- * 기존 Google TTS (fallback용)
+ * Web TTS Fallback 함수 - 가장 안정적인 대안
+ * @param {string} text - 음성으로 변환할 텍스트
+ * @returns {Promise<string|null>} Base64 인코딩된 오디오 데이터 또는 실패 시 null
+ */
+async function generateWebTTSFallback(text) {
+  try {
+    console.log('🌐 Web TTS Fallback 시작:', text);
+    
+    // Web Speech API 사용
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      // Web Speech API는 직접 오디오 데이터를 반환하지 않으므로
+      // 성공적으로 재생되면 true 반환
+      await generateWebSpeech(text, 'ko-KR');
+      console.log('✅ Web TTS 재생 성공');
+      return 'WEB_TTS_SUCCESS'; // 특별한 마커 반환
+    } else {
+      console.warn('⚠️ Web Speech API가 지원되지 않습니다.');
+      return null;
+    }
+  } catch (error) {
+    console.error('Web TTS Fallback 오류:', error);
+    return null;
+  }
+}
+
+/**
+ * 기존 Google TTS (fallback용) - 더 안전한 오류 처리
  * @param {string} text - 음성으로 변환할 텍스트
  * @param {string} voiceName - 사용할 음성 이름 (예: 'ko-KR-Standard-A')
  * @returns {Promise<string|null>} Base64 인코딩된 오디오 데이터 또는 실패 시 null
@@ -611,6 +700,9 @@ export async function generateSpeechFromText(text, voiceName = 'ko-KR-Neural2-A'
     console.error('TTS를 위한 텍스트가 없습니다.');
     return null;
   }
+  
+  // 요청 제한 적용
+  await checkRequestLimit();
   
   console.log(`🔊 Google Cloud TTS 요청 (${voiceName}): "${text}"`);
 
@@ -639,7 +731,7 @@ export async function generateSpeechFromText(text, voiceName = 'ko-KR-Neural2-A'
   };
 
   try {
-    const response = await fetch(GOOGLE_TTS_URL, {
+    const response = await fetch(`${GOOGLE_TTS_URL}?key=${API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -650,7 +742,30 @@ export async function generateSpeechFromText(text, voiceName = 'ko-KR-Neural2-A'
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Google Cloud TTS API 오류:', JSON.stringify(errorData, null, 2));
-      throw new Error(`Google TTS API 요청 실패: ${response.status}`);
+      
+      // 403 오류면 서비스 비활성화 - 다른 음성으로 재시도
+      if (response.status === 403) {
+        console.warn('⚠️ Google Cloud TTS API가 비활성화되어 있습니다.');
+        console.warn('📋 활성화 방법: https://console.developers.google.com/apis/api/texttospeech.googleapis.com/overview');
+        
+        // 다른 음성으로 재시도
+        if (voiceName !== 'ko-KR-Standard-A') {
+          console.log('🔄 다른 음성으로 재시도: ko-KR-Standard-A');
+          return await generateSpeechFromText(text, 'ko-KR-Standard-A');
+        } else {
+          // 모든 음성이 실패하면 Web TTS로 fallback
+          console.log('🔄 Web TTS로 fallback...');
+          return await generateWebTTSFallback(text);
+        }
+      }
+      
+      // 기타 오류도 다른 음성으로 재시도
+      console.warn('⚠️ Google Cloud TTS API 오류, 다른 음성으로 재시도');
+      if (voiceName !== 'ko-KR-Standard-A') {
+        return await generateSpeechFromText(text, 'ko-KR-Standard-A');
+      } else {
+        return await generateWebTTSFallback(text);
+      }
     }
 
     const data = await response.json();
@@ -660,17 +775,13 @@ export async function generateSpeechFromText(text, voiceName = 'ko-KR-Neural2-A'
       return data.audioContent; // Base64-encoded MP3 audio
     } else {
       console.warn('Google TTS API 응답에 오디오 콘텐츠가 없습니다.');
-      return null;
+      return await generateWebTTSFallback(text);
     }
   } catch (error) {
     console.error('Google Cloud TTS 음성 생성 중 오류 발생:', error);
     
-    // 403 오류면 서비스 비활성화 상태
-    if (error.message && error.message.includes('403')) {
-      console.warn('⚠️ Google Cloud TTS API가 비활성화되어 있습니다.');
-      console.warn('📋 활성화 방법: https://console.developers.google.com/apis/api/texttospeech.googleapis.com/overview');
-    }
-    
-    throw error; // 상위에서 처리
+    // 모든 오류에 대해 Web TTS로 fallback
+    console.log('🔄 Web TTS로 fallback...');
+    return await generateWebTTSFallback(text);
   }
 }

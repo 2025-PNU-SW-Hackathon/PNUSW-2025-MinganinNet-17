@@ -32,5 +32,10 @@ export declare function sendAudioMessageWithVoice(
 export declare function generateWebSpeech(text: string, lang?: string): Promise<void>;
 export declare function stopWebSpeech(): void;
 
-export declare function generateNativeTTS(text: string, voiceName?: string): Promise<string | null>;
+export interface NativeTTSResult {
+  audioData: string;
+  mimeType?: string;
+}
+
+export declare function generateNativeTTS(text: string, voiceName?: string): Promise<NativeTTSResult | null>;
 export declare function generateSpeechFromText(text: string, voiceName?: string): Promise<string | null>;

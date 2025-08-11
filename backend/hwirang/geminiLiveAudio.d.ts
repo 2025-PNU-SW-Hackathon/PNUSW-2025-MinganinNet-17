@@ -3,10 +3,12 @@
  */
 
 export interface LiveAudioResponse {
+  error: boolean;
   audioData: string;
   text: string;
   mimeType: string;
   source: string;
+  userInput?: string;
 }
 
 export interface LiveSessionConfig {
@@ -31,6 +33,7 @@ export interface RealtimeInput {
 }
 
 export class GeminiLiveSession {
+  isConnected: boolean;
   constructor();
   connect(systemInstruction?: string): Promise<any>;
   sendAudio(audioData: string, mimeType?: string): Promise<void>;

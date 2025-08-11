@@ -160,7 +160,7 @@ export default function RootLayout() {
           return; // AsyncStorage 확인 건너뛰기
         }
       } catch (error) {
-        console.error('마지막 알림 응답 확인 중 오류:', error);
+        console.error('마지막 알림 응답 확인 중 오류:', error); // 그래서 맨날 여기서 오류 발생
       }
 
       // Fallback: AsyncStorage에서 pending 알림 확인 (1차 시도 실패 시)
@@ -207,7 +207,7 @@ export default function RootLayout() {
         name="index" 
         options={{ headerShown: false }} 
       />
-       <Stack.Screen 
+      <Stack.Screen 
         name="onboarding" 
         options={{ headerShown: false }} 
       />

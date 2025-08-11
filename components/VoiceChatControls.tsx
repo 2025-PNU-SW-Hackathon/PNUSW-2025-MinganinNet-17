@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -29,7 +29,7 @@ const VoiceChatControls: React.FC<VoiceChatControlsProps> = ({
       pauseOpacity.value = withTiming(1, { duration: 200 });
       closeOpacity.value = withTiming(1, { duration: 200 });
     }
-  }, [disabled]);
+  }, [disabled, pauseOpacity, closeOpacity]);
 
   const handlePausePress = () => {
     if (disabled) return;

@@ -1,8 +1,9 @@
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
+  Alert,
   Animated,
-  Dimensions,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -12,19 +13,19 @@ import {
   View
 } from 'react-native';
 import CalendarScreen from '../backend/calendar/calendar';
+import { generateDailyFeedback, parsePlanModificationCommand } from '../backend/hwirang/gemini';
 import { getActivePlan } from '../backend/supabase/habits';
-import { DailyTodo, Plan } from '../types/habit';
+import { createReport } from '../backend/supabase/reports';
+import { useHabitStore } from '../lib/habitStore';
+import { DailyTodo } from '../types/habit';
 import ProfileScreen from './ProfileScreen';
 import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
 import VoiceChatScreen from './VoiceChatScreen';
 
-const { width } = Dimensions.get('window');
-
-// Helper function to parse duration strings into days
 const parseDurationToDays = (duration: string): number => {
   if (duration.includes('개월')) {
     const months = parseInt(duration.replace('개월', '').trim(), 10);
-    return isNaN(months) ? 0 : months * 30; // Approximation
+    return isNaN(months) ? 0 : months * 30;
   }
   if (duration.includes('주')) {
     const weeks = parseInt(duration.replace('주', '').trim(), 10);
@@ -41,14 +42,12 @@ interface HomeScreenProps {
   selectedDate?: string;
 }
 
-// Coach status based on achievement rate
 interface CoachStatus {
   emoji: string;
   message: string;
   color: string;
 }
 
-// Animated Todo Item Component
 interface AnimatedTodoItemProps {
   todo: DailyTodo;
   isCompleted: boolean;
@@ -61,87 +60,32 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
   const textOpacity = useRef(new Animated.Value(isCompleted ? 0.6 : 1)).current;
 
   const handlePress = () => {
-    // Scale animation for the whole item
     Animated.sequence([
-      Animated.spring(scaleAnimation, {
-        toValue: 1.05,
-        useNativeDriver: true,
-        tension: 300,
-        friction: 8,
-      }),
-      Animated.spring(scaleAnimation, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 300,
-        friction: 8,
-      })
+      Animated.spring(scaleAnimation, { toValue: 1.05, useNativeDriver: true, tension: 300, friction: 8 }),
+      Animated.spring(scaleAnimation, { toValue: 1, useNativeDriver: true, tension: 300, friction: 8 })
     ]).start();
 
-    // Checkmark and text animations
     if (!isCompleted) {
-      // Completing task
       Animated.parallel([
-        Animated.spring(checkmarkScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 300,
-          friction: 6,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 0.6,
-          duration: 200,
-          useNativeDriver: true,
-        })
+        Animated.spring(checkmarkScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 6 }),
+        Animated.timing(textOpacity, { toValue: 0.6, duration: 200, useNativeDriver: true })
       ]).start();
     } else {
-      // Uncompleting task
       Animated.parallel([
-        Animated.spring(checkmarkScale, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 300,
-          friction: 6,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        })
+        Animated.spring(checkmarkScale, { toValue: 0, useNativeDriver: true, tension: 300, friction: 6 }),
+        Animated.timing(textOpacity, { toValue: 1, duration: 200, useNativeDriver: true })
       ]).start();
     }
-
     onToggle();
   };
 
   return (
     <Animated.View style={[{ transform: [{ scale: scaleAnimation }] }]}>
-      <TouchableOpacity
-        style={styles.todoItem}
-        onPress={handlePress}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={styles.todoItem} onPress={handlePress} activeOpacity={0.8}>
         <View style={[styles.todoCheckbox, isCompleted && styles.todoCheckedBox]}>
-          <Animated.Text 
-            style={[
-              styles.checkmarkText,
-              { 
-                transform: [{ scale: checkmarkScale }],
-                opacity: checkmarkScale
-              }
-            ]}
-          >
-            ✓
-          </Animated.Text>
+          <Animated.Text style={[styles.checkmarkText, { transform: [{ scale: checkmarkScale }], opacity: checkmarkScale }]}>✓</Animated.Text>
         </View>
-        <Animated.Text 
-          style={[
-            styles.todoText, 
-            isCompleted && styles.todoTextCompleted,
-            { opacity: textOpacity }
-          ]} 
-          numberOfLines={2} 
-          ellipsizeMode="tail"
-        >
+        <Animated.Text style={[styles.todoText, isCompleted && styles.todoTextCompleted, { opacity: textOpacity }]} numberOfLines={2} ellipsizeMode="tail">
           {todo.description}
         </Animated.Text>
       </TouchableOpacity>
@@ -150,24 +94,21 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
 };
 
 export default function HomeScreen({ selectedDate }: HomeScreenProps) {
+  const router = useRouter();
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
   const [internalSelectedDate, setInternalSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const { plan, setPlan } = useHabitStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
   const [effectiveStartDate, setEffectiveStartDate] = useState<string | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
-  
-  // Use selectedDate from props if provided, otherwise use internal state
-  const targetDate = selectedDate || internalSelectedDate;
+  const [reportVoiceChatVisible, setReportVoiceChatVisible] = useState(false);
 
-  // Animation for coach status
+  const targetDate = selectedDate || internalSelectedDate;
   const coachScaleAnimation = useRef(new Animated.Value(1)).current;
   const [previousCoachStatus, setPreviousCoachStatus] = useState<CoachStatus | null>(null);
-  
-  // Animations for smooth content loading
   const goalFadeAnimation = useRef(new Animated.Value(0)).current;
   const todoFadeAnimation = useRef(new Animated.Value(0)).current;
   const coachFadeAnimation = useRef(new Animated.Value(0)).current;
@@ -176,14 +117,10 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     const fetchPlan = async () => {
       try {
         setLoading(true);
-        const fetchedPlan = await getActivePlan(); // <-- Use the new function
-        setPlan(fetchedPlan);
-
+        const fetchedPlan = await getActivePlan();
         if (fetchedPlan) {
-          // The start date from the new Plan object is considered the effective start date.
+          setPlan(fetchedPlan);
           setEffectiveStartDate(fetchedPlan.start_date);
-
-          // Initialize todo completion status using the unique ID of each todo.
           const initialCompletion: { [key: string]: boolean } = {};
           fetchedPlan.milestones.forEach(m => {
             m.daily_todos.forEach(todo => {
@@ -191,6 +128,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
             });
           });
           setTodoCompletion(initialCompletion);
+        } else {
+          router.replace('/goal-setting');
         }
       } catch (e) {
         setError('Failed to fetch habit plan.');
@@ -199,16 +138,16 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         setLoading(false);
       }
     };
-
-    fetchPlan();
-  }, []);
+    if (!plan) {
+        fetchPlan();
+    }
+  }, [plan, router]);
 
   const getCoachStatus = (): CoachStatus => {
     const todos = getTodosForSelectedDate();
     if (!plan || todos.length === 0) {
       return { emoji: '😊', message: '오늘도 화이팅!', color: '#4CAF50' };
     }
-    // Updated to use the new todo completion state
     const completedCount = todos.filter(todo => todoCompletion[todo.id.toString()]).length;
     const avgRate = completedCount / todos.length;
     if (avgRate >= 1) return { emoji: '🥳', message: '완벽한 하루!', color: '#4CAF50' };
@@ -256,98 +195,130 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const handleTodoToggle = (todoId: number): void => {
     const todoKey = todoId.toString();
     const willBeCompleted = !todoCompletion[todoKey];
-    
-    // Haptic feedback for satisfying feel
     if (willBeCompleted) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
     setTodoCompletion(prev => ({ ...prev, [todoKey]: !prev[todoKey] }));
-    // Here you would also add a call to a Supabase function to update `is_completed` in the DB.
-    // e.g., updateTodoStatus(todoId, willBeCompleted);
   };
   
   const formatCalendarDate = (date: Date) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return {
-      dayName: days[date.getDay()],
-      dayNumber: date.getDate().toString().padStart(2, '0'),
-      isToday: date.toDateString() === new Date().toDateString(),
-      dateString: date.toISOString().split('T')[0]
-    };
+    return { dayName: days[date.getDay()], dayNumber: date.getDate().toString().padStart(2, '0'), isToday: date.toDateString() === new Date().toDateString(), dateString: date.toISOString().split('T')[0] };
   };
 
-  const handleCalendarDatePress = (dateString: string): void => {
-    setInternalSelectedDate(dateString);
+  const handleCalendarDatePress = (dateString: string): void => setInternalSelectedDate(dateString);
+  const handleVoiceChatOpen = (): void => { setVoiceChatVisible(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); };
+  const handleVoiceChatClose = (): void => setVoiceChatVisible(false);
+
+  const handleReportCreationComplete = async (data: any) => {
+    setReportVoiceChatVisible(false);
+    if (!data || !data.transcript) {
+      Alert.alert('오류', '리포트 내용을 인식하지 못했습니다.');
+      return;
+    }
+    try {
+      const userSummary = data.transcript.split('\n').pop() || '';
+      const today = new Date();
+      const todayTodos = getTodosForSelectedDate();
+      const completedCount = todayTodos.filter(t => todoCompletion[t.id.toString()]).length;
+      const achievementScore = todayTodos.length > 0 ? Math.round((completedCount / todayTodos.length) * 10) : 0;
+      const feedback = await generateDailyFeedback(userSummary, achievementScore, todayTodos);
+      await createReport({ report_date: today.toISOString().split('T')[0], achievement_score: achievementScore, ai_coach_feedback: [feedback], daily_activities: { todos: todayTodos }, user_summary: userSummary });
+      Alert.alert('성공', '오늘의 리포트가 성공적으로 생성되었습니다.');
+    } catch (error) {
+      console.error('Error creating report:', error);
+      Alert.alert('오류', '리포트 생성 중 오류가 발생했습니다.');
+    }
   };
 
-  const handleVoiceChatOpen = (): void => {
-    setVoiceChatVisible(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  };
-
-  const handleVoiceChatClose = (): void => {
+  const handleVoiceCommand = async (data: any) => {
     setVoiceChatVisible(false);
+    
+    // action 필드 확인하여 처리
+    if (data && data.action === 'PLAN_COMPLETE_GO_HOME') {
+      // 홈화면 모드 완료 - 홈화면으로 돌아가기
+      console.log('✅ Plan mode completed, staying on home screen');
+      Alert.alert('완료', '음성 명령이 처리되었습니다.');
+      return;
+    }
+    
+    if (!data || !data.transcript) {
+      Alert.alert('오류', '음성 명령을 인식하지 못했습니다.');
+      return;
+    }
+    try {
+      const command = await parsePlanModificationCommand(data.transcript);
+      if (!command || command.action === 'unknown') {
+        Alert.alert('알 수 없는 명령', '이해하지 못했습니다. 다시 말씀해주세요.');
+        return;
+      }
+      if (command.action === 'create_report') {
+        setReportVoiceChatVisible(true);
+        return;
+      }
+      if (!plan) {
+        Alert.alert('오류', '수정할 계획이 없습니다.');
+        return;
+      }
+      let newPlan = JSON.parse(JSON.stringify(plan));
+      switch (command.action) {
+        case 'add_todo':
+          if (newPlan.milestones && newPlan.milestones.length > 0) {
+            const newTodo: DailyTodo = { id: `new-todo-${Date.now()}`, description: command.payload.description, is_completed: false };
+            newPlan.milestones[0].daily_todos.push(newTodo);
+            setPlan(newPlan);
+            Alert.alert('성공', `'${command.payload.description}' 할 일이 추가되었습니다.`);
+          } else {
+            Alert.alert('오류', '할 일을 추가할 마일스톤이 없습니다.');
+          }
+          break;
+        case 'complete_todo':
+          let todoFound = false;
+          for (const milestone of newPlan.milestones) {
+            const todo = milestone.daily_todos.find(t => t.description.includes(command.payload.description));
+            if (todo) { todo.is_completed = true; todoFound = true; break; }
+          }
+          if (todoFound) {
+            setPlan(newPlan);
+            Alert.alert('성공', `'${command.payload.description}' 할 일을 완료했습니다.`);
+          } else {
+            Alert.alert('오류', `'${command.payload.description}' 할 일을 찾지 못했습니다.`);
+          }
+          break;
+        default: Alert.alert('알 수 없는 명령', '지원하지 않는 명령입니다.'); break;
+      }
+    } catch (error) {
+      console.error('Error processing voice command:', error);
+      Alert.alert('오류', '음성 명령 처리 중 오류가 발생했습니다.');
+    }
   };
 
-  const handleVoiceInput = (text: string): void => {
-    console.log('Voice input received:', text);
-    // Here you would integrate with your AI backend
-  };
+  const coachStatus = useMemo(() => getCoachStatus(), [plan, todoCompletion, targetDate]);
+  const calendarDates = useMemo(() => getCalendarDates(), []);
+  const todosForSelectedDate = useMemo(() => getTodosForSelectedDate(), [plan, effectiveStartDate, targetDate]);
 
-  const coachStatus = getCoachStatus();
-  const calendarDates = getCalendarDates();
-  const todosForSelectedDate = getTodosForSelectedDate();
-
-  // Animate coach when status changes
   useEffect(() => {
     if (previousCoachStatus && previousCoachStatus.emoji !== coachStatus.emoji) {
-      // Coach status changed! Trigger bounce animation
       Animated.sequence([
-        Animated.spring(coachScaleAnimation, {
-          toValue: 1.2,
-          useNativeDriver: true,
-          tension: 300,
-          friction: 8,
-        }),
-        Animated.spring(coachScaleAnimation, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 300,
-          friction: 8,
-        })
+        Animated.spring(coachScaleAnimation, { toValue: 1.2, useNativeDriver: true, tension: 300, friction: 8 }),
+        Animated.spring(coachScaleAnimation, { toValue: 1, useNativeDriver: true, tension: 300, friction: 8 })
       ]).start();
     }
     setPreviousCoachStatus(coachStatus);
-  }, [coachStatus.emoji, coachStatus.message]);
+  }, [coachStatus.emoji, previousCoachStatus?.emoji]);
 
-  // Animate content when loading completes
   useEffect(() => {
     if (!loading) {
-      // Stagger the animations for a more polished feel
       Animated.stagger(150, [
-        Animated.timing(goalFadeAnimation, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(coachFadeAnimation, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(todoFadeAnimation, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
+        Animated.timing(goalFadeAnimation, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(coachFadeAnimation, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(todoFadeAnimation, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]).start();
     }
   }, [loading]);
 
-  // Show ProfileScreen if settings is selected
   if (currentScreen === 'settings') {
     return <ProfileScreen onBackToHome={() => setCurrentScreen('home')} />;
   }
@@ -357,48 +328,21 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.headerArea}>
           <View style={styles.profileHeader}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>🌱</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.profileButton}
-              onPress={() => setCurrentScreen('settings')}
-            >
-              <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
-            </TouchableOpacity>
+            <View style={styles.logoContainer}><Text style={styles.logoText}>🌱</Text></View>
+            <TouchableOpacity style={styles.profileButton} onPress={() => setCurrentScreen('settings')}><View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View></TouchableOpacity>
           </View>
-
           <Text style={styles.greetingText}>{getGreeting()}</Text>
-          
-          {/* Enhanced Goal Text Loading */}
           {loading ? (
-            <View style={styles.goalLoadingContainer}>
-              <SkeletonText width="90%" height={18} style={styles.goalSkeletonLine1} />
-              <SkeletonText width="60%" height={18} style={styles.goalSkeletonLine2} />
-            </View>
+            <View style={styles.goalLoadingContainer}><SkeletonText width="90%" height={18} style={styles.goalSkeletonLine1} /><SkeletonText width="60%" height={18} style={styles.goalSkeletonLine2} /></View>
           ) : (
-            <Animated.View style={{ opacity: goalFadeAnimation }}>
-              <Text style={styles.goalText}>
-                {plan?.plan_title || '진행 중인 목표가 없습니다.'} 
-              </Text>
-            </Animated.View>
+            <Animated.View style={{ opacity: goalFadeAnimation }}><Text style={styles.goalText}>{plan?.plan_title || '진행 중인 목표가 없습니다.'}</Text></Animated.View>
           )}
-
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.calendarScroll}
-            contentContainerStyle={styles.calendarContainer}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.calendarScroll} contentContainerStyle={styles.calendarContainer}>
             {calendarDates.map((date, index) => {
               const dateInfo = formatCalendarDate(date);
               const isSelected = targetDate === dateInfo.dateString;
               return (
-                <TouchableOpacity
-                  key={index}
-                  style={[styles.calendarDate, dateInfo.isToday && styles.calendarDateToday, isSelected && styles.calendarDateSelected]}
-                  onPress={() => handleCalendarDatePress(dateInfo.dateString)}
-                >
+                <TouchableOpacity key={index} style={[styles.calendarDate, dateInfo.isToday && styles.calendarDateToday, isSelected && styles.calendarDateSelected]} onPress={() => handleCalendarDatePress(dateInfo.dateString)}>
                   <Text style={styles.calendarDayName}>{dateInfo.dayName}</Text>
                   <Text style={[styles.calendarDayNumber, (dateInfo.isToday || isSelected) && styles.calendarTextActive]}>{dateInfo.dayNumber}</Text>
                 </TouchableOpacity>
@@ -406,88 +350,52 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
             })}
           </ScrollView>
         </View>
-
         <View style={styles.mainContent}>
-          {/* Enhanced Coach Card Loading */}
-          {loading ? (
-            <SkeletonCard type="coach" />
-          ) : (
+          {loading ? <SkeletonCard type="coach" /> : (
             <Animated.View style={[styles.coachCard, { opacity: coachFadeAnimation }]}>
-              <Text style={styles.cardTitle}>Coach's Status</Text>
+              <Text style={styles.cardTitle}>Coach&apos;s Status</Text>
               <View style={styles.coachContent}>
-                <Animated.View style={{ transform: [{ scale: coachScaleAnimation }] }}>
-                  <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
-                </Animated.View>
+                <Animated.View style={{ transform: [{ scale: coachScaleAnimation }] }}><Text style={styles.coachEmoji}>{coachStatus.emoji}</Text></Animated.View>
                 <Text style={styles.coachMessage}>{coachStatus.message}</Text>
                 <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
               </View>
             </Animated.View>
           )}
-
-          {/* Enhanced Todo Card Loading */}
           <View style={styles.todoCard}>
-            <Text style={styles.cardTitle}>Today's To-Do</Text>
+            <Text style={styles.cardTitle}>Today&apos;s To-Do</Text>
             <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
-              {loading ? (
-                <SkeletonTodoList count={3} />
-              ) : error ? (
-                <Text style={styles.emptyTodoText}>{error}</Text>
-              ) : todosForSelectedDate.length > 0 ? (
+              {loading ? <SkeletonTodoList count={3} /> : error ? <Text style={styles.emptyTodoText}>{error}</Text> : todosForSelectedDate.length > 0 ? (
                 <Animated.View style={{ opacity: todoFadeAnimation }}>
                   {todosForSelectedDate.map((todo) => {
                     const todoKey = todo.id.toString();
                     const isCompleted = todoCompletion[todoKey];
-                    return (
-                      <AnimatedTodoItem
-                        key={todo.id} // Use the unique ID for the key
-                        todo={todo}
-                        isCompleted={isCompleted}
-                        onToggle={() => handleTodoToggle(todo.id)}
-                      />
-                    );
+                    return <AnimatedTodoItem key={todo.id} todo={todo} isCompleted={isCompleted} onToggle={() => handleTodoToggle(todo.id)} />;
                   })}
                 </Animated.View>
               ) : (
-                <Animated.View style={[styles.emptyTodoContainer, { opacity: todoFadeAnimation }]}>
-                  <Text style={styles.emptyTodoText}>오늘의 할 일이 없습니다.</Text>
-                </Animated.View>
+                <Animated.View style={[styles.emptyTodoContainer, { opacity: todoFadeAnimation }]}><Text style={styles.emptyTodoText}>오늘의 할 일이 없습니다.</Text></Animated.View>
               )}
             </ScrollView>
           </View>
         </View>
       </ScrollView>
 
-      {/* Floating Voice Chat Button */}
-      <TouchableOpacity
-        style={styles.floatingVoiceButton}
-        onPress={handleVoiceChatOpen}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={styles.floatingVoiceButton} onPress={handleVoiceChatOpen} activeOpacity={0.8}>
         <Text style={styles.voiceButtonIcon}>🎤</Text>
       </TouchableOpacity>
 
-      {/* Voice Chat Modal */}
-      <VoiceChatScreen
-        visible={voiceChatVisible}
-        onClose={handleVoiceChatClose}
-        onVoiceInput={handleVoiceInput}
-      />
+      {voiceChatVisible && (
+          <VoiceChatScreen visible={voiceChatVisible} mode="plan" onClose={handleVoiceChatClose} onComplete={handleVoiceCommand} />
+      )}
+      {reportVoiceChatVisible && (
+          <VoiceChatScreen visible={reportVoiceChatVisible} mode="report" onClose={() => setReportVoiceChatVisible(false)} onComplete={handleReportCreationComplete} />
+      )}
 
-      <Modal
-        visible={calendarVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setCalendarVisible(false)}
-      >
+      <Modal visible={calendarVisible} transparent={true} animationType="fade" onRequestClose={() => setCalendarVisible(false)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <CalendarScreen />
-            <TouchableOpacity 
-              style={styles.closeButton} 
-              onPress={() => setCalendarVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>닫기</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.closeButton} onPress={() => setCalendarVisible(false)}><Text style={styles.closeButtonText}>닫기</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -536,37 +444,9 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: '#1c1c2e', borderRadius: 20, padding: 20, elevation: 5, minWidth: 350, maxWidth: '90%', maxHeight: '90%' },
   closeButton: { marginTop: 16, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20, backgroundColor: '#6c63ff', borderRadius: 20 },
   closeButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  goalLoadingContainer: {
-    marginBottom: 20,
-  },
-  goalSkeletonLine1: {
-    marginBottom: 8,
-  },
-  goalSkeletonLine2: {
-    marginBottom: 0,
-  },
-  floatingVoiceButton: {
-    position: 'absolute',
-    bottom: 100,
-    right: 24,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#6c63ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#6c63ff',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  voiceButtonIcon: {
-    fontSize: 28,
-    textAlign: 'center',
-    lineHeight: 28,
-  },
-}); 
+  goalLoadingContainer: { marginBottom: 20 },
+  goalSkeletonLine1: { marginBottom: 8 },
+  goalSkeletonLine2: { marginBottom: 0 },
+  floatingVoiceButton: { position: 'absolute', bottom: 100, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 12 },
+  voiceButtonIcon: { fontSize: 28, textAlign: 'center', lineHeight: 28 }
+}) 
