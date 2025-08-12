@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DailyTodo } from '../../../types/habit';
-import DailyReportResult from './steps/DailyReportResult';
+import DailyReportResultScreen from './steps/DailyReportResultScreen';
 import DailyReportStep1 from './steps/DailyReportStep1';
 import DailyReportStep2 from './steps/DailyReportStep2';
 
@@ -63,11 +63,10 @@ export default function DailyReportCreateFlow({ onBack }: DailyReportCreateFlowP
       case 'result':
         if (!step1Data || !step2Data) return null;
         return (
-          <DailyReportResult
+          <DailyReportResultScreen
             todos={step1Data.todos}
             achievementScore={step1Data.achievementScore}
-            userSummary={step2Data.userSummary}
-            aiFeedback={step2Data.aiFeedback}
+            aiReportText={step2Data.aiFeedback}
             onBack={onBack}
           />
         );
