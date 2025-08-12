@@ -116,14 +116,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: -32, // Elevate the button above the tab bar
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.37,
-    shadowRadius: 7.49,
     elevation: 12,
+    boxShadow: '0 6px 7px rgba(0,0,0,0.37)',
   },
   plusEmoji: {
     fontSize: 28,

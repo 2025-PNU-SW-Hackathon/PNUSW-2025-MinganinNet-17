@@ -37,12 +37,10 @@ export default function ScreenTransitionManager({
   const prevScreenKey = useRef<string>(screenKey);
   const animationCount = useRef(0);
 
-  // If animations are disabled, render children directly
-  if (!AnimationConfig.ENABLE_SCREEN_TRANSITIONS) {
-    return <View style={styles.container}>{children}</View>;
-  }
-
   useEffect(() => {
+    if (!AnimationConfig.ENABLE_SCREEN_TRANSITIONS) {
+      return;
+    }
     const screenChanged = prevScreenKey.current !== screenKey;
     
     if (screenChanged) {
@@ -96,6 +94,10 @@ export default function ScreenTransitionManager({
     
     prevScreenKey.current = screenKey;
   }, [screenKey, children, direction]);
+
+  if (!AnimationConfig.ENABLE_SCREEN_TRANSITIONS) {
+    return <View style={styles.container}>{children}</View>;
+  }
 
   const handleAnimationComplete = () => {
     animationCount.current++;

@@ -1,7 +1,7 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, usePathname } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { checkUserHasHabits } from '../backend/supabase/habits';
+import { getActivePlan } from '../backend/supabase/habits';
 import GoalSettingStep1 from './GoalSettingStep1';
 import GoalSettingStep2 from './GoalSettingStep2';
 import GoalSettingStep3 from './GoalSettingStep3';
@@ -34,6 +34,7 @@ interface AppData {
 
 export default function MainApp() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
+  const pathname = usePathname();
   // Note: DailySchedulePopup functionality removed since HomeScreen now manages its own interactions
   
   const [appData, setAppData] = useState<AppData>({
@@ -45,6 +46,31 @@ export default function MainApp() {
     coachingIntensity: '',
     habitData: null,
   });
+
+  // (tabs) 경로일 때 목표 확인 및 goalStep1으로 이동
+  useEffect(() => {
+    const checkGoalAndNavigate = async () => {
+      if (pathname === '/(tabs)' && currentScreen === 'home') {
+        try {
+          console.log('🔍 (tabs) 경로에서 목표 확인 시작');
+          const activePlan = await getActivePlan();
+          
+          if (!activePlan) {
+            console.log('🎯 목표가 없음 - goalStep1으로 이동');
+            setCurrentScreen('goalStep1');
+          } else {
+            console.log('✅ 목표가 있음 - 홈 화면 유지');
+          }
+        } catch (error) {
+          console.error('❌ 목표 확인 중 오류:', error);
+          console.log('🚨 에러 발생 - goalStep1으로 이동');
+          setCurrentScreen('goalStep1');
+        }
+      }
+    };
+
+    checkGoalAndNavigate();
+  }, [pathname, currentScreen]);
 
   // Splash Screen handlers
   const handleSplashComplete = () => {
@@ -60,17 +86,17 @@ export default function MainApp() {
   const handleLoginSuccess = async () => {
     // 일반 로그인 로직
     try {
-      const hasHabits = await checkUserHasHabits();
+      const activePlan = await getActivePlan();
       
-      if (hasHabits) {
-        // 이미 habits 데이터가 있으면 바로 메인 화면으로
+      if (activePlan) {
+        // 이미 목표가 있으면 바로 메인 화면으로
         router.replace('/(tabs)');
       } else {
-        // habits 데이터가 없으면 목표 설정으로
+        // 목표가 없으면 목표 설정으로
         setCurrentScreen('goalStep1');
       }
     } catch (error) {
-      console.error('Error checking user habits:', error);
+      console.error('Error checking user plan:', error);
       // 에러가 발생하면 기본적으로 목표 설정으로 이동
       setCurrentScreen('goalStep1');
     }
@@ -93,9 +119,17 @@ export default function MainApp() {
   };
 
   // Goal Setting Step 1 handlers
-  const handleGoalStep1Next = (habitGoal: string) => {
-    // console.log('🎯 handleGoalStep1Next called with:', habitGoal);
-    // console.log('📱 Current screen before update:', currentScreen);
+  const handleGoalStep1Next = (habitGoal: string | any) => {
+    // 음성 채팅 완료 시 GoalSettingStep5로 직접 이동
+    if (habitGoal === 'VOICE_COMPLETE_JUMP_TO_STEP5') {
+      console.log('🎯 Voice goal setting completed, jumping to GoalSettingStep5');
+      setCurrentScreen('goalStep5');
+      return;
+    }
+    
+    // 일반적인 다음 단계 진행
+    console.log('🎯 handleGoalStep1Next called with:', habitGoal);
+    console.log('📱 Current screen before update:', currentScreen);
     setAppData(prev => ({ ...prev, habitGoal }));
     setCurrentScreen('goalStep2');
     console.log('📱 Screen should now be: goalStep2');
@@ -299,8 +333,6 @@ export default function MainApp() {
         );
       
       default:
-        // Ensures exhaustiveness; should not be reached.
-        const exhaustiveCheck: never = currentScreen;
         return null;
     }
   };

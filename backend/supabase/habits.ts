@@ -125,10 +125,19 @@ export async function createNewHabitAndPlan(
     throw new Error('Failed to create the plan.');
   }
 
+  // 잠시 대기 (RLS 정책이 적용될 시간을 줌)
+  await new Promise(resolve => setTimeout(resolve, 100));
+
   // Step 3: Create the Milestones and Daily_Todos
+  console.log('🔍 Debug: About to create milestones for plan:', newPlan.id);
+  console.log('🔍 Debug: Current user ID:', user.id);
+  console.log('🔍 Debug: Milestones to create:', milestones);
+  
   const createdMilestones = [];
   for (const milestone of milestones) {
     const { daily_todos, ...milestoneDetails } = milestone;
+    console.log('🔍 Debug: Creating milestone with data:', { ...milestoneDetails, plan_id: newPlan.id });
+    
     const { data: newMilestone, error: milestoneError } = await supabase
       .from('milestones')
       .insert({
@@ -139,7 +148,10 @@ export async function createNewHabitAndPlan(
       .single();
 
     if (milestoneError || !newMilestone) {
-      console.error('Error creating milestone:', milestoneError);
+      console.error('💥 Error creating milestone:', milestoneError);
+      console.error('💥 Milestone data that failed:', { ...milestoneDetails, plan_id: newPlan.id });
+      console.error('💥 Plan ID:', newPlan.id);
+      console.error('💥 User ID:', user.id);
       throw new Error('Failed to create a milestone.');
     }
 

@@ -5,6 +5,7 @@ import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import { DailyTodo } from '../types/habit'; // Import the correct type
 import DailyReportResultScreen from './DailyReportResultScreen';
+import VoiceChatScreen from './VoiceChatScreen';
 
 // Removed local TodoItem interface
 
@@ -117,25 +118,26 @@ const CreateDailyReportStep2View = ({
 
 export default function CreateDailyReportStep2Screen({ onBack, achievementScore, todos }: CreateDailyReportStep2ScreenProps) {
   const colorScheme = useColorScheme() ?? 'light';
-  const [currentScreen, setCurrentScreen] = useState<'step2' | 'result'>('step2');
+  const [currentScreen, setCurrentScreen] = useState<'mode-selection' | 'step2' | 'result'>('mode-selection');
   const [userSummary, setUserSummary] = useState<string>('');
   const [aiFeedback, setAiFeedback] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [voiceChatVisible, setVoiceChatVisible] = useState(false);
 
 
   // Handle navigation to result screen
-  const handleSubmit = async () => {
+  const handleSubmit = async (summary: string) => {
     setIsLoading(true);
     setError(null);
     try {
       const feedbackTodos = todos.map(t => ({
         id: t.id.toString(),
         description: t.description,
-        completed: t.is_completed, // Use is_completed from the incoming data
+        completed: t.is_completed,
       }));
       
-      const feedbackResult = await generateDailyFeedback(userSummary, achievementScore, feedbackTodos);
+      const feedbackResult = await generateDailyFeedback(summary, achievementScore, feedbackTodos);
 
       setAiFeedback(feedbackResult);
       setCurrentScreen('result');
@@ -147,11 +149,80 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
     }
   };
 
-  // Handle back from result screen
-  const handleBackFromResult = () => {
-    setCurrentScreen('step2');
-    setAiFeedback(''); // Reset feedback when returning
+  const handleVoiceComplete = (data: any) => {
+    setVoiceChatVisible(false);
+    if (data && data.transcript) {
+      setUserSummary(data.transcript);
+      // Automatically trigger submission after voice input
+      handleSubmit(data.transcript);
+    }
   };
+
+  // Mode selection screen
+  if (currentScreen === 'mode-selection') {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme].background }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Text style={[styles.backButtonText, { color: Colors[colorScheme].text }]}>
+              ← 뒤로
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.modeSelectionContainer}>
+          <Text style={[styles.modeTitle, { color: Colors[colorScheme].text }]}>
+            리포트 작성 방법을{'\n'}선택해주세요
+          </Text>
+          <Text style={[styles.modeSubtitle, { color: Colors[colorScheme].icon }]}>
+            텍스트로 입력하거나 AI와 음성 대화로 작성할 수 있어요
+          </Text>
+
+          <View style={styles.modeOptionsContainer}>
+            <TouchableOpacity
+              style={styles.modeOption}
+              onPress={() => setCurrentScreen('step2')}
+            >
+              <Text style={styles.modeIcon}>✏️</Text>
+              <Text style={[styles.modeOptionTitle, { color: Colors[colorScheme].text }]}>텍스트 입력</Text>
+              <Text style={[styles.modeOptionDescription, { color: Colors[colorScheme].icon }]}>
+                키보드로 직접 하루를 요약해주세요
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modeOption}
+              onPress={() => setVoiceChatVisible(true)}
+            >
+              <Text style={styles.modeIcon}>🎤</Text>
+              <Text style={[styles.modeOptionTitle, { color: Colors[colorScheme].text }]}>음성 대화</Text>
+              <Text style={[styles.modeOptionDescription, { color: Colors[colorScheme].icon }]}>
+                AI와 대화하며 자연스럽게 하루를 돌아보세요
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.achievementSummary}>
+            <Text style={[styles.summaryTitle, { color: Colors[colorScheme].text }]}>오늘의 성과</Text>
+            <Text style={[styles.summaryText, { color: Colors[colorScheme].icon }]}>
+              달성률: {achievementScore}/10 | 완료된 할 일: {todos.filter(t => t.is_completed).length}/{todos.length}개
+            </Text>
+          </View>
+        </View>
+
+        {voiceChatVisible && (
+          <VoiceChatScreen
+            visible={voiceChatVisible}
+            mode="report"
+            onClose={() => setVoiceChatVisible(false)}
+            onComplete={handleVoiceComplete}
+          />
+        )}
+      </SafeAreaView>
+    );
+  }
+
+
 
   // Show result screen
   if (currentScreen === 'result') {
@@ -163,12 +234,13 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
            />;
   }
 
+  // Text mode (original interface)
   return (
     <CreateDailyReportStep2View
-      onBack={onBack}
+      onBack={() => setCurrentScreen('mode-selection')}
       userSummary={userSummary}
       setUserSummary={setUserSummary}
-      handleSubmit={handleSubmit}
+      handleSubmit={() => handleSubmit(userSummary)}
       isLoading={isLoading}
       error={error}
       colorScheme={colorScheme}
@@ -263,4 +335,64 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
   },
+  modeSelectionContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+  },
+  modeTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 32,
+  },
+  modeSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 40,
+    lineHeight: 24,
+  },
+  modeOptionsContainer: {
+    gap: 20,
+    marginBottom: 40,
+  },
+  modeOption: {
+    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  modeIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  modeOptionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  modeOptionDescription: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  achievementSummary: {
+    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  summaryText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
 }); 

@@ -1,6 +1,8 @@
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
+  Alert,
   Animated,
   Dimensions,
   Modal,
@@ -12,7 +14,10 @@ import {
   View
 } from 'react-native';
 import CalendarScreen from '../backend/calendar/calendar';
+import { generateDailyFeedback, parsePlanModificationCommand } from '../backend/hwirang/gemini';
 import { getActivePlan } from '../backend/supabase/habits';
+import { createReport } from '../backend/supabase/reports';
+import { useHabitStore } from '../lib/habitStore';
 import { DailyTodo, Plan } from '../types/habit';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
@@ -244,19 +249,21 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
 };
 
 export default function HomeScreen({ selectedDate }: HomeScreenProps) {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const styles = createStyles(colors);
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
   const [internalSelectedDate, setInternalSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const { plan, setPlan } = useHabitStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
   const [effectiveStartDate, setEffectiveStartDate] = useState<string | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
-  
+  const [reportVoiceChatVisible, setReportVoiceChatVisible] = useState(false);
+
   // Use selectedDate from props if provided, otherwise use internal state
   const targetDate = selectedDate || internalSelectedDate;
 
@@ -278,14 +285,10 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     const fetchPlan = async () => {
       try {
         setLoading(true);
-        const fetchedPlan = await getActivePlan(); // <-- Use the new function
-        setPlan(fetchedPlan);
-
+        const fetchedPlan = await getActivePlan();
         if (fetchedPlan) {
-          // The start date from the new Plan object is considered the effective start date.
+          setPlan(fetchedPlan);
           setEffectiveStartDate(fetchedPlan.start_date);
-
-          // Initialize todo completion status using the unique ID of each todo.
           const initialCompletion: { [key: string]: boolean } = {};
           fetchedPlan.milestones.forEach(m => {
             m.daily_todos.forEach(todo => {
@@ -293,6 +296,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
             });
           });
           setTodoCompletion(initialCompletion);
+        } else {
+          router.replace('/goal-setting');
         }
       } catch (e) {
         setError('Failed to fetch habit plan.');
@@ -301,9 +306,10 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         setLoading(false);
       }
     };
-
-    fetchPlan();
-  }, []);
+    if (!plan) {
+        fetchPlan();
+    }
+  }, [plan, router]);
 
   const getCoachStatus = (): CoachStatus => {
     const todos = getTodosForSelectedDate();
@@ -394,14 +400,92 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     setVoiceChatVisible(false);
   };
 
-  const handleVoiceInput = (text: string): void => {
-    console.log('Voice input received:', text);
-    // Here you would integrate with your AI backend
+  const handleReportCreationComplete = async (data: any) => {
+    setReportVoiceChatVisible(false);
+    if (!data || !data.transcript) {
+      Alert.alert('오류', '리포트 내용을 인식하지 못했습니다.');
+      return;
+    }
+    try {
+      const userSummary = data.transcript.split('\n').pop() || '';
+      const today = new Date();
+      const todayTodos = getTodosForSelectedDate();
+      const completedCount = todayTodos.filter(t => todoCompletion[t.id.toString()]).length;
+      const achievementScore = todayTodos.length > 0 ? Math.round((completedCount / todayTodos.length) * 10) : 0;
+      const feedback = await generateDailyFeedback(userSummary, achievementScore, todayTodos);
+      await createReport({ report_date: today.toISOString().split('T')[0], achievement_score: achievementScore, ai_coach_feedback: [feedback], daily_activities: { todos: todayTodos }, user_summary: userSummary });
+      Alert.alert('성공', '오늘의 리포트가 성공적으로 생성되었습니다.');
+    } catch (error) {
+      console.error('Error creating report:', error);
+      Alert.alert('오류', '리포트 생성 중 오류가 발생했습니다.');
+    }
   };
 
-  const coachStatus = getCoachStatus();
-  const calendarDates = getCalendarDates();
-  const todosForSelectedDate = getTodosForSelectedDate();
+  const handleVoiceCommand = async (data: any) => {
+    setVoiceChatVisible(false);
+    
+    // action 필드 확인하여 처리
+    if (data && data.action === 'PLAN_COMPLETE_GO_HOME') {
+      // 홈화면 모드 완료 - 홈화면으로 돌아가기
+      console.log('✅ Plan mode completed, staying on home screen');
+      Alert.alert('완료', '음성 명령이 처리되었습니다.');
+      return;
+    }
+    
+    if (!data || !data.transcript) {
+      Alert.alert('오류', '음성 명령을 인식하지 못했습니다.');
+      return;
+    }
+    try {
+      const command = await parsePlanModificationCommand(data.transcript);
+      if (!command || command.action === 'unknown') {
+        Alert.alert('알 수 없는 명령', '이해하지 못했습니다. 다시 말씀해주세요.');
+        return;
+      }
+      if (command.action === 'create_report') {
+        setReportVoiceChatVisible(true);
+        return;
+      }
+      if (!plan) {
+        Alert.alert('오류', '수정할 계획이 없습니다.');
+        return;
+      }
+      let newPlan = JSON.parse(JSON.stringify(plan));
+      switch (command.action) {
+        case 'add_todo':
+          if (newPlan.milestones && newPlan.milestones.length > 0) {
+            const newTodo: DailyTodo = { id: `new-todo-${Date.now()}`, description: command.payload.description, is_completed: false };
+            newPlan.milestones[0].daily_todos.push(newTodo);
+            setPlan(newPlan);
+            Alert.alert('성공', `'${command.payload.description}' 할 일이 추가되었습니다.`);
+          } else {
+            Alert.alert('오류', '할 일을 추가할 마일스톤이 없습니다.');
+          }
+          break;
+        case 'complete_todo':
+          let todoFound = false;
+          for (const milestone of newPlan.milestones) {
+            const todo = milestone.daily_todos.find(t => t.description.includes(command.payload.description));
+            if (todo) { todo.is_completed = true; todoFound = true; break; }
+          }
+          if (todoFound) {
+            setPlan(newPlan);
+            Alert.alert('성공', `'${command.payload.description}' 할 일을 완료했습니다.`);
+          } else {
+            Alert.alert('오류', `'${command.payload.description}' 할 일을 찾지 못했습니다.`);
+          }
+          break;
+        default: Alert.alert('알 수 없는 명령', '지원하지 않는 명령입니다.'); break;
+      }
+    } catch (error) {
+      console.error('Error processing voice command:', error);
+      Alert.alert('오류', '음성 명령 처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  const coachStatus = useMemo(() => getCoachStatus(), [plan, todoCompletion, targetDate]);
+  const calendarDates = useMemo(() => getCalendarDates(), []);
+  const todosForSelectedDate = useMemo(() => getTodosForSelectedDate(), [plan, effectiveStartDate, targetDate]);
   
   // Calculate progress statistics
   const getProgressStats = () => {
@@ -442,7 +526,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       ]).start();
     }
     setPreviousCoachStatus(coachStatus);
-  }, [coachStatus.emoji, coachStatus.message]);
+  }, [coachStatus.emoji, previousCoachStatus?.emoji]);
 
   // Animate content when loading completes
   useEffect(() => {
@@ -760,12 +844,13 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         <Text style={styles.voiceButtonIcon}>🎤</Text>
       </TouchableOpacity>
 
-      {/* Voice Chat Modal */}
-      <VoiceChatScreen
-        visible={voiceChatVisible}
-        onClose={handleVoiceChatClose}
-        onVoiceInput={handleVoiceInput}
-      />
+      {/* Voice Chat Modals */}
+      {voiceChatVisible && (
+          <VoiceChatScreen visible={voiceChatVisible} mode="plan" onClose={handleVoiceChatClose} onComplete={handleVoiceCommand} />
+      )}
+      {reportVoiceChatVisible && (
+          <VoiceChatScreen visible={reportVoiceChatVisible} mode="report" onClose={() => setReportVoiceChatVisible(false)} onComplete={handleReportCreationComplete} />
+      )}
 
       <Modal
         visible={calendarVisible}
