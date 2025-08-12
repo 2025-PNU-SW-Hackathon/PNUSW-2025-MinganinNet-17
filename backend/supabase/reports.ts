@@ -18,7 +18,7 @@ export interface DailyActivities {
 }
 
 /**
- * Supabase `reports` 테이블의 데이터를 나타내는 타입입니다.
+ * Supabase `daily_reports` 테이블의 데이터를 나타내는 타입입니다.
  */
 export interface ReportFromSupabase {
   id: string;
@@ -84,7 +84,7 @@ export const fetchReports = async (): Promise<{
 
   // 2. 현재 사용자의 모든 리포트 데이터 가져오기 (최신순으로 정렬)
   const { data, error } = await supabase
-    .from('reports')
+    .from('daily_reports')
     .select('*')
     .eq('user_id', user.id)
     .order('report_date', { ascending: false });
@@ -132,9 +132,9 @@ export const createReport = async (reportData: {
 
   console.log('Supabase에 저장을 시도하는 리포트 데이터:', newReport);
 
-  // 3. Supabase `reports` 테이블에 데이터 삽입
+  // 3. Supabase `daily_reports` 테이블에 데이터 삽입
   const { data, error } = await supabase
-    .from('reports')
+    .from('daily_reports')
     .insert(newReport)
     .select()
     .single(); // 삽입된 데이터를 바로 반환받음
@@ -183,7 +183,7 @@ export const aggregateWeeklyReports = async (): Promise<{
 
   // 3. 해당 기간의 일간 리포트 가져오기
   const { data: dailyReports, error } = await supabase
-    .from('reports')
+    .from('daily_reports')
     .select('*')
     .eq('user_id', user.id)
     .gte('report_date', weekStartStr)
