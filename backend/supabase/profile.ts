@@ -40,7 +40,7 @@ export async function getConsecutiveCompletionStreak(): Promise<number> {
   // 사용자 리포트 가져오기 (필요 필드만 선택)
   // 연속성 판단을 위해 최근 90일 정도만 조회 (필요시 조정 가능)
   const { data, error } = await supabase
-    .from('reports')
+    .from('daily_reports')
     .select('report_date,daily_activities')
     .eq('user_id', user.id)
     .lte('report_date', todayStr)
@@ -100,7 +100,7 @@ export async function getThisWeekTodosCompletionRate(): Promise<number> {
   const weekEndStr = sundayUtc.toISOString().split('T')[0];
 
   const { data, error } = await supabase
-    .from('reports')
+    .from('daily_reports')
     .select('report_date,daily_activities')
     .eq('user_id', user.id)
     .gte('report_date', weekStartStr)

@@ -1,17 +1,17 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getActivePlan } from '../backend/supabase/habits';
-import { Colors } from '../constants/Colors';
-import { useColorScheme } from '../hooks/useColorScheme';
-import { DailyTodo, Plan } from '../types/habit';
-import CreateDailyReportStep2Screen from './CreateDailyReportStep2Screen';
+import { getActivePlan } from '../../../../backend/supabase/habits';
+import { Colors } from '../../../../constants/Colors';
+import { useColorScheme } from '../../../../hooks/useColorScheme';
+import { DailyTodo, Plan } from '../../../../types/habit';
 
-interface CreateDailyReportScreenProps {
+interface DailyReportStep1Props {
+  onComplete: (todos: DailyTodo[], achievementScore: number) => void;
   onBack: () => void;
 }
 
-// Animated Todo Item Component for CreateDailyReportScreen
+// Animated Todo Item Component
 interface AnimatedTodoItemProps {
   todo: DailyTodo;
   isCompleted: boolean;
@@ -92,9 +92,8 @@ const getAchievementColor = (score: number): string => {
   return '#F44336';
 };
 
-export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScreenProps) {
+export default function DailyReportStep1({ onComplete, onBack }: DailyReportStep1Props) {
   const colorScheme = useColorScheme();
-  const [currentStep, setCurrentStep] = useState<'step1' | 'step2'>('step1');
   const [todos, setTodos] = useState<DailyTodo[]>([]);
   const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
   const [loading, setLoading] = useState<boolean>(true);
@@ -160,24 +159,12 @@ export default function CreateDailyReportScreen({ onBack }: CreateDailyReportScr
   };
   
   const handleNext = (): void => {
-    setCurrentStep('step2');
+    const completedTodos = todos.map(t => ({
+      ...t,
+      is_completed: todoCompletion[t.id.toString()]
+    }));
+    onComplete(completedTodos, achievementRate);
   };
-
-  const handleBackFromStep2 = (): void => {
-    setCurrentStep('step1');
-  };
-
-  if (currentStep === 'step2') {
-    return <CreateDailyReportStep2Screen 
-              onBack={onBack}  // 메인 리포트 화면으로 바로 이동하도록 변경
-              achievementScore={achievementRate} 
-              todos={todos.map(t => ({ 
-                ...t, 
-                // No longer need to convert id to string here
-                completed: todoCompletion[t.id.toString()] 
-              }))}
-           />;
-  }
 
   const TodoList = () => {
     if (loading) {
@@ -390,11 +377,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 56,
-    backgroundColor: '#6c63ff', // App's purple theme color for consistency
+    backgroundColor: '#6c63ff',
   },
   nextButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
   },
-}); 
+});

@@ -10,8 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { createReport } from '../backend/supabase/reports';
-import { DailyTodo } from '../types/habit';
+import { createReport } from '../../../../backend/supabase/reports';
+import { DailyTodo } from '../../../../types/habit';
 
 const { width, height } = Dimensions.get('window');
 

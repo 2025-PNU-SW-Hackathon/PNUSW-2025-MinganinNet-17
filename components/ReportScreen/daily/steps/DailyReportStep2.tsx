@@ -1,23 +1,22 @@
 import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { generateDailyFeedback } from '../backend/hwirang/gemini';
-import { Colors } from '../constants/Colors';
-import { useColorScheme } from '../hooks/useColorScheme';
-import { DailyTodo } from '../types/habit'; // Import the correct type
-import DailyReportResultScreen from './DailyReportResultScreen';
-import VoiceChatScreen from './VoiceChatScreen';
+import { generateDailyFeedback } from '../../../../backend/hwirang/gemini';
+import { Colors } from '../../../../constants/Colors';
+import { useColorScheme } from '../../../../hooks/useColorScheme';
+import { DailyTodo } from '../../../../types/habit';
+import VoiceChatScreen from '../../../VoiceChatScreen';
 
-// Removed local TodoItem interface
-
-interface CreateDailyReportStep2ScreenProps {
-  onBack: () => void;
+interface DailyReportStep2Props {
+  todos: DailyTodo[];
   achievementScore: number;
-  todos: DailyTodo[]; // Use DailyTodo[] directly
+  onComplete: (userSummary: string, aiFeedback: string) => void;
+  onBack: () => void;
 }
 
-// Step 2의 UI를 렌더링하는 것을 책임지는 분리된 컴포넌트입니다.
-// 이렇게 하면 상태 업데이트 시 불필요한 리렌더링을 방지하여 입력 문제를 해결할 수 있습니다.
-const CreateDailyReportStep2View = ({
+type InputMode = 'mode-selection' | 'text-input';
+
+// Text Input View Component
+const TextInputView = ({
   onBack,
   userSummary,
   setUserSummary,
@@ -116,17 +115,14 @@ const CreateDailyReportStep2View = ({
   );
 };
 
-export default function CreateDailyReportStep2Screen({ onBack, achievementScore, todos }: CreateDailyReportStep2ScreenProps) {
+export default function DailyReportStep2({ todos, achievementScore, onComplete, onBack }: DailyReportStep2Props) {
   const colorScheme = useColorScheme() ?? 'light';
-  const [currentScreen, setCurrentScreen] = useState<'mode-selection' | 'step2' | 'result'>('mode-selection');
+  const [inputMode, setInputMode] = useState<InputMode>('mode-selection');
   const [userSummary, setUserSummary] = useState<string>('');
-  const [aiFeedback, setAiFeedback] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
 
-
-  // Handle navigation to result screen
   const handleSubmit = async (summary: string) => {
     setIsLoading(true);
     setError(null);
@@ -138,9 +134,7 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
       }));
       
       const feedbackResult = await generateDailyFeedback(summary, achievementScore, feedbackTodos);
-
-      setAiFeedback(feedbackResult);
-      setCurrentScreen('result');
+      onComplete(summary, feedbackResult);
     } catch (err) {
       console.error('handleSubmit에서 오류 발생:', err);
       setError('피드백을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -159,7 +153,7 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
   };
 
   // Mode selection screen
-  if (currentScreen === 'mode-selection') {
+  if (inputMode === 'mode-selection') {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme].background }]}>
         <View style={styles.header}>
@@ -181,7 +175,7 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
           <View style={styles.modeOptionsContainer}>
             <TouchableOpacity
               style={styles.modeOption}
-              onPress={() => setCurrentScreen('step2')}
+              onPress={() => setInputMode('text-input')}
             >
               <Text style={styles.modeIcon}>✏️</Text>
               <Text style={[styles.modeOptionTitle, { color: Colors[colorScheme].text }]}>텍스트 입력</Text>
@@ -222,22 +216,10 @@ export default function CreateDailyReportStep2Screen({ onBack, achievementScore,
     );
   }
 
-
-
-  // Show result screen
-  if (currentScreen === 'result') {
-    return <DailyReportResultScreen 
-              onBack={onBack}  // 메인 리포트 화면으로 바로 이동하도록 변경
-              achievementScore={achievementScore} 
-              aiReportText={aiFeedback}
-              todos={todos} // 할일 목록 데이터 전달
-           />;
-  }
-
-  // Text mode (original interface)
+  // Text input mode
   return (
-    <CreateDailyReportStep2View
-      onBack={() => setCurrentScreen('mode-selection')}
+    <TextInputView
+      onBack={() => setInputMode('mode-selection')}
       userSummary={userSummary}
       setUserSummary={setUserSummary}
       handleSubmit={() => handleSubmit(userSummary)}
@@ -326,10 +308,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: 56,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#cccccc',
-    opacity: 0.5,
-  },
   submitButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -394,5 +372,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-
-}); 
+});
