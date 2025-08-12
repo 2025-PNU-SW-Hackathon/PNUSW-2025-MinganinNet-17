@@ -2,10 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WeeklyReportFromSupabase } from '../../backend/supabase/reports';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../hooks/useColorScheme';
-import DebugNextButton from '../DebugNextButton';
-import { ActivitySection } from './components/weekly_ActivitySection';
 import { WeekNavigator } from './components/weekly_Navigator';
-import { ReviewsSection } from './components/weekly_ReviewsSection';
 
 // Mock Weekly Report Data Interface
 interface WeeklyReportData {
@@ -105,21 +102,11 @@ const mockWeeklyReports: WeeklyReportData[] = [
 ];
 
 interface WeeklyReportSectionProps {
-  currentWeekIndex: number;
-  currentWeekReportGenerated: boolean;
-  currentWeeklyReport: WeeklyReportFromSupabase | null;
-  onNavigate: (direction: 'previous' | 'next') => void;
-  onStartWeeklyReport: () => void;
-  onDebugWeeklyNavigation: () => void;
+  onCreateReport: () => void;
 }
 
 export const WeeklyReportSection = ({
-  currentWeekIndex,
-  currentWeekReportGenerated,
-  currentWeeklyReport,
-  onNavigate,
-  onStartWeeklyReport,
-  onDebugWeeklyNavigation
+  onCreateReport
 }: WeeklyReportSectionProps) => {
   const colorScheme = useColorScheme();
 
@@ -137,7 +124,7 @@ export const WeeklyReportSection = ({
             </Text>
             <TouchableOpacity 
               style={[styles.weeklyReportButton, { backgroundColor: '#1c1c2e' }]}
-              onPress={onStartWeeklyReport}
+              onPress={onCreateReport}
               activeOpacity={0.8}
             >
               <Text style={styles.weeklyReportButtonText}>
@@ -161,138 +148,16 @@ export const WeeklyReportSection = ({
     );
   };
 
-  if (currentWeekIndex === 0 && !currentWeekReportGenerated) {
-    // Current week without generated report - show empty state
-    return (
-      <View style={styles.newWeeklyContainer}>
-        <WeekNavigator 
-          currentWeekIndex={currentWeekIndex}
-          currentWeekReportGenerated={currentWeekReportGenerated}
-          weeklyReportsLength={mockWeeklyReports.length}
-          onNavigate={onNavigate}
-        />
-        <EmptyWeeklyReport />
-        <DebugNextButton
-          to="Next Weekly State"
-          onPress={onDebugWeeklyNavigation}
-          label="Debug: Cycle Weeks"
-          disabled={false}
-        />
-      </View>
-    );
-  } else if (currentWeekIndex === -1) {
-    // Next week - show creation screen
-    return (
-      <View style={styles.newWeeklyContainer}>
-        <WeekNavigator 
-          currentWeekIndex={currentWeekIndex}
-          currentWeekReportGenerated={currentWeekReportGenerated}
-          weeklyReportsLength={mockWeeklyReports.length}
-          onNavigate={onNavigate}
-        />
-        <EmptyWeeklyReport />
-        <DebugNextButton
-          to="Next Weekly State"
-          onPress={onDebugWeeklyNavigation}
-          label="Debug: Cycle Weeks"
-          disabled={false}
-        />
-      </View>
-    );
-  } else if (currentWeekIndex === 0 && currentWeekReportGenerated) {
-    // Current week and report is generated → show result in weekly tab too
-    const currentWeekData: WeeklyReportData | null = currentWeeklyReport
-      ? mapWeeklyReportFromSupabase(currentWeeklyReport)
-      : null;
-
-    if (!currentWeekData) {
-      return (
-        <View style={styles.contentContainer}>
-          <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>
-            주간 리포트 데이터를 불러올 수 없습니다.
-          </Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.newWeeklyContainer}>
-        <WeekNavigator 
-          currentWeekIndex={currentWeekIndex}
-          currentWeekReportGenerated={currentWeekReportGenerated}
-          weeklyReportsLength={mockWeeklyReports.length}
-          onNavigate={onNavigate}
-        />
-        <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-          {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
-        </Text>
-        <ActivitySection data={currentWeekData} />
-        <ReviewsSection data={currentWeekData} />
-
-        <TouchableOpacity 
-          style={[styles.weeklyReportButton, { backgroundColor: '#1c1c2e', marginTop: 24 }]}
-          onPress={onStartWeeklyReport}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.weeklyReportButtonText}>
-            주간 리포트 시작하기
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  } else if (currentWeekIndex > 0) {
-    // Previous weeks - show historical data
-    const currentWeekData = mockWeeklyReports[currentWeekIndex - 1];
-    
-    if (!currentWeekData) {
-      return (
-        <View style={styles.contentContainer}>
-          <Text style={{ color: Colors[colorScheme ?? 'light'].text }}>
-            주간 리포트 데이터를 불러올 수 없습니다.
-          </Text>
-        </View>
-      );
-    }
-    
-    return (
-      <View style={styles.newWeeklyContainer}>
-        <WeekNavigator 
-          currentWeekIndex={currentWeekIndex}
-          currentWeekReportGenerated={currentWeekReportGenerated}
-          weeklyReportsLength={mockWeeklyReports.length}
-          onNavigate={onNavigate}
-        />
-        <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-          {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
-        </Text>
-        <ActivitySection data={currentWeekData} />
-        <ReviewsSection data={currentWeekData} />
-        <DebugNextButton
-          to="Next Weekly State"
-          onPress={onDebugWeeklyNavigation}
-          label="Debug: Cycle Weeks"
-          disabled={false}
-        />
-      </View>
-    );
-  }
-  
-  // Default case - show empty state
+  // 현재는 빈 상태만 표시 (기존 복잡한 로직 제거)
   return (
     <View style={styles.newWeeklyContainer}>
       <WeekNavigator 
-        currentWeekIndex={currentWeekIndex}
-        currentWeekReportGenerated={currentWeekReportGenerated}
+        currentWeekIndex={0}
+        currentWeekReportGenerated={false}
         weeklyReportsLength={mockWeeklyReports.length}
-        onNavigate={onNavigate}
+        onNavigate={() => {}} // 빈 함수로 처리
       />
       <EmptyWeeklyReport />
-      <DebugNextButton
-        to="Next Weekly State"
-        onPress={onDebugWeeklyNavigation}
-        label="Debug: Cycle Weeks"
-        disabled={false}
-      />
     </View>
   );
 };
@@ -302,19 +167,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
-  contentContainer: {
-    paddingHorizontal: 24,
-    gap: 16,
-    flex: 1,
-  },
-  weeklySummaryTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 32,
-    marginTop: 16,
-    fontFamily: 'Inter',
-  },
-  // Empty Weekly Report Styles
   emptyWeeklyContainer: {
     flex: 1,
     justifyContent: 'center',

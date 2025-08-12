@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Colors } from '../../constants/Colors';
-import { useColorScheme } from '../../hooks/useColorScheme';
-import DebugNextButton from '../DebugNextButton';
+import { WeeklyReportFromSupabase } from '../../../../backend/supabase/reports';
+import { Colors } from '../../../../constants/Colors';
+import { useColorScheme } from '../../../../hooks/useColorScheme';
 
-interface GeneratingWeeklyReportScreenProps {
+interface WeeklyReportStep2Props {
+  step1Data: any;
+  onComplete: (report: WeeklyReportFromSupabase) => void;
   onBack: () => void;
-  onGenerationComplete: () => void;
-  onDebugSkip: () => void;
 }
 
-export const GeneratingWeeklyReportScreen = ({ 
-  onBack, 
-  onGenerationComplete, 
-  onDebugSkip 
-}: GeneratingWeeklyReportScreenProps) => {
+export default function WeeklyReportStep2({ 
+  step1Data, 
+  onComplete, 
+  onBack 
+}: WeeklyReportStep2Props) {
   const colorScheme = useColorScheme();
   const [loadingProgress, setLoadingProgress] = useState(0);
 
@@ -26,7 +26,8 @@ export const GeneratingWeeklyReportScreen = ({
           clearInterval(interval);
           // Set report as generated and stay in weekly_create to show results
           setTimeout(() => {
-            onGenerationComplete();
+            // step1Data에서 생성된 리포트를 사용
+            onComplete(step1Data);
           }, 1000);
           return 100;
         }
@@ -35,7 +36,7 @@ export const GeneratingWeeklyReportScreen = ({
     }, 300);
 
     return () => clearInterval(interval);
-  }, [onGenerationComplete]);
+  }, [onComplete, step1Data]);
 
   return (
     <View style={styles.generatingContent}>
@@ -100,99 +101,87 @@ export const GeneratingWeeklyReportScreen = ({
           </Text>
         </View>
       </View>
-
-      {/* Debug Button */}
-      <DebugNextButton
-        to="Skip Generation"
-        onPress={onDebugSkip}
-        label="Debug: Skip Generation"
-        disabled={false}
-      />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   generatingContent: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 24,
   },
   loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 60,
+    width: '100%',
   },
   circularProgressContainer: {
     position: 'relative',
-    width: 200,
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 120,
+    height: 120,
     marginBottom: 32,
   },
   circularProgressTrack: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     borderWidth: 6,
     borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   circularProgressBar: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
   circularProgressFill: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 6,
     borderColor: 'transparent',
   },
   circularProgressContent: {
     position: 'absolute',
-    alignItems: 'center',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
-    width: 160,
-    height: 160,
+    alignItems: 'center',
   },
   loadingIcon: {
-    fontSize: 60,
+    fontSize: 32,
     marginBottom: 8,
   },
   loadingTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '600',
     textAlign: 'center',
   },
   loadingSubtext: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
     textAlign: 'center',
-    marginBottom: 40,
-    fontFamily: 'Inter',
+    marginBottom: 32,
   },
   progressContainer: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 20,
   },
   progressBarBackground: {
+    width: '100%',
     height: 8,
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 4,
-    overflow: 'hidden',
+    marginBottom: 8,
   },
   progressBarFill: {
-    height: '100%',
+    height: 8,
     borderRadius: 4,
   },
   progressText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 8,
-    fontFamily: 'Inter',
+    fontSize: 12,
   },
 });

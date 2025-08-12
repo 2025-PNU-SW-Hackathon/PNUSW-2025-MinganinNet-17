@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { fetchReports, ReportFromSupabase, WeeklyReportFromSupabase } from '../../backend/supabase/reports';
+import { fetchReports, ReportFromSupabase } from '../../backend/supabase/reports';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../hooks/useColorScheme';
-import CreateDailyReportScreen from '../CreateDailyReportScreen';
 import ScreenTransitionManager from '../ScreenTransitionManager';
+import DailyReportCreateFlow from './daily/DailyReportCreateFlow';
 import { DailyReportSection } from './daily_Section';
-import { CreateWeeklyReportScreen } from './weekly_CreateReportScreen';
-import { GeneratingWeeklyReportScreen } from './weekly_GeneratingScreen';
-import { WeeklyReportResultScreen } from './weekly_ResultScreen';
+import WeeklyReportCreateFlow from './weekly/WeeklyReportCreateFlow';
 import { WeeklyReportSection } from './weekly_Section';
 
 type ReportView = 'daily' | 'weekly';
@@ -22,152 +20,47 @@ export default function ReportScreen() {
   const [todayReport, setTodayReport] = useState<ReportFromSupabase | null>(null);
   const [historicalReports, setHistoricalReports] = useState<ReportFromSupabase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Weekly report states
-  const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
-  const [currentWeekReportGenerated, setCurrentWeekReportGenerated] = useState(false);
-  const [currentWeeklyReport, setCurrentWeeklyReport] = useState<WeeklyReportFromSupabase | null>(null);
 
   useEffect(() => {
     const loadReports = async () => {
       setIsLoading(true);
-      const { todayReport, historicalReports } = await fetchReports(); // Supabase에서 리포트 데이터 가져오기
+      const { todayReport, historicalReports } = await fetchReports();
       setTodayReport(todayReport);
       setHistoricalReports(historicalReports);
       setIsLoading(false);
     };
 
     loadReports();
-  }, [currentScreen]); // []안은 어떤 상태가 변경될 때 마다, 함수를 실행할지 정함
+  }, [currentScreen]);
 
   // Handle navigation to create daily report screen
-  const handleCreateReport = () => {
+  const handleCreateDailyReport = () => {
     setCurrentScreen('daily_create');
   };
 
-  // Handle back navigation from create screen
-  const handleBackToReport = () => {
-    setCurrentScreen('daily_report');
-  };
-
-  // Weekly report navigation handlers
-  const handleNavigate = (direction: 'previous' | 'next') => {
-    if (direction === 'previous') {
-      setCurrentWeekIndex(currentWeekIndex + 1);
-    } else {
-      setCurrentWeekIndex(currentWeekIndex - 1);
-    }
-  };
-
-  const handleStartWeeklyReport = () => {
-    setCurrentWeekReportGenerated(false);
-    setCurrentWeeklyReport(null);
-    setCurrentScreen('weekly_report');
-  };
-
-  const handleWeeklyReportGenerated = (report: WeeklyReportFromSupabase) => {
-    setCurrentWeeklyReport(report);
+  // Handle navigation to create weekly report screen
+  const handleCreateWeeklyReport = () => {
     setCurrentScreen('weekly_create');
   };
 
-  const handleGenerationComplete = () => {
-    setCurrentWeekReportGenerated(true);
+  // Handle back navigation from create screens
+  const handleBackToDailyReport = () => {
+    setCurrentScreen('daily_report');
   };
 
-  const handleSaveReport = () => {
-    console.log('💾 저장 버튼 클릭: 주간 리포트 저장');
-    setCurrentWeekReportGenerated(true);
-    setCurrentWeekIndex(0);
-    setCurrentScreen('daily_report'); // 이게 말이안됨, 주간 상태를 표시하는데 상태는 daily_report?
-    setSelectedView('weekly'); // 여기도 weekly잖아?
-  };
-
-  const handleDebugWeeklyNavigation = () => {
-    try {
-      console.log('🐛 DEBUG: WeeklyReport - Current week index:', currentWeekIndex);
-      const nextIndex = (currentWeekIndex + 1) % 3; // Assuming 3 mock weeks
-      setCurrentWeekIndex(nextIndex);
-      console.log('🐛 DEBUG: WeeklyReport - Switched to week index:', nextIndex);
-    } catch (error) {
-      console.error('🐛 DEBUG: WeeklyReport - Error in debug handler:', error);
-    }
-  };
-
-  const handleDebugSkip = () => {
-    console.log('🐛 DEBUG: Skipping weekly report generation');
-    setCurrentWeekReportGenerated(true);
+  const handleBackToWeeklyReport = () => {
+    setCurrentScreen('weekly_report');
   };
 
   // Render function for screen content
   const renderScreen = () => {
     switch (currentScreen) {
       case 'daily_create':
-        return <CreateDailyReportScreen onBack={handleBackToReport} />;
-      case 'weekly_report':
-        return (
-          <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-            <View style={styles.createWeeklyHeader}>
-              <TouchableOpacity 
-                style={styles.backButton}
-                onPress={() => setCurrentScreen('daily_report')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
-                  ← 뒤로
-                </Text>
-              </TouchableOpacity>
-              <Text style={[styles.createWeeklyTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-                주간 리포트 생성
-              </Text>
-            </View>
-            <CreateWeeklyReportScreen 
-              onBack={() => setCurrentScreen('daily_report')}
-              onReportGenerated={handleWeeklyReportGenerated}
-            />
-          </SafeAreaView>
-        );
+        return <DailyReportCreateFlow onBack={handleBackToDailyReport} />;
       case 'weekly_create':
-        if (currentWeekReportGenerated) {
-          return (
-            <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-              <View style={styles.createWeeklyHeader}>
-                <Text style={[styles.createWeeklyTitle, { color: Colors[colorScheme ?? 'light'].text }]}> 
-                  주간 리포트
-                </Text>
-              </View>
-              <WeeklyReportResultScreen 
-                currentWeeklyReport={currentWeeklyReport}
-                onSaveReport={handleSaveReport}
-                onDebugWeeklyNavigation={handleDebugWeeklyNavigation}
-              />
-            </SafeAreaView>
-          );
-        } else {
-          return (
-            <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-              <View style={styles.createWeeklyHeader}>
-                <TouchableOpacity 
-                  style={styles.backButton}
-                  onPress={() => setCurrentScreen('weekly_report')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.backButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
-                    ← 뒤로
-                  </Text>
-                </TouchableOpacity>
-                <Text style={[styles.createWeeklyTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-                  주간 리포트 생성
-                </Text>
-              </View>
-              <GeneratingWeeklyReportScreen 
-                onBack={() => setCurrentScreen('weekly_report')}
-                onGenerationComplete={handleGenerationComplete}
-                onDebugSkip={handleDebugSkip}
-              />
-            </SafeAreaView>
-          );
-        }
+        return <WeeklyReportCreateFlow onBack={handleBackToWeeklyReport} />;
       case 'daily_report':
+      case 'weekly_report':
       default:
         return <ReportScreenContent />;
     }
@@ -185,16 +78,11 @@ export default function ReportScreen() {
           todayReport={todayReport}
           historicalReports={historicalReports}
           isLoading={isLoading}
-          onCreateReport={handleCreateReport}
+          onCreateReport={handleCreateDailyReport}
         />
       ) : (
         <WeeklyReportSection 
-          currentWeekIndex={currentWeekIndex}
-          currentWeekReportGenerated={currentWeekReportGenerated}
-          currentWeeklyReport={currentWeeklyReport}
-          onNavigate={handleNavigate}
-          onStartWeeklyReport={handleStartWeeklyReport}
-          onDebugWeeklyNavigation={handleDebugWeeklyNavigation}
+          onCreateReport={handleCreateWeeklyReport}
         />
       )}
     </SafeAreaView>
@@ -248,10 +136,10 @@ export default function ReportScreen() {
     );
   };
 
-  return ( // 화면 전환을 위한 컴포넌트, currentScreen이 변경될 때마다 화면이 전환됨
+  return (
     <ScreenTransitionManager
       screenKey={currentScreen}
-      direction={currentScreen === 'daily_create' ? 'forward' : 'backward'}
+      direction={currentScreen === 'daily_create' || currentScreen === 'weekly_create' ? 'forward' : 'backward'}
       onTransitionComplete={() => {
         console.log('Report screen transition completed:', currentScreen);
       }}
@@ -310,26 +198,5 @@ const styles = StyleSheet.create({
   },
   segmentTextInactive: {
     opacity: 0.7,
-  },
-  // Create Weekly Report Screen Styles
-  createWeeklyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-  backButton: {
-    paddingRight: 16,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  createWeeklyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    fontFamily: 'Inter',
   },
 });
