@@ -1,19 +1,20 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { WeeklyReportFromSupabase } from '../../backend/supabase/reports';
+import { WeeklyReportFromSupabase, fetchWeeklyReports } from '../../backend/supabase/reports';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../hooks/useColorScheme';
+import { ActivitySection } from './components/weekly_ActivitySection';
 import { WeekNavigator } from './components/weekly_Navigator';
+import { ReviewsSection } from './components/weekly_ReviewsSection';
+import WeeklyReportCreateFlow from './weekly/WeeklyReportCreateFlow';
 
 // Mock Weekly Report Data Interface
 interface WeeklyReportData {
   id: string;
   weekStart: string;
   weekEnd: string;
-  achievementScore: number;
   daysCompleted: number;
-  totalDays: number;
   insights: string;
-  bestDay: string;
   averageScore: number;
   dailyScores: number[];
 }
@@ -36,85 +37,130 @@ const formatWeeklyDate = (weekStart: string, weekEnd: string): string => {
 
 // Backend → UI 데이터 매핑 함수
 const mapWeeklyReportFromSupabase = (report: WeeklyReportFromSupabase): WeeklyReportData => {
-  const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
-  const dailyScores = report.daily_scores || [];
-  let bestDayIndex = 0;
-  let bestScore = -1;
-  dailyScores.forEach((score, idx) => {
-    if (score > bestScore) {
-      bestScore = score;
-      bestDayIndex = idx;
-    }
-  });
-
   return {
     id: report.id,
     weekStart: report.week_start,
     weekEnd: report.week_end,
-    achievementScore: Math.round(report.average_score),
     daysCompleted: report.days_completed,
-    totalDays: 7,
     insights: report.insights,
-    bestDay: dayNames[bestDayIndex] || '월',
     averageScore: report.average_score,
     dailyScores: report.daily_scores,
   };
 };
 
-// Mock Weekly Data
-const mockWeeklyReports: WeeklyReportData[] = [
-  {
-    id: 'week-1',
-    weekStart: '2025-01-27',
-    weekEnd: '2025-02-02',
-    achievementScore: 8,
-    daysCompleted: 6,
-    totalDays: 7,
-    averageScore: 8.2,
-    bestDay: '금요일',
-    dailyScores: [8, 7, 9, 8, 10, 6, 9],
-    insights: '이번 주는 목표를 꾸준히 달성했습니다.\n주 중 내용 2\n주 중 내용 3'
-  },
-  {
-    id: 'week-2',
-    weekStart: '2025-01-20',
-    weekEnd: '2025-01-26',
-    achievementScore: 7,
-    daysCompleted: 5,
-    totalDays: 7,
-    averageScore: 7.4,
-    bestDay: '수요일',
-    dailyScores: [6, 8, 9, 7, 6, 0, 8],
-    insights: '지난주 대비 향상된 성과를 보였습니다.\n주말 활동이 부족했습니다.\n전반적으로 안정적인 패턴을 유지했습니다.'
-  },
-  {
-    id: 'week-3',
-    weekStart: '2025-01-13',
-    weekEnd: '2025-01-19',
-    achievementScore: 6,
-    daysCompleted: 4,
-    totalDays: 7,
-    averageScore: 6.1,
-    bestDay: '화요일',
-    dailyScores: [5, 8, 6, 0, 7, 0, 0],
-    insights: '목표 달성에 어려움이 있었습니다.\n새로운 도전에 적응하는 시간이 필요했습니다.\n다음 주는 더 나은 결과를 기대합니다.'
-  }
-];
+// 현재 주차의 시작일 계산 함수
+const getCurrentWeekStart = (): string => {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // 월요일까지의 차이
+  
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  
+  return monday.getFullYear() + '-' + 
+         String(monday.getMonth() + 1).padStart(2, '0') + '-' + 
+         String(monday.getDate()).padStart(2, '0');
+};
+
+// 저번주 월요일 계산 함수
+const getLastWeekStart = (): string => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const diffToLastMonday = dayOfWeek === 0 ? -13 : -6 - dayOfWeek;
+  
+  const lastMonday = new Date(today);
+  lastMonday.setDate(today.getDate() + diffToLastMonday);
+  lastMonday.setHours(0, 0, 0, 0);
+  
+  return lastMonday.getFullYear() + '-' + 
+         String(lastMonday.getMonth() + 1).padStart(2, '0') + '-' + 
+         String(lastMonday.getDate()).padStart(2, '0');
+};
+
+// 목표 주차 결정 함수
+const getTargetWeekInfo = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  
+  const isWeekCompleted = dayOfWeek === 0; // 일요일이면 이번주 완료
+  const targetWeekStart = isWeekCompleted 
+    ? getCurrentWeekStart()    // 이번주
+    : getLastWeekStart();      // 저번주
+    
+  return { isWeekCompleted, targetWeekStart };
+};
 
 interface WeeklyReportSectionProps {
-  onCreateReport: () => void;
 }
 
-export const WeeklyReportSection = ({
-  onCreateReport
-}: WeeklyReportSectionProps) => {
+export const WeeklyReportSection = ({}: WeeklyReportSectionProps) => {
   const colorScheme = useColorScheme();
+  const [isCreating, setIsCreating] = useState(false);
+  const [weeklyReports, setWeeklyReports] = useState<WeeklyReportFromSupabase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
+
+  // 주간 리포트 데이터 로딩
+  useEffect(() => {
+    const loadWeeklyReports = async () => {
+      try {
+        setIsLoading(true);
+        const reports = await fetchWeeklyReports();
+        setWeeklyReports(reports);
+        
+        // 목표 주차 결정 및 인덱스 찾기
+        const { isWeekCompleted, targetWeekStart } = getTargetWeekInfo();
+        
+        const targetIndex = reports.findIndex(report => report.week_start === targetWeekStart);
+        setCurrentWeekIndex(targetIndex >= 0 ? targetIndex : 0);
+      } catch (error) {
+        console.error('주간 리포트 로딩 실패:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadWeeklyReports();
+  }, []);
+
+  // If creating report, show the create flow
+  if (isCreating) {
+    return <WeeklyReportCreateFlow onBack={() => setIsCreating(false)} />;
+  }
+
+  // 현재 주차의 리포트 데이터
+  const currentWeekReport = weeklyReports[currentWeekIndex];
+  const currentWeekData = currentWeekReport ? mapWeeklyReportFromSupabase(currentWeekReport) : null;
+
+  // 주간 리포트 표시 컴포넌트
+  const WeeklyReportDisplay = () => { // 없으면 빈 화면 표시
+    if (!currentWeekData) {
+      return <EmptyWeeklyReport />;
+    }
+
+    return ( // 있으면 주간 리포트 표시
+      <View style={styles.weeklyReportContainer}> 
+        {/* Weekly Summary Title */}
+        <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+          {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
+        </Text>
+
+        {/* Activity Section */}
+        <ActivitySection data={currentWeekData} />
+
+        {/* Reviews Section */}
+        <ReviewsSection data={currentWeekData} />
+      </View>
+    );
+  };
 
   // Empty Weekly Report Component
   const EmptyWeeklyReport = () => {
-    const isEndOfWeek = true;
+    const { isWeekCompleted } = getTargetWeekInfo();
     
-    if (isEndOfWeek) {
+    if (isWeekCompleted) {
+      // 시나리오 2: 이번주 완료, 리포트 없음 → 생성 버튼 표시
       return (
         <View style={styles.emptyWeeklyContainer}>
           <View style={styles.emptyWeeklyContent}>
@@ -124,7 +170,7 @@ export const WeeklyReportSection = ({
             </Text>
             <TouchableOpacity 
               style={[styles.weeklyReportButton, { backgroundColor: '#1c1c2e' }]}
-              onPress={onCreateReport}
+              onPress={() => setIsCreating(true)}
               activeOpacity={0.8}
             >
               <Text style={styles.weeklyReportButtonText}>
@@ -134,30 +180,43 @@ export const WeeklyReportSection = ({
           </View>
         </View>
       );
+    } else {
+      // 시나리오 1: 이번주 진행 중, 저번주 리포트 없음 → 대기 메시지
+      return (
+        <View style={styles.emptyWeeklyContainer}>
+          <View style={styles.emptyWeeklyContent}>
+            <Text style={styles.emptyWeeklyIcon}>📅</Text>
+            <Text style={[styles.emptyWeeklyText, { color: Colors[colorScheme ?? 'light'].text }]}>
+              아직 주차가 끝나지 않았습니다.{'\n'}이번주가 끝나고 뵈어요!
+            </Text>
+          </View>
+        </View>
+      );
     }
-    
+  };
+
+  // 로딩 중 표시
+  if (isLoading) {
     return (
-      <View style={styles.emptyWeeklyContainer}>
-        <View style={styles.emptyWeeklyContent}>
-          <Text style={styles.emptyWeeklyIcon}>📅</Text>
-          <Text style={[styles.emptyWeeklyText, { color: Colors[colorScheme ?? 'light'].text }]}>
-            아직 주차가 끝나지 않았습니다.{'\n'}이번주가 끝나고 뵈어요!
+      <View style={styles.newWeeklyContainer}>
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: Colors[colorScheme ?? 'light'].text }]}>
+            주간 리포트를 불러오는 중...
           </Text>
         </View>
       </View>
     );
-  };
+  }
 
-  // 현재는 빈 상태만 표시 (기존 복잡한 로직 제거)
   return (
     <View style={styles.newWeeklyContainer}>
       <WeekNavigator 
-        currentWeekIndex={0}
-        currentWeekReportGenerated={false}
-        weeklyReportsLength={mockWeeklyReports.length}
-        onNavigate={() => {}} // 빈 함수로 처리
+        currentWeekIndex={currentWeekIndex}
+        currentWeekReportGenerated={!!currentWeekReport}
+        weeklyReportsLength={weeklyReports.length}
+        onNavigate={(index) => setCurrentWeekIndex(Number(index))}
       />
-      <EmptyWeeklyReport />
+      <WeeklyReportDisplay />
     </View>
   );
 };
@@ -166,6 +225,26 @@ const styles = StyleSheet.create({
   newWeeklyContainer: {
     flex: 1,
     paddingHorizontal: 24,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Inter',
+  },
+  weeklyReportContainer: {
+    flex: 1,
+  },
+  weeklySummaryTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 32,
+    fontFamily: 'Inter',
   },
   emptyWeeklyContainer: {
     flex: 1,

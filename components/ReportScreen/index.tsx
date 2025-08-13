@@ -3,19 +3,14 @@ import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 import { fetchReports, ReportFromSupabase } from '../../backend/supabase/reports';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../hooks/useColorScheme';
-import ScreenTransitionManager from '../ScreenTransitionManager';
-import DailyReportCreateFlow from './daily/DailyReportCreateFlow';
 import { DailyReportSection } from './daily_Section';
-import WeeklyReportCreateFlow from './weekly/WeeklyReportCreateFlow';
 import { WeeklyReportSection } from './weekly_Section';
 
 type ReportView = 'daily' | 'weekly';
-type ScreenView = 'daily_report' | 'daily_create' | 'weekly_report' | 'weekly_create';
 
 export default function ReportScreen() {
   const colorScheme = useColorScheme();
   const [selectedView, setSelectedView] = useState<ReportView>('daily');
-  const [currentScreen, setCurrentScreen] = useState<ScreenView>('daily_report');
   
   const [todayReport, setTodayReport] = useState<ReportFromSupabase | null>(null);
   const [historicalReports, setHistoricalReports] = useState<ReportFromSupabase[]>([]);
@@ -31,40 +26,7 @@ export default function ReportScreen() {
     };
 
     loadReports();
-  }, [currentScreen]);
-
-  // Handle navigation to create daily report screen
-  const handleCreateDailyReport = () => {
-    setCurrentScreen('daily_create');
-  };
-
-  // Handle navigation to create weekly report screen
-  const handleCreateWeeklyReport = () => {
-    setCurrentScreen('weekly_create');
-  };
-
-  // Handle back navigation from create screens
-  const handleBackToDailyReport = () => {
-    setCurrentScreen('daily_report');
-  };
-
-  const handleBackToWeeklyReport = () => {
-    setCurrentScreen('weekly_report');
-  };
-
-  // Render function for screen content
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'daily_create':
-        return <DailyReportCreateFlow onBack={handleBackToDailyReport} />;
-      case 'weekly_create':
-        return <WeeklyReportCreateFlow onBack={handleBackToWeeklyReport} />;
-      case 'daily_report':
-      case 'weekly_report':
-      default:
-        return <ReportScreenContent />;
-    }
-  };
+  }, []);
 
   // Main Report Screen Content Component
   const ReportScreenContent = () => (
@@ -78,12 +40,9 @@ export default function ReportScreen() {
           todayReport={todayReport}
           historicalReports={historicalReports}
           isLoading={isLoading}
-          onCreateReport={handleCreateDailyReport}
         />
       ) : (
-        <WeeklyReportSection 
-          onCreateReport={handleCreateWeeklyReport}
-        />
+        <WeeklyReportSection />
       )}
     </SafeAreaView>
   );
@@ -136,17 +95,7 @@ export default function ReportScreen() {
     );
   };
 
-  return (
-    <ScreenTransitionManager
-      screenKey={currentScreen}
-      direction={currentScreen === 'daily_create' || currentScreen === 'weekly_create' ? 'forward' : 'backward'}
-      onTransitionComplete={() => {
-        console.log('Report screen transition completed:', currentScreen);
-      }}
-    >
-      {renderScreen()}
-    </ScreenTransitionManager>
-  );
+  return <ReportScreenContent />;
 }
 
 const styles = StyleSheet.create({

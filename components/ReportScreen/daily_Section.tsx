@@ -1,23 +1,29 @@
+import { useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ReportFromSupabase } from '../../backend/supabase/reports';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { ReportCard } from './components/daily_ReportCard';
+import DailyReportCreateFlow from './daily/DailyReportCreateFlow';
 
 interface DailyReportSectionProps {
   todayReport: ReportFromSupabase | null;
   historicalReports: ReportFromSupabase[];
   isLoading: boolean;
-  onCreateReport: () => void;
 }
 
 export const DailyReportSection = ({ 
   todayReport, 
   historicalReports, 
-  isLoading, 
-  onCreateReport 
+  isLoading
 }: DailyReportSectionProps) => {
   const colorScheme = useColorScheme();
+  const [isCreating, setIsCreating] = useState(false);
+
+  // If creating report, show the create flow
+  if (isCreating) {
+    return <DailyReportCreateFlow onBack={() => setIsCreating(false)} />;
+  }
 
   const CreateReportPrompt = () => {
     return (
@@ -26,7 +32,7 @@ export const DailyReportSection = ({
           styles.createReportCard,
           { backgroundColor: Colors[colorScheme ?? 'light'].background }
         ]}
-        onPress={onCreateReport}
+        onPress={() => setIsCreating(true)}
         activeOpacity={0.7}
       >
         <View style={styles.createReportContent}>
