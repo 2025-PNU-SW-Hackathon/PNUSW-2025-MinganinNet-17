@@ -10,11 +10,8 @@ interface WeeklyReportData {
   id: string;
   weekStart: string;
   weekEnd: string;
-  achievementScore: number;
   daysCompleted: number;
-  totalDays: number;
   insights: string;
-  bestDay: string;
   averageScore: number;
   dailyScores: number[];
 }
@@ -37,26 +34,12 @@ const formatWeeklyDate = (weekStart: string, weekEnd: string): string => {
 
 // Backend → UI 데이터 매핑 함수
 const mapWeeklyReportFromSupabase = (report: WeeklyReportFromSupabase): WeeklyReportData => {
-  const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
-  const dailyScores = report.daily_scores || [];
-  let bestDayIndex = 0;
-  let bestScore = -1;
-  dailyScores.forEach((score, idx) => {
-    if (score > bestScore) {
-      bestScore = score;
-      bestDayIndex = idx;
-    }
-  });
-
   return {
     id: report.id,
     weekStart: report.week_start,
     weekEnd: report.week_end,
-    achievementScore: Math.round(report.average_score),
     daysCompleted: report.days_completed,
-    totalDays: 7,
     insights: report.insights,
-    bestDay: dayNames[bestDayIndex] || '월',
     averageScore: report.average_score,
     dailyScores: report.daily_scores,
   };

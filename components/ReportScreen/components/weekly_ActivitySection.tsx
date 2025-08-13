@@ -14,11 +14,8 @@ interface WeeklyReportData {
   id: string;
   weekStart: string;
   weekEnd: string;
-  achievementScore: number;
   daysCompleted: number;
-  totalDays: number;
   insights: string;
-  bestDay: string;
   averageScore: number;
   dailyScores: number[];
 }
