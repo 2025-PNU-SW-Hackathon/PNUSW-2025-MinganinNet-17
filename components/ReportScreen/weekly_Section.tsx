@@ -1,19 +1,18 @@
+import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WeeklyReportFromSupabase } from '../../backend/supabase/reports';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { WeekNavigator } from './components/weekly_Navigator';
+import WeeklyReportCreateFlow from './weekly/WeeklyReportCreateFlow';
 
 // Mock Weekly Report Data Interface
 interface WeeklyReportData {
   id: string;
   weekStart: string;
   weekEnd: string;
-  achievementScore: number;
   daysCompleted: number;
-  totalDays: number;
   insights: string;
-  bestDay: string;
   averageScore: number;
   dailyScores: number[];
 }
@@ -36,26 +35,12 @@ const formatWeeklyDate = (weekStart: string, weekEnd: string): string => {
 
 // Backend → UI 데이터 매핑 함수
 const mapWeeklyReportFromSupabase = (report: WeeklyReportFromSupabase): WeeklyReportData => {
-  const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
-  const dailyScores = report.daily_scores || [];
-  let bestDayIndex = 0;
-  let bestScore = -1;
-  dailyScores.forEach((score, idx) => {
-    if (score > bestScore) {
-      bestScore = score;
-      bestDayIndex = idx;
-    }
-  });
-
   return {
     id: report.id,
     weekStart: report.week_start,
     weekEnd: report.week_end,
-    achievementScore: Math.round(report.average_score),
     daysCompleted: report.days_completed,
-    totalDays: 7,
     insights: report.insights,
-    bestDay: dayNames[bestDayIndex] || '월',
     averageScore: report.average_score,
     dailyScores: report.daily_scores,
   };
@@ -67,11 +52,8 @@ const mockWeeklyReports: WeeklyReportData[] = [
     id: 'week-1',
     weekStart: '2025-01-27',
     weekEnd: '2025-02-02',
-    achievementScore: 8,
     daysCompleted: 6,
-    totalDays: 7,
     averageScore: 8.2,
-    bestDay: '금요일',
     dailyScores: [8, 7, 9, 8, 10, 6, 9],
     insights: '이번 주는 목표를 꾸준히 달성했습니다.\n주 중 내용 2\n주 중 내용 3'
   },
@@ -79,11 +61,8 @@ const mockWeeklyReports: WeeklyReportData[] = [
     id: 'week-2',
     weekStart: '2025-01-20',
     weekEnd: '2025-01-26',
-    achievementScore: 7,
     daysCompleted: 5,
-    totalDays: 7,
     averageScore: 7.4,
-    bestDay: '수요일',
     dailyScores: [6, 8, 9, 7, 6, 0, 8],
     insights: '지난주 대비 향상된 성과를 보였습니다.\n주말 활동이 부족했습니다.\n전반적으로 안정적인 패턴을 유지했습니다.'
   },
@@ -91,24 +70,24 @@ const mockWeeklyReports: WeeklyReportData[] = [
     id: 'week-3',
     weekStart: '2025-01-13',
     weekEnd: '2025-01-19',
-    achievementScore: 6,
     daysCompleted: 4,
-    totalDays: 7,
     averageScore: 6.1,
-    bestDay: '화요일',
     dailyScores: [5, 8, 6, 0, 7, 0, 0],
     insights: '목표 달성에 어려움이 있었습니다.\n새로운 도전에 적응하는 시간이 필요했습니다.\n다음 주는 더 나은 결과를 기대합니다.'
   }
 ];
 
 interface WeeklyReportSectionProps {
-  onCreateReport: () => void;
 }
 
-export const WeeklyReportSection = ({
-  onCreateReport
-}: WeeklyReportSectionProps) => {
+export const WeeklyReportSection = ({}: WeeklyReportSectionProps) => {
   const colorScheme = useColorScheme();
+  const [isCreating, setIsCreating] = useState(false);
+
+  // If creating report, show the create flow
+  if (isCreating) {
+    return <WeeklyReportCreateFlow onBack={() => setIsCreating(false)} />;
+  }
 
   // Empty Weekly Report Component
   const EmptyWeeklyReport = () => {
@@ -124,7 +103,7 @@ export const WeeklyReportSection = ({
             </Text>
             <TouchableOpacity 
               style={[styles.weeklyReportButton, { backgroundColor: '#1c1c2e' }]}
-              onPress={onCreateReport}
+              onPress={() => setIsCreating(true)}
               activeOpacity={0.8}
             >
               <Text style={styles.weeklyReportButtonText}>
