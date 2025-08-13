@@ -58,7 +58,37 @@ const getCurrentWeekStart = (): string => {
   monday.setDate(today.getDate() + diffToMonday);
   monday.setHours(0, 0, 0, 0);
   
-  return monday.toISOString().split('T')[0];
+  return monday.getFullYear() + '-' + 
+         String(monday.getMonth() + 1).padStart(2, '0') + '-' + 
+         String(monday.getDate()).padStart(2, '0');
+};
+
+// 저번주 월요일 계산 함수
+const getLastWeekStart = (): string => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const diffToLastMonday = dayOfWeek === 0 ? -13 : -6 - dayOfWeek;
+  
+  const lastMonday = new Date(today);
+  lastMonday.setDate(today.getDate() + diffToLastMonday);
+  lastMonday.setHours(0, 0, 0, 0);
+  
+  return lastMonday.getFullYear() + '-' + 
+         String(lastMonday.getMonth() + 1).padStart(2, '0') + '-' + 
+         String(lastMonday.getDate()).padStart(2, '0');
+};
+
+// 목표 주차 결정 함수
+const getTargetWeekInfo = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  
+  const isWeekCompleted = dayOfWeek === 0; // 일요일이면 이번주 완료
+  const targetWeekStart = isWeekCompleted 
+    ? getCurrentWeekStart()    // 이번주
+    : getLastWeekStart();      // 저번주
+    
+  return { isWeekCompleted, targetWeekStart };
 };
 
 interface WeeklyReportSectionProps {
@@ -79,10 +109,11 @@ export const WeeklyReportSection = ({}: WeeklyReportSectionProps) => {
         const reports = await fetchWeeklyReports();
         setWeeklyReports(reports);
         
-        // 현재 주차 인덱스 찾기
-        const currentWeekStart = getCurrentWeekStart();
-        const currentIndex = reports.findIndex(report => report.week_start === currentWeekStart);
-        setCurrentWeekIndex(currentIndex >= 0 ? currentIndex : 0);
+        // 목표 주차 결정 및 인덱스 찾기
+        const { isWeekCompleted, targetWeekStart } = getTargetWeekInfo();
+        
+        const targetIndex = reports.findIndex(report => report.week_start === targetWeekStart);
+        setCurrentWeekIndex(targetIndex >= 0 ? targetIndex : 0);
       } catch (error) {
         console.error('주간 리포트 로딩 실패:', error);
       } finally {
@@ -103,13 +134,13 @@ export const WeeklyReportSection = ({}: WeeklyReportSectionProps) => {
   const currentWeekData = currentWeekReport ? mapWeeklyReportFromSupabase(currentWeekReport) : null;
 
   // 주간 리포트 표시 컴포넌트
-  const WeeklyReportDisplay = () => {
+  const WeeklyReportDisplay = () => { // 없으면 빈 화면 표시
     if (!currentWeekData) {
       return <EmptyWeeklyReport />;
     }
 
-    return (
-      <View style={styles.weeklyReportContainer}>
+    return ( // 있으면 주간 리포트 표시
+      <View style={styles.weeklyReportContainer}> 
         {/* Weekly Summary Title */}
         <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
           {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
@@ -126,9 +157,10 @@ export const WeeklyReportSection = ({}: WeeklyReportSectionProps) => {
 
   // Empty Weekly Report Component
   const EmptyWeeklyReport = () => {
-    const isEndOfWeek = true;
+    const { isWeekCompleted } = getTargetWeekInfo();
     
-    if (isEndOfWeek) {
+    if (isWeekCompleted) {
+      // 시나리오 2: 이번주 완료, 리포트 없음 → 생성 버튼 표시
       return (
         <View style={styles.emptyWeeklyContainer}>
           <View style={styles.emptyWeeklyContent}>
@@ -148,18 +180,19 @@ export const WeeklyReportSection = ({}: WeeklyReportSectionProps) => {
           </View>
         </View>
       );
-    }
-    
-    return (
-      <View style={styles.emptyWeeklyContainer}>
-        <View style={styles.emptyWeeklyContent}>
-          <Text style={styles.emptyWeeklyIcon}>📅</Text>
-          <Text style={[styles.emptyWeeklyText, { color: Colors[colorScheme ?? 'light'].text }]}>
-            아직 주차가 끝나지 않았습니다.{'\n'}이번주가 끝나고 뵈어요!
-          </Text>
+    } else {
+      // 시나리오 1: 이번주 진행 중, 저번주 리포트 없음 → 대기 메시지
+      return (
+        <View style={styles.emptyWeeklyContainer}>
+          <View style={styles.emptyWeeklyContent}>
+            <Text style={styles.emptyWeeklyIcon}>📅</Text>
+            <Text style={[styles.emptyWeeklyText, { color: Colors[colorScheme ?? 'light'].text }]}>
+              아직 주차가 끝나지 않았습니다.{'\n'}이번주가 끝나고 뵈어요!
+            </Text>
+          </View>
         </View>
-      </View>
-    );
+      );
+    }
   };
 
   // 로딩 중 표시
