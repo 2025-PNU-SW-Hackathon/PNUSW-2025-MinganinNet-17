@@ -266,34 +266,6 @@ const calculateWeeklyStats = (
   };
 };
 
-/*
- * 주간 리포트가 이미 존재하는지 확인합니다.
- * @param weekStart - 주간 시작일
- * @returns 존재 여부
- */
-/*
-export const checkWeeklyReportExists = async (weekStart: string): Promise<boolean> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return false;
-  }
-
-  const { data, error } = await supabase
-    .from('weekly_reports')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('week_start', weekStart)
-    .single();
-
-  if (error && error.code !== 'PGRST116') { // PGRST116는 데이터가 없는 경우
-    console.error('주간 리포트 존재 여부 확인 중 오류:', error);
-    return false;
-  }
-
-  return !!data;
-};
-*/
-
 /**
  * 주간 리포트를 위한 AI 인사이트를 생성합니다.
  * @param dailyReports - 일간 리포트 배열
@@ -514,4 +486,94 @@ export const generateAndSaveWeeklyReport = async (): Promise<WeeklyReportFromSup
     console.error('❌ 주간 리포트 생성 중 오류:', error);
     return null;
   }
+};
+
+/**
+ * 현재 사용자의 모든 주간 리포트를 Supabase DB에서 가져옵니다.
+ * 최신순으로 정렬하여 반환합니다.
+ * @returns 주간 리포트 배열 또는 빈 배열
+ */
+export const fetchWeeklyReports = async (): Promise<WeeklyReportFromSupabase[]> => {
+  // 1. 현재 사용자 정보 가져오기
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.error('사용자가 인증되지 않았습니다.');
+    return [];
+  }
+
+  // 2. 현재 사용자의 모든 주간 리포트 데이터 가져오기 (최신순으로 정렬)
+  const { data, error } = await supabase
+    .from('weekly_reports')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('week_start', { ascending: false });
+
+  if (error) {
+    console.error('주간 리포트 데이터를 가져오는 중 오류가 발생했습니다:', error);
+    return [];
+  }
+  
+  if (!data) {
+    return [];
+  }
+
+  console.log(`가져온 주간 리포트 수: ${data.length}개`);
+  return data;
+};
+
+/**
+ * 특정 주차의 주간 리포트가 이미 존재하는지 확인합니다.
+ * @param weekStart - 주간 시작일 (YYYY-MM-DD 형식)
+ * @returns 존재 여부
+ */
+export const checkWeeklyReportExists = async (weekStart: string): Promise<boolean> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return false;
+  }
+
+  const { data, error } = await supabase
+    .from('weekly_reports')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('week_start', weekStart)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116는 데이터가 없는 경우
+    console.error('주간 리포트 존재 여부 확인 중 오류:', error);
+    return false;
+  }
+
+  return !!data;
+};
+
+/**
+ * 특정 주차의 주간 리포트를 가져옵니다.
+ * @param weekStart - 주간 시작일 (YYYY-MM-DD 형식)
+ * @returns 주간 리포트 데이터 또는 null
+ */
+export const fetchWeeklyReportByWeek = async (weekStart: string): Promise<WeeklyReportFromSupabase | null> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.error('사용자가 인증되지 않았습니다.');
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('weekly_reports')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('week_start', weekStart)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') { // 데이터가 없는 경우
+      console.log(`주간 리포트가 존재하지 않습니다: ${weekStart}`);
+      return null;
+    }
+    console.error('주간 리포트 조회 중 오류:', error);
+    return null;
+  }
+
+  return data;
 };
