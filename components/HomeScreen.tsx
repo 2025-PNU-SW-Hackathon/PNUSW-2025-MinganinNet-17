@@ -23,7 +23,7 @@ import { useColorScheme } from '../hooks/useColorScheme';
 import { useHabitStore } from '../lib/habitStore';
 import { DailyTodo } from '../types/habit';
 import { AccentGlassCard, SecondaryGlassCard } from './GlassCard';
-import { PurpleBlueGradient } from './GradientBackground';
+import VintagePaperBackground from './VintagePaperBackground';
 import ProfileScreen from './ProfileScreen';
 import { SkeletonCard, SkeletonTodoList } from './SkeletonLoaders';
 import VoiceChatScreen from './VoiceChatScreen';
@@ -637,7 +637,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   }
 
   return (
-    <PurpleBlueGradient style={styles.container}>
+    <VintagePaperBackground style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.headerArea}>
@@ -910,7 +910,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         </View>
       </Modal>
       </SafeAreaView>
-    </PurpleBlueGradient>
+    </VintagePaperBackground>
   );
 }
 

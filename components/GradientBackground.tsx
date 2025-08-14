@@ -9,7 +9,7 @@ import { useColorScheme } from '../hooks/useColorScheme';
 
 interface GradientBackgroundProps {
   children: ReactNode;
-  variant?: 'purple-blue' | 'purple-pink' | 'blue-teal' | 'custom';
+  variant?: 'purple-blue' | 'purple-pink' | 'blue-teal' | 'vintage-paper' | 'custom';
   colors?: string[];
   locations?: number[];
   start?: { x: number; y: number };
@@ -40,21 +40,37 @@ export const GradientBackground: React.FC<GradientBackgroundProps> = ({
 
     switch (variant) {
       case 'purple-blue':
-        // Matches the reference image gradient
+        // Updated to sage green gradient
         return isDark
           ? [
-              '#4A148C', // Deep purple
-              '#6A1B9A', // Medium purple
-              '#7E57C2', // Light purple
-              '#5C6BC0', // Purple-blue
-              '#42A5F5', // Light blue
+              '#2c2c2c', // Dark charcoal
+              '#353b34', // Very dark sage
+              '#4a5549', // Darker sage
+              '#5f6f5e', // Dark sage
+              '#748873', // Sage green
             ]
           : [
-              '#3D5AFE', // Bright blue
-              '#6C63FF', // Primary purple
-              '#8B7CF6', // Light purple
-              '#A78BFA', // Very light purple
-              '#C4B5FD', // Pale purple
+              '#748873', // Sage green
+              '#8fa087', // Light sage
+              '#d1a980', // Warm beige
+              '#e5e0d8', // Light beige
+              '#f8f8f8', // Warm white
+            ];
+
+      case 'vintage-paper':
+        // New vintage paper gradient
+        return isDark
+          ? [
+              '#2c2c2c', // Dark charcoal
+              '#353b34', // Very dark sage
+              '#4a5549', // Darker sage
+              '#748873', // Sage green
+            ]
+          : [
+              '#f8f8f8', // Warm white (top)
+              '#f0f0f0', // Very light beige
+              '#e5e0d8', // Light beige (middle)
+              '#d1a980', // Warm beige (bottom accent)
             ];
 
       case 'purple-pink':
@@ -125,6 +141,10 @@ const styles = StyleSheet.create({
 // Pre-configured gradient variants
 export const PurpleBlueGradient: React.FC<Omit<GradientBackgroundProps, 'variant'>> = (props) => (
   <GradientBackground variant="purple-blue" {...props} />
+);
+
+export const VintagePaperGradient: React.FC<Omit<GradientBackgroundProps, 'variant'>> = (props) => (
+  <GradientBackground variant="vintage-paper" {...props} />
 );
 
 export const PurplePinkGradient: React.FC<Omit<GradientBackgroundProps, 'variant'>> = (props) => (

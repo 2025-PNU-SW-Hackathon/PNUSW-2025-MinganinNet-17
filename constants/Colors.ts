@@ -3,40 +3,40 @@
  * Includes neutral shades, semantic colors, and opacity variants for modern UI design.
  */
 
-const tintColorLight = '#6c63ff';
-const tintColorDark = '#6c63ff';
+const tintColorLight = '#748873';
+const tintColorDark = '#748873';
 
 export const Colors = {
   light: {
     // Backgrounds
-    background: '#ffffff',
-    surface: '#f8f9fa',
-    card: '#ffffff',
-    cardSecondary: '#f1f3f4',
+    background: '#f8f8f8',
+    surface: '#e5e0d8',
+    card: '#f8f8f8',
+    cardSecondary: '#e5e0d8',
     
-    // Neutral color scale (50-900)
+    // Neutral color scale (50-900) - Earth tones
     neutral: {
-      50: '#f9fafb',
-      100: '#f3f4f6',
-      200: '#e5e7eb',
-      300: '#d1d5db',
-      400: '#9ca3af',
-      500: '#6b7280',
-      600: '#4b5563',
-      700: '#374151',
-      800: '#1f2937',
-      900: '#111827',
+      50: '#f8f8f8',
+      100: '#f0f0f0',
+      200: '#e5e0d8',
+      300: '#d1a980',
+      400: '#b8a082',
+      500: '#748873',
+      600: '#5f6f5e',
+      700: '#4a5549',
+      800: '#353b34',
+      900: '#2c2c2c',
     },
     
     // Text colors
-    text: '#1a1a1a',
-    textSecondary: '#6b7280',
-    textMuted: '#9ca3af',
+    text: '#2c2c2c',
+    textSecondary: '#5a6b5a',
+    textMuted: '#8fa087',
     
     // Primary colors with variants
-    primary: '#6c63ff',
-    primaryLight: '#8b7cf6',
-    primaryDark: '#5b52cc',
+    primary: '#748873',
+    primaryLight: '#8fa087',
+    primaryDark: '#5f6f5e',
     tint: tintColorLight,
     
     // Semantic colors
@@ -99,11 +99,11 @@ export const Colors = {
     
     // Primary color with opacity
     primaryOpacity: {
-      10: 'rgba(108, 99, 255, 0.1)',
-      20: 'rgba(108, 99, 255, 0.2)',
-      30: 'rgba(108, 99, 255, 0.3)',
-      50: 'rgba(108, 99, 255, 0.5)',
-      80: 'rgba(108, 99, 255, 0.8)',
+      10: 'rgba(116, 136, 115, 0.1)',
+      20: 'rgba(116, 136, 115, 0.2)',
+      30: 'rgba(116, 136, 115, 0.3)',
+      50: 'rgba(116, 136, 115, 0.5)',
+      80: 'rgba(116, 136, 115, 0.8)',
     },
     
     // Typography system
@@ -235,9 +235,9 @@ export const Colors = {
     textMuted: '#7a7a95',
     
     // Primary colors with variants
-    primary: '#6c63ff',
-    primaryLight: '#8b7cf6',
-    primaryDark: '#5b52cc',
+    primary: '#748873',
+    primaryLight: '#8fa087',
+    primaryDark: '#5f6f5e',
     tint: tintColorDark,
     
     // Semantic colors
@@ -300,11 +300,11 @@ export const Colors = {
     
     // Primary color with opacity
     primaryOpacity: {
-      10: 'rgba(108, 99, 255, 0.1)',
-      20: 'rgba(108, 99, 255, 0.2)',
-      30: 'rgba(108, 99, 255, 0.3)',
-      50: 'rgba(108, 99, 255, 0.5)',
-      80: 'rgba(108, 99, 255, 0.8)',
+      10: 'rgba(116, 136, 115, 0.1)',
+      20: 'rgba(116, 136, 115, 0.2)',
+      30: 'rgba(116, 136, 115, 0.3)',
+      50: 'rgba(116, 136, 115, 0.5)',
+      80: 'rgba(116, 136, 115, 0.8)',
     },
     
     // Typography system (same for both light and dark modes)
