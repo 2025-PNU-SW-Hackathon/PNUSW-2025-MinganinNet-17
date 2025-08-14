@@ -6,7 +6,7 @@ interface WeekNavigatorProps {
   currentWeekIndex: number;
   currentWeekReportGenerated: boolean;
   weeklyReportsLength: number;
-  onNavigate: (direction: 'previous' | 'next') => void;
+  onNavigate: (index: number) => void;
 }
 
 export const WeekNavigator = ({ 
@@ -19,7 +19,8 @@ export const WeekNavigator = ({
   
   // Allow going to -1 (next week) when current week report is generated
   const canGoPrevious = currentWeekIndex < weeklyReportsLength - 1;
-  const canGoNext = currentWeekReportGenerated ? currentWeekIndex > -1 : currentWeekIndex > 0;
+  // const canGoNext = currentWeekReportGenerated ? currentWeekIndex > -1 : currentWeekIndex > 0;
+  const canGoNext = currentWeekIndex > 0;
   
   return (
     <View style={styles.weekNavigatorContainer}>
@@ -28,7 +29,7 @@ export const WeekNavigator = ({
           styles.weekNavButton, 
           !canGoPrevious && styles.weekNavButtonDisabled
         ]}
-        onPress={() => canGoPrevious && onNavigate('previous')}
+        onPress={() => canGoPrevious && onNavigate(currentWeekIndex + 1)}
         disabled={!canGoPrevious}
         activeOpacity={0.7}
       >
@@ -37,7 +38,7 @@ export const WeekNavigator = ({
           { color: Colors[colorScheme ?? 'light'].text },
           !canGoPrevious && styles.weekNavButtonTextDisabled
         ]}>
-          ← 이전 주
+          ← 이전 리포트
         </Text>
       </TouchableOpacity>
       
@@ -46,7 +47,7 @@ export const WeekNavigator = ({
           styles.weekNavButton, 
           !canGoNext && styles.weekNavButtonDisabled
         ]}
-        onPress={() => canGoNext && onNavigate('next')}
+        onPress={() => canGoNext && onNavigate(currentWeekIndex - 1)}
         disabled={!canGoNext}
         activeOpacity={0.7}
       >
@@ -55,7 +56,7 @@ export const WeekNavigator = ({
           { color: Colors[colorScheme ?? 'light'].text },
           !canGoNext && styles.weekNavButtonTextDisabled
         ]}>
-          다음 주 →
+          다음 리포트 →
         </Text>
       </TouchableOpacity>
     </View>

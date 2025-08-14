@@ -134,27 +134,6 @@ export const WeeklyReportSection = ({}: WeeklyReportSectionProps) => {
   const currentWeekData = currentWeekReport ? mapWeeklyReportFromSupabase(currentWeekReport) : null;
 
   // 주간 리포트 표시 컴포넌트
-  const WeeklyReportDisplay = () => { // 없으면 빈 화면 표시
-    if (!currentWeekData) {
-      return <EmptyWeeklyReport />;
-    }
-
-    return ( // 있으면 주간 리포트 표시
-      <View style={styles.weeklyReportContainer}> 
-        {/* Weekly Summary Title */}
-        <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-          {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
-        </Text>
-
-        {/* Activity Section */}
-        <ActivitySection data={currentWeekData} />
-
-        {/* Reviews Section */}
-        <ReviewsSection data={currentWeekData} />
-      </View>
-    );
-  };
-
   // Empty Weekly Report Component
   const EmptyWeeklyReport = () => {
     const { isWeekCompleted } = getTargetWeekInfo();
@@ -193,6 +172,27 @@ export const WeeklyReportSection = ({}: WeeklyReportSectionProps) => {
         </View>
       );
     }
+  };
+
+  const WeeklyReportDisplay = () => { // 없으면 빈 화면 표시
+    if (!currentWeekData) {
+      return <EmptyWeeklyReport />;
+    }
+
+    return ( // 있으면 주간 리포트 표시
+      <View style={styles.weeklyReportContainer}> 
+        {/* Weekly Summary Title */}
+        <Text style={[styles.weeklySummaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+          {formatWeeklyDate(currentWeekData.weekStart, currentWeekData.weekEnd).replace('주간 리포트', '주간 요약')}
+        </Text>
+
+        {/* Activity Section */}
+        <ActivitySection data={currentWeekData} />
+
+        {/* Reviews Section */}
+        <ReviewsSection data={currentWeekData} />
+      </View>
+    );
   };
 
   // 로딩 중 표시
