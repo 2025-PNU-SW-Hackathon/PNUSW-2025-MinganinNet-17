@@ -47,10 +47,21 @@ export const VintagePaperBackground: React.FC<VintagePaperBackgroundProps> = ({
         style={StyleSheet.absoluteFillObject}
       />
       
-      {/* Paper texture overlay - subtle noise pattern */}
-      <View style={[styles.textureOverlay, isDark && styles.textureOverlayDark]} />
+      {/* Enhanced Multi-Layer Paper Texture System */}
       
-      {/* Subtle paper grain effect */}
+      {/* Paper fiber grain - diagonal pattern */}
+      <View style={[styles.paperFibers, isDark && styles.paperFibersDark]} />
+      
+      {/* Paper noise - speckled texture for imperfections */}
+      <View style={[styles.paperNoise, isDark && styles.paperNoiseDark]} />
+      
+      {/* Paper weave - cross-hatch fiber pattern */}
+      <View style={[styles.paperWeave, isDark && styles.paperWeaveDark]} />
+      
+      {/* Vintage patina - aging effects */}
+      <View style={[styles.vintagePatina, isDark && styles.vintagePatinaDark]} />
+      
+      {/* Legacy grain overlay - enhanced */}
       <View style={[styles.grainOverlay, isDark && styles.grainOverlayDark]} />
       
       {/* Content container */}
@@ -69,29 +80,83 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   
-  // Light mode texture overlays
-  textureOverlay: {
+  // Enhanced Paper Fiber Grain - Diagonal Pattern
+  paperFibers: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.03,
+    opacity: 0.08, // More visible for authentic paper feel
     backgroundColor: 'transparent',
-    // CSS-like pattern simulation using backgroundColor and opacity
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderTopColor: 'rgba(209, 169, 128, 0.3)', // Warm beige fiber lines
+    borderBottomColor: 'rgba(229, 224, 216, 0.2)',
+    transform: [{ rotate: '45deg' }, { scale: 1.5 }], // Diagonal grain pattern
+  },
+  paperFibersDark: {
+    borderTopColor: 'rgba(116, 136, 115, 0.25)', // Sage green fibers
+    borderBottomColor: 'rgba(143, 160, 135, 0.15)',
   },
   
+  // Paper Noise - Speckled Texture for Imperfections
+  paperNoise: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.06,
+    // Simulate paper speckles using background pattern
+    backgroundColor: 'rgba(209, 169, 128, 0.1)',
+    // Create noise effect using multiple small gradients
+    borderRadius: 1,
+    borderWidth: 0.25,
+    borderColor: 'rgba(229, 224, 216, 0.3)',
+  },
+  paperNoiseDark: {
+    backgroundColor: 'rgba(116, 136, 115, 0.08)',
+    borderColor: 'rgba(143, 160, 135, 0.2)',
+  },
+  
+  // Paper Weave - Cross-hatch Fiber Pattern
+  paperWeave: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.04,
+    backgroundColor: 'transparent',
+    borderLeftWidth: 0.25,
+    borderRightWidth: 0.25,
+    borderLeftColor: 'rgba(209, 169, 128, 0.4)',
+    borderRightColor: 'rgba(229, 224, 216, 0.3)',
+    transform: [{ rotate: '-45deg' }, { scale: 1.2 }], // Cross-grain effect
+  },
+  paperWeaveDark: {
+    borderLeftColor: 'rgba(116, 136, 115, 0.3)',
+    borderRightColor: 'rgba(143, 160, 135, 0.2)',
+  },
+  
+  // Vintage Patina - Aging Effects
+  vintagePatina: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.05,
+    backgroundColor: 'rgba(209, 169, 128, 0.08)', // Subtle aging discoloration
+    // Create uneven aging pattern
+    borderTopLeftRadius: 50,
+    borderBottomRightRadius: 30,
+    borderTopRightRadius: 20,
+    borderBottomLeftRadius: 40,
+  },
+  vintagePatinaDark: {
+    backgroundColor: 'rgba(95, 111, 94, 0.06)', // Dark aged paper effect
+  },
+  
+  // Enhanced grain overlay
   grainOverlay: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.02,
+    opacity: 0.06, // Increased from 0.02 for better visibility
     backgroundColor: '#d1a980', // Warm beige overlay for paper feel
-  },
-  
-  // Dark mode texture overlays
-  textureOverlayDark: {
-    opacity: 0.05,
-    backgroundColor: '#748873', // Sage green texture
+    // Add subtle texture variation
+    borderWidth: 0.1,
+    borderColor: 'rgba(229, 224, 216, 0.5)',
   },
   
   grainOverlayDark: {
-    opacity: 0.03,
+    opacity: 0.08, // Increased from 0.03
     backgroundColor: '#5f6f5e', // Dark sage overlay
+    borderColor: 'rgba(143, 160, 135, 0.4)',
   },
 });
 

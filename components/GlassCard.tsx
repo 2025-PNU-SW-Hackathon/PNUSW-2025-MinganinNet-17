@@ -149,16 +149,22 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 
   const content = (
     <>
-      {/* Multi-layer glass block refraction system */}
-      <View style={[styles.outerRefraction, colorScheme === 'dark' && styles.outerRefractionDark]} />
-      <View style={[styles.innerHighlight, colorScheme === 'dark' && styles.innerHighlightDark]} />
-      <View style={[styles.bottomEdgeShadow, colorScheme === 'dark' && styles.bottomEdgeShadowDark]} />
+      {/* Liquid Glass Background Layers */}
+      <View style={[styles.liquidGlassBase, colorScheme === 'dark' && styles.liquidGlassBaseDark]} />
+      <View style={[styles.liquidGlassLayer1, colorScheme === 'dark' && styles.liquidGlassLayer1Dark]} />
+      <View style={[styles.liquidGlassLayer2, colorScheme === 'dark' && styles.liquidGlassLayer2Dark]} />
       
-      {/* Glass highlight effect - enhanced for glass block */}
-      <View style={[styles.glassHighlight, colorScheme === 'dark' && styles.glassHighlightDark]} />
+      {/* Complex Inset Shadow System */}
+      <View style={[styles.insetShadowDark, colorScheme === 'dark' && styles.insetShadowDarkMode]} />
+      <View style={[styles.insetShadowLight, colorScheme === 'dark' && styles.insetShadowLightMode]} />
+      <View style={[styles.innerGlow, colorScheme === 'dark' && styles.innerGlowDark]} />
+      <View style={[styles.outerGlow, colorScheme === 'dark' && styles.outerGlowDark]} />
       
-      {/* Content with enhanced magnification effect */}
-      <View style={[styles.contentContainer, styles.magnifiedContent, contentContainerStyle]}>
+      {/* Backdrop Blur Simulation */}
+      <View style={[styles.backdropBlur, colorScheme === 'dark' && styles.backdropBlurDark]} />
+      
+      {/* Content with liquid glass magnification */}
+      <View style={[styles.contentContainer, styles.liquidGlassContent, contentContainerStyle]}>
         {children}
       </View>
     </>
@@ -197,85 +203,145 @@ const createStyles = (colors: typeof Colors.light) =>
   StyleSheet.create({
     container: {
       borderRadius: Spacing.layout.borderRadius.xl,
-      borderWidth: 1.5, // Thicker border for glass block appearance
+      borderWidth: 0, // Remove border - using complex shadow system instead
       padding: Spacing.xl,
       overflow: 'hidden',
       position: 'relative',
     },
     contentContainer: {
       flex: 1,
-      zIndex: 10, // Ensure content is above glass effects
+      zIndex: 20, // Ensure content is above all glass effects
     },
     
-    // Enhanced magnification effect for glass block
-    magnifiedContent: {
-      transform: [{ scale: 1.025 }], // Stronger magnification
+    // Correct Transparent Liquid Glass Background (matching Figma)
+    liquidGlassBase: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(116, 136, 115, 0.08)', // Ultra-light sage glass - matches Figma's rgba(255,255,255,0.08)
+      borderRadius: Spacing.layout.borderRadius.xl,
+    },
+    liquidGlassBaseDark: {
+      backgroundColor: 'rgba(143, 160, 135, 0.06)',
     },
     
-    // Multi-layer glass block refraction system
-    outerRefraction: {
-      position: 'absolute',
-      top: -1,
-      left: -1,
-      right: -1,
-      bottom: -1,
-      borderRadius: Spacing.layout.borderRadius.xl + 1,
-      borderWidth: 2,
-      borderColor: 'rgba(116, 136, 115, 0.4)', // Strong outer refraction edge
+    liquidGlassLayer1: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(116, 136, 115, 0.04)', // Very subtle sage tint
+      borderRadius: Spacing.layout.borderRadius.xl,
     },
-    outerRefractionDark: {
-      borderColor: 'rgba(143, 160, 135, 0.35)',
+    liquidGlassLayer1Dark: {
+      backgroundColor: 'rgba(143, 160, 135, 0.03)',
     },
     
-    // Inner highlight border for glass thickness
-    innerHighlight: {
+    liquidGlassLayer2: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255, 255, 255, 0.03)', // Barely visible white overlay for glass shine
+      borderRadius: Spacing.layout.borderRadius.xl,
+    },
+    liquidGlassLayer2Dark: {
+      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    },
+    
+    // Complex Inset Shadow System (based on Figma CSS)
+    insetShadowDark: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: Spacing.layout.borderRadius.xl,
+      // Simulating: inset 2.7px 2.7px 0px -1.35px #333333, inset -2.7px -2.7px 0px -1.35px #262626
+      borderTopWidth: 2,
+      borderLeftWidth: 2,
+      borderRightWidth: 2,
+      borderBottomWidth: 2,
+      borderTopColor: 'rgba(116, 136, 115, 0.6)', // Sage version of #333333
+      borderLeftColor: 'rgba(116, 136, 115, 0.6)',
+      borderRightColor: 'rgba(95, 111, 94, 0.5)', // Sage version of #262626
+      borderBottomColor: 'rgba(95, 111, 94, 0.5)',
+    },
+    insetShadowDarkMode: {
+      borderTopColor: 'rgba(143, 160, 135, 0.5)',
+      borderLeftColor: 'rgba(143, 160, 135, 0.5)',
+      borderRightColor: 'rgba(74, 85, 73, 0.4)',
+      borderBottomColor: 'rgba(74, 85, 73, 0.4)',
+    },
+    
+    insetShadowLight: {
       position: 'absolute',
       top: 1,
       left: 1,
       right: 1,
       bottom: 1,
       borderRadius: Spacing.layout.borderRadius.xl - 1,
-      borderWidth: 1,
-      borderTopColor: 'rgba(255, 255, 255, 0.25)',
-      borderLeftColor: 'rgba(255, 255, 255, 0.25)',
-      borderRightColor: 'rgba(116, 136, 115, 0.15)',
-      borderBottomColor: 'rgba(116, 136, 115, 0.15)',
+      // Simulating: inset 2.7px 2.7px 1.35px -2.7px #FFFFFF, inset -2.7px -2.7px 1.35px -2.7px #FFFFFF
+      borderTopWidth: 1,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderBottomWidth: 1,
+      borderTopColor: 'rgba(255, 255, 255, 0.4)',
+      borderLeftColor: 'rgba(255, 255, 255, 0.4)',
+      borderRightColor: 'rgba(255, 255, 255, 0.2)',
+      borderBottomColor: 'rgba(255, 255, 255, 0.2)',
     },
-    innerHighlightDark: {
-      borderTopColor: 'rgba(255, 255, 255, 0.15)',
-      borderLeftColor: 'rgba(255, 255, 255, 0.15)',
-      borderRightColor: 'rgba(143, 160, 135, 0.2)',
-      borderBottomColor: 'rgba(143, 160, 135, 0.2)',
-    },
-    
-    // Bottom edge shadow for glass block depth
-    bottomEdgeShadow: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 8,
-      backgroundColor: 'rgba(116, 136, 115, 0.08)',
-      borderBottomLeftRadius: Spacing.layout.borderRadius.xl,
-      borderBottomRightRadius: Spacing.layout.borderRadius.xl,
-    },
-    bottomEdgeShadowDark: {
-      backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    insetShadowLightMode: {
+      borderTopColor: 'rgba(255, 255, 255, 0.3)',
+      borderLeftColor: 'rgba(255, 255, 255, 0.3)',
+      borderRightColor: 'rgba(255, 255, 255, 0.15)',
+      borderBottomColor: 'rgba(255, 255, 255, 0.15)',
     },
     
-    // Enhanced glass highlight effect
-    glassHighlight: {
+    // Inner Glow Effect - Transparent with glass-like luminosity
+    innerGlow: {
       position: 'absolute',
-      top: 0,
-      left: 0,
-      right: '55%',
-      height: '45%',
-      backgroundColor: 'rgba(255, 255, 255, 0.12)', // Stronger highlight
-      borderTopLeftRadius: Spacing.layout.borderRadius.xl,
-      borderBottomRightRadius: Spacing.layout.borderRadius.lg,
+      top: 4,
+      left: 4,
+      right: 4,
+      bottom: 4,
+      borderRadius: Spacing.layout.borderRadius.xl - 4,
+      backgroundColor: 'rgba(255, 255, 255, 0.02)', // Much more transparent
+      shadowColor: 'rgba(255, 255, 255, 0.5)',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.3, // Reduced for subtlety
+      shadowRadius: 8,
+      elevation: 0,
     },
-    glassHighlightDark: {
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    innerGlowDark: {
+      backgroundColor: 'rgba(255, 255, 255, 0.01)',
+      shadowColor: 'rgba(255, 255, 255, 0.3)',
+      shadowOpacity: 0.2,
+    },
+    
+    // Outer Glow Effect - Soft luminous glass effect
+    outerGlow: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      right: 8,
+      bottom: 8,
+      borderRadius: Spacing.layout.borderRadius.xl - 8,
+      backgroundColor: 'rgba(242, 242, 242, 0.03)', // Much more transparent
+      shadowColor: '#F2F2F2',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.15, // Reduced for transparent effect
+      shadowRadius: 20,
+      elevation: 0,
+    },
+    outerGlowDark: {
+      backgroundColor: 'rgba(200, 200, 200, 0.02)',
+      shadowColor: '#CCCCCC',
+      shadowOpacity: 0.1,
+    },
+    
+    // Enhanced Backdrop Blur Simulation (primary glass effect from Figma)
+    backdropBlur: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255, 255, 255, 0.04)', // Lighter than base layer for layered effect
+      borderRadius: Spacing.layout.borderRadius.xl,
+      // This creates the primary glass transparency effect
+    },
+    backdropBlurDark: {
+      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    },
+    
+    // Enhanced magnification for liquid glass
+    liquidGlassContent: {
+      transform: [{ scale: 1.015 }], // Subtle liquid glass magnification
     },
     
     disabled: {
