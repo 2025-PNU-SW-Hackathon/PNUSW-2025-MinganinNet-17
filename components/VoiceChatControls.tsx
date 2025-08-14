@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, AccessibilityActionEvent } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -70,7 +70,12 @@ const VoiceChatControls: React.FC<VoiceChatControlsProps> = ({
   }));
 
   return (
-    <View style={styles.container}>
+    <View 
+      style={styles.container}
+      accessible={false} // Allow individual buttons to be focused
+      accessibilityRole="group"
+      accessibilityLabel="음성 채팅 제어 버튼"
+    >
       {/* Pause/Resume Button */}
       <Animated.View style={[pauseButtonStyle]}>
         <TouchableOpacity
@@ -78,13 +83,40 @@ const VoiceChatControls: React.FC<VoiceChatControlsProps> = ({
           onPress={handlePausePress}
           disabled={disabled}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={isPaused ? "음성 재개" : "음성 일시정지"}
+          accessibilityHint={
+            disabled 
+              ? "현재 사용할 수 없습니다" 
+              : isPaused 
+                ? "두 번 탭하면 음성 채팅을 재개합니다" 
+                : "두 번 탭하면 음성 채팅을 일시정지합니다"
+          }
+          accessibilityState={{ 
+            disabled: disabled,
+            selected: !isPaused // Playing state is "selected"
+          }}
+          accessibilityActions={[
+            { name: 'activate', label: isPaused ? '재개' : '일시정지' }
+          ]}
+          onAccessibilityAction={(event: AccessibilityActionEvent) => {
+            if (event.nativeEvent.actionName === 'activate') {
+              handlePausePress();
+            }
+          }}
         >
           {isPaused ? (
             // Resume icon (play triangle)
-            <View style={styles.playIcon} />
+            <View 
+              style={styles.playIcon} 
+              accessible={false} // Icon is decorative, parent button has label
+            />
           ) : (
             // Pause icon (two bars)
-            <View style={styles.pauseIcon}>
+            <View 
+              style={styles.pauseIcon}
+              accessible={false} // Icon is decorative, parent button has label
+            >
               <View style={styles.pauseBar} />
               <View style={styles.pauseBar} />
             </View>
@@ -98,8 +130,25 @@ const VoiceChatControls: React.FC<VoiceChatControlsProps> = ({
           style={[styles.controlButton, styles.closeButton]}
           onPress={handleClosePress}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="음성 채팅 종료"
+          accessibilityHint="두 번 탭하면 음성 채팅을 종료하고 이전 화면으로 돌아갑니다"
+          accessibilityState={{ disabled: false }}
+          accessibilityActions={[
+            { name: 'activate', label: '종료' }
+          ]}
+          onAccessibilityAction={(event: AccessibilityActionEvent) => {
+            if (event.nativeEvent.actionName === 'activate') {
+              handleClosePress();
+            }
+          }}
         >
-          <Text style={styles.closeIcon}>✕</Text>
+          <Text 
+            style={styles.closeIcon}
+            accessible={false} // Icon is decorative, parent button has label
+          >
+            ✕
+          </Text>
         </TouchableOpacity>
       </Animated.View>
     </View>

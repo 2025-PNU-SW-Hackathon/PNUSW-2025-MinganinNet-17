@@ -7,9 +7,14 @@ import { GoogleGenAI, Modality } from '@google/genai';
 import Constants from 'expo-constants';
 
 // API 설정 - 기존 Gemini API와 동일한 방식으로 설정
-const API_KEY = Constants.expoConfig?.extra?.geminiApiKey;
+const API_KEY = Constants.expoConfig?.extra?.geminiApiKey || Constants.manifest?.extra?.geminiApiKey;
 
 if (!API_KEY) {
+  console.error('Available Constants:', {
+    expoConfig: Constants.expoConfig?.extra,
+    manifest: Constants.manifest?.extra,
+    executionEnvironment: Constants.executionEnvironment
+  });
   throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.');
 }
 

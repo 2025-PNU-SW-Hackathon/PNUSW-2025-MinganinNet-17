@@ -3,7 +3,7 @@ import { addSafetyInstructions } from './aiSafety';
 import { generateNativeAudio } from './geminiLiveAudio';
 
 // API 설정
-const API_KEY = Constants.expoConfig?.extra?.geminiApiKey;
+const API_KEY = Constants.expoConfig?.extra?.geminiApiKey || Constants.manifest?.extra?.geminiApiKey;
 
 // Gemini API 엔드포인트들 - 용도별 모델 분리
 const GEMINI_PRO_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent';

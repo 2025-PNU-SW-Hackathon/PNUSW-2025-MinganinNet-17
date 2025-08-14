@@ -2,6 +2,7 @@ import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { getActivePlan } from '../backend/supabase/habits';
+import ErrorBoundary from './ErrorBoundary';
 import GoalSettingStep1 from './GoalSettingStep1';
 import GoalSettingStep2 from './GoalSettingStep2';
 import GoalSettingStep3 from './GoalSettingStep3';
@@ -329,7 +330,9 @@ export default function MainApp() {
       
       case 'home':
         return (
-          <HomeScreen />
+          <ErrorBoundary>
+            <HomeScreen />
+          </ErrorBoundary>
         );
       
       default:
@@ -338,18 +341,25 @@ export default function MainApp() {
   };
 
   return (
-    <View style={styles.container}>
-      <ScreenTransitionManager
-        screenKey={currentScreen}
-        onTransitionComplete={() => {
-          console.log('Screen transition completed for:', currentScreen);
-        }}
-      >
-        {renderScreen()}
-      </ScreenTransitionManager>
-      
-      {/* Daily Schedule Popup - Removed since HomeScreen now manages its own interactions */}
-    </View>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('MainApp Error Boundary:', error);
+        console.error('Component Stack:', errorInfo.componentStack);
+      }}
+    >
+      <View style={styles.container}>
+        <ScreenTransitionManager
+          screenKey={currentScreen}
+          onTransitionComplete={() => {
+            console.log('Screen transition completed for:', currentScreen);
+          }}
+        >
+          {renderScreen()}
+        </ScreenTransitionManager>
+        
+        {/* Daily Schedule Popup - Removed since HomeScreen now manages its own interactions */}
+      </View>
+    </ErrorBoundary>
   );
 }
 

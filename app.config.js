@@ -1,6 +1,19 @@
 // app.config.js 파일 내용
 
+console.log('🔍 Debug: Loading dotenv...');
 require('dotenv').config();
+
+console.log('🔍 Debug: dotenv loaded. Checking environment variables:');
+console.log('🔍 Debug: process.env.GEMINI_API_KEY =', process.env.GEMINI_API_KEY);
+console.log('🔍 Debug: process.env.EXPO_PUBLIC_SUPABASE_URL =', process.env.EXPO_PUBLIC_SUPABASE_URL);
+console.log('🔍 Debug: All process.env keys containing GEMINI:', Object.keys(process.env).filter(key => key.includes('GEMINI')));
+console.log('🔍 Debug: Current working directory:', process.cwd());
+console.log('🔍 Debug: .env file should be at:', require('path').join(process.cwd(), '.env'));
+
+const geminiApiKey = process.env.GEMINI_API_KEY;
+console.log('🔍 Debug: geminiApiKey being passed to extra:', geminiApiKey);
+console.log('🔍 Debug: geminiApiKey type:', typeof geminiApiKey);
+console.log('🔍 Debug: geminiApiKey length:', geminiApiKey ? geminiApiKey.length : 'undefined');
 
 module.exports = {
   expo: {
@@ -34,7 +47,7 @@ module.exports = {
       bundler: "metro"
     },
     extra: {
-      geminiApiKey: process.env.GEMINI_API_KEY,
+      geminiApiKey: geminiApiKey,
       backendUrl: process.env.BACKEND_URL || 'http://localhost:3001',
       eas: {
         projectId: "YOUR_EAS_PROJECT_ID"

@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useRouter } from 'expo-router';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -17,13 +17,15 @@ import CalendarScreen from '../backend/calendar/calendar';
 import { generateDailyFeedback, parsePlanModificationCommand } from '../backend/hwirang/gemini';
 import { getActivePlan } from '../backend/supabase/habits';
 import { createReport } from '../backend/supabase/reports';
-import { useHabitStore } from '../lib/habitStore';
-import { DailyTodo, Plan } from '../types/habit';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
+import { useHabitStore } from '../lib/habitStore';
+import { DailyTodo } from '../types/habit';
+import { AccentGlassCard, SecondaryGlassCard } from './GlassCard';
+import { PurpleBlueGradient } from './GradientBackground';
 import ProfileScreen from './ProfileScreen';
-import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
+import { SkeletonCard, SkeletonTodoList } from './SkeletonLoaders';
 import VoiceChatScreen from './VoiceChatScreen';
 
 const { width } = Dimensions.get('window');
@@ -63,124 +65,83 @@ interface AnimatedTodoItemProps {
   onToggle: () => void;
 }
 
-const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps) => {
+const AnimatedTodoItem = memo(({ todo, isCompleted, onToggle }: AnimatedTodoItemProps) => {
+  // Optimized: Combine related animations and reduce animated values
   const scaleAnimation = useRef(new Animated.Value(1)).current;
-  const checkmarkScale = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
-  const textOpacity = useRef(new Animated.Value(isCompleted ? 0.6 : 1)).current;
-  const checkboxColorAnimation = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
-  const strikethroughWidth = useRef(new Animated.Value(isCompleted ? 100 : 0)).current;
-  const itemElevation = useRef(new Animated.Value(0)).current;
+  const completionAnimation = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
+  const pressAnimation = useRef(new Animated.Value(0)).current;
 
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
 
-  const handlePress = () => {
-    // Enhanced scale animation with bounce
+  const handlePress = useCallback(() => {
+    // Optimized: Single press animation with native driver
     Animated.sequence([
-      Animated.spring(scaleAnimation, {
-        toValue: 1.02,
-        useNativeDriver: true,
-        tension: 400,
-        friction: 6,
-      }),
-      Animated.spring(scaleAnimation, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 400,
-        friction: 8,
-      })
+      Animated.parallel([
+        Animated.spring(scaleAnimation, {
+          toValue: 0.98,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 7,
+        }),
+        Animated.timing(pressAnimation, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.spring(scaleAnimation, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 8,
+        }),
+        Animated.timing(pressAnimation, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ])
     ]).start();
 
-    // Subtle elevation animation for press feedback
-    Animated.sequence([
-      Animated.timing(itemElevation, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: false,
-      }),
-      Animated.timing(itemElevation, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: false,
-      })
-    ]).start();
-
-    // Enhanced completion/incompletion animations
-    if (!isCompleted) {
-      // Completing task - enhanced animations
-      Animated.parallel([
-        Animated.spring(checkmarkScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 500,
-          friction: 4, // Bouncier animation
-        }),
-        Animated.timing(checkboxColorAnimation, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: false,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 0.6,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(strikethroughWidth, {
-          toValue: 100,
-          duration: 400,
-          useNativeDriver: false,
-        })
-      ]).start();
-    } else {
-      // Uncompleting task - reverse animations
-      Animated.parallel([
-        Animated.spring(checkmarkScale, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 400,
-          friction: 6,
-        }),
-        Animated.timing(checkboxColorAnimation, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(strikethroughWidth, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        })
-      ]).start();
-    }
+    // Optimized: Single completion animation
+    Animated.timing(completionAnimation, {
+      toValue: isCompleted ? 0 : 1,
+      duration: 300,
+      useNativeDriver: false, // Required for width/backgroundColor interpolations
+    }).start();
 
     onToggle();
-  };
+  }, [isCompleted, onToggle, scaleAnimation, pressAnimation, completionAnimation]);
 
-  // Interpolate checkbox background color
-  const checkboxBackgroundColor = checkboxColorAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['transparent', colors.primary]
-  });
-
-  const checkboxBorderColor = checkboxColorAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.textSecondary, colors.primary]
-  });
-
-  const itemShadowOpacity = itemElevation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.05, 0.15]
-  });
-
-  const strikethroughWidthPercentage = strikethroughWidth.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['0%', '100%']
-  });
+  // Optimized: Cached interpolations using single animation value
+  const animatedStyles = useMemo(() => ({
+    checkboxBackgroundColor: completionAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['transparent', colors.primary]
+    }),
+    checkboxBorderColor: completionAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [colors.textSecondary, colors.primary]
+    }),
+    checkmarkScale: completionAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1]
+    }),
+    textOpacity: completionAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 0.6]
+    }),
+    strikethroughWidth: completionAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0%', '100%']
+    }),
+    pressElevation: pressAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [2, 6]
+    })
+  }), [completionAnimation, pressAnimation, colors]);
 
   return (
     <Animated.View 
@@ -188,7 +149,7 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
         styles.todoItemContainer,
         { 
           transform: [{ scale: scaleAnimation }],
-          shadowOpacity: itemShadowOpacity,
+          elevation: animatedStyles.pressElevation,
         }
       ]}
     >
@@ -201,8 +162,8 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
           style={[
             styles.todoCheckbox, 
             { 
-              backgroundColor: checkboxBackgroundColor,
-              borderColor: checkboxBorderColor,
+              backgroundColor: animatedStyles.checkboxBackgroundColor,
+              borderColor: animatedStyles.checkboxBorderColor,
             }
           ]}
         >
@@ -210,8 +171,8 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
             style={[
               styles.checkmarkText,
               { 
-                transform: [{ scale: checkmarkScale }],
-                opacity: checkmarkScale
+                transform: [{ scale: animatedStyles.checkmarkScale }],
+                opacity: animatedStyles.checkmarkScale
               }
             ]}
           >
@@ -224,7 +185,7 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
             style={[
               styles.todoText, 
               isCompleted && styles.todoTextCompleted,
-              { opacity: textOpacity }
+              { opacity: animatedStyles.textOpacity }
             ]} 
             numberOfLines={2} 
             ellipsizeMode="tail"
@@ -237,7 +198,7 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
             style={[
               styles.strikethroughLine,
               {
-                width: strikethroughWidthPercentage,
+                width: animatedStyles.strikethroughWidth,
                 backgroundColor: colors.textSecondary,
               }
             ]}
@@ -246,7 +207,17 @@ const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps
       </TouchableOpacity>
     </Animated.View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for memo optimization
+  return (
+    prevProps.todo.id === nextProps.todo.id &&
+    prevProps.todo.description === nextProps.todo.description &&
+    prevProps.isCompleted === nextProps.isCompleted
+  );
+});
+
+// Add display name for debugging
+AnimatedTodoItem.displayName = 'AnimatedTodoItem';
 
 export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const router = useRouter();
@@ -257,6 +228,18 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const [internalSelectedDate, setInternalSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const { plan, setPlan } = useHabitStore();
   const [loading, setLoading] = useState(true);
+  
+  // Safety effect to ensure loading doesn't stay true indefinitely
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.warn('Loading state stuck at true, forcing to false');
+        setLoading(false);
+      }
+    }, 5000); // 5 second safety timeout
+    
+    return () => clearTimeout(timeout);
+  }, [loading]);
   const [error, setError] = useState<string | null>(null);
   const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
   const [effectiveStartDate, setEffectiveStartDate] = useState<string | null>(null);
@@ -308,6 +291,10 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     };
     if (!plan) {
         fetchPlan();
+    } else {
+        // If plan already exists, set loading to false
+        console.log('Plan exists, setting loading to false');
+        setLoading(false);
     }
   }, [plan, router]);
 
@@ -328,9 +315,19 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
 
   const getGreeting = (): string => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning.';
-    if (hour < 18) return 'Good afternoon.';
-    return 'Good evening.';
+    const greetings = {
+      morning: ['좋은 아침이에요!', '오늘도 화이팅!', '새로운 하루가 시작됐어요!'],
+      afternoon: ['오늘 하루 어때요?', '열심히 하고 계시네요!', '점심 맛있게 드셨나요?'],
+      evening: ['수고 많으셨어요!', '오늘도 고생하셨습니다!', '하루 마무리 잘하세요!']
+    };
+    
+    let timeOfDay: 'morning' | 'afternoon' | 'evening';
+    if (hour < 12) timeOfDay = 'morning';
+    else if (hour < 18) timeOfDay = 'afternoon';
+    else timeOfDay = 'evening';
+    
+    const phrases = greetings[timeOfDay];
+    return phrases[Math.floor(Math.random() * phrases.length)];
   };
 
   const getCalendarDates = (): Date[] => {
@@ -361,7 +358,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     return [];
   };
 
-  const handleTodoToggle = (todoId: number): void => {
+  // Optimized: Memoized todo toggle handler
+  const handleTodoToggle = useCallback((todoId: number): void => {
     const todoKey = todoId.toString();
     const willBeCompleted = !todoCompletion[todoKey];
     
@@ -375,7 +373,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     setTodoCompletion(prev => ({ ...prev, [todoKey]: !prev[todoKey] }));
     // Here you would also add a call to a Supabase function to update `is_completed` in the DB.
     // e.g., updateTodoStatus(todoId, willBeCompleted);
-  };
+  }, [todoCompletion]);
   
   const formatCalendarDate = (date: Date) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -387,18 +385,19 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     };
   };
 
-  const handleCalendarDatePress = (dateString: string): void => {
+  // Optimized: Memoized handlers
+  const handleCalendarDatePress = useCallback((dateString: string): void => {
     setInternalSelectedDate(dateString);
-  };
+  }, []);
 
-  const handleVoiceChatOpen = (): void => {
+  const handleVoiceChatOpen = useCallback((): void => {
     setVoiceChatVisible(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  };
+  }, []);
 
-  const handleVoiceChatClose = (): void => {
+  const handleVoiceChatClose = useCallback((): void => {
     setVoiceChatVisible(false);
-  };
+  }, []);
 
   const handleReportCreationComplete = async (data: any) => {
     setReportVoiceChatVisible(false);
@@ -483,12 +482,17 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     }
   };
 
-  const coachStatus = useMemo(() => getCoachStatus(), [plan, todoCompletion, targetDate]);
-  const calendarDates = useMemo(() => getCalendarDates(), []);
-  const todosForSelectedDate = useMemo(() => getTodosForSelectedDate(), [plan, effectiveStartDate, targetDate]);
+  // Optimized memoization with specific dependencies
+  const coachStatus = useMemo(() => {
+    const status = getCoachStatus();
+    console.log('Coach status updated:', status);
+    return status;
+  }, [plan?.milestones, todoCompletion, targetDate]);
+  const calendarDates = useMemo(() => getCalendarDates(), []); // Static, no dependencies needed
+  const todosForSelectedDate = useMemo(() => getTodosForSelectedDate(), [plan?.milestones, effectiveStartDate, targetDate]);
   
-  // Calculate progress statistics
-  const getProgressStats = () => {
+  // Optimized: Memoized progress statistics calculation
+  const progressStats = useMemo(() => {
     const todos = todosForSelectedDate;
     if (todos.length === 0) return { completed: 0, total: 0, percentage: 0, isComplete: false };
     
@@ -502,105 +506,130 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       percentage,
       isComplete
     };
-  };
-  
-  const progressStats = getProgressStats();
+  }, [todosForSelectedDate, todoCompletion]);
 
-  // Animate coach when status changes
+  // Animate coach when status changes - optimized with cleanup
   useEffect(() => {
+    let animationRef: Animated.CompositeAnimation | null = null;
+    
     if (previousCoachStatus && previousCoachStatus.emoji !== coachStatus.emoji) {
-      // Coach status changed! Trigger bounce animation
-      Animated.sequence([
+      // Coach status changed! Trigger optimized bounce animation
+      animationRef = Animated.sequence([
         Animated.spring(coachScaleAnimation, {
-          toValue: 1.2,
+          toValue: 1.15,
           useNativeDriver: true,
-          tension: 300,
+          tension: 400,
           friction: 8,
         }),
         Animated.spring(coachScaleAnimation, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 300,
-          friction: 8,
+          tension: 400,
+          friction: 10,
         })
-      ]).start();
+      ]);
+      animationRef.start();
     }
     setPreviousCoachStatus(coachStatus);
-  }, [coachStatus.emoji, previousCoachStatus?.emoji]);
 
-  // Animate content when loading completes
+    return () => {
+      if (animationRef) {
+        animationRef.stop();
+      }
+    };
+  }, [coachStatus.emoji, previousCoachStatus?.emoji, coachScaleAnimation]);
+
+  // Animate content when loading completes - optimized with cleanup
   useEffect(() => {
+    let staggerAnimation: Animated.CompositeAnimation | null = null;
+    
     if (!loading) {
-      // Stagger the animations for a more polished feel
-      Animated.stagger(150, [
+      // Optimized stagger animation with faster timing
+      staggerAnimation = Animated.stagger(100, [
         Animated.timing(goalFadeAnimation, {
           toValue: 1,
-          duration: 600,
+          duration: 400,
           useNativeDriver: true,
         }),
         Animated.timing(coachFadeAnimation, {
           toValue: 1,
-          duration: 600,
+          duration: 400,
           useNativeDriver: true,
         }),
         Animated.timing(todoFadeAnimation, {
           toValue: 1,
-          duration: 600,
+          duration: 400,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]);
+      staggerAnimation.start();
     }
-  }, [loading]);
 
-  // Animate progress bar based on completion percentage
+    return () => {
+      if (staggerAnimation) {
+        staggerAnimation.stop();
+      }
+    };
+  }, [loading, goalFadeAnimation, coachFadeAnimation, todoFadeAnimation]);
+
+  // Optimized: Combined progress and celebration animations with cleanup
   useEffect(() => {
-    Animated.timing(progressBarAnimation, {
+    let progressAnimation: Animated.CompositeAnimation | null = null;
+    let celebrationAnimation: Animated.CompositeAnimation | null = null;
+    
+    // Animate progress bar
+    progressAnimation = Animated.timing(progressBarAnimation, {
       toValue: progressStats.percentage,
-      duration: 800,
+      duration: 600, // Faster animation
       useNativeDriver: false,
-    }).start();
-  }, [progressStats.percentage]);
+    });
+    progressAnimation.start();
 
-  // Trigger celebration animation when 100% complete
-  useEffect(() => {
+    // Trigger celebration if complete
     if (progressStats.isComplete && progressStats.total > 0) {
-      // Celebration sequence
-      Animated.sequence([
-        Animated.spring(celebrationScale, {
-          toValue: 1.05,
-          useNativeDriver: true,
-          tension: 300,
-          friction: 6,
-        }),
-        Animated.spring(celebrationScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 300,
-          friction: 8,
-        }),
-      ]).start();
-
-      // Glow effect for completion
-      Animated.sequence([
-        Animated.timing(completionGlow, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(completionGlow, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      // Enhanced haptic feedback for completion
+      // Combined celebration animation
+      celebrationAnimation = Animated.parallel([
+        Animated.sequence([
+          Animated.spring(celebrationScale, {
+            toValue: 1.03,
+            useNativeDriver: true,
+            tension: 400,
+            friction: 8,
+          }),
+          Animated.spring(celebrationScale, {
+            toValue: 1,
+            useNativeDriver: true,
+            tension: 400,
+            friction: 10,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(completionGlow, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(completionGlow, {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ]);
+      
+      celebrationAnimation.start();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
-      // Reset completion glow when not complete
       completionGlow.setValue(0);
+      celebrationScale.setValue(1);
     }
-  }, [progressStats.isComplete, progressStats.total]);
+
+    return () => {
+      if (progressAnimation) progressAnimation.stop();
+      if (celebrationAnimation) celebrationAnimation.stop();
+    };
+  }, [progressStats.percentage, progressStats.isComplete, progressStats.total, 
+      progressBarAnimation, celebrationScale, completionGlow]);
 
   // Show ProfileScreen if settings is selected
   if (currentScreen === 'settings') {
@@ -608,8 +637,9 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <PurpleBlueGradient style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.headerArea}>
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
@@ -624,22 +654,14 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
           </View>
 
           <Text style={styles.greetingText}>{getGreeting()}</Text>
-          
-          {/* Enhanced Goal Text Loading */}
-          {loading ? (
-            <View style={styles.goalLoadingContainer}>
-              <SkeletonText width="90%" height={18} style={styles.goalSkeletonLine1} />
-              <SkeletonText width="60%" height={18} style={styles.goalSkeletonLine2} />
-            </View>
-          ) : (
-            <Animated.View style={{ opacity: goalFadeAnimation }}>
-              <Text style={styles.goalText}>
-                {plan?.plan_title || '진행 중인 목표가 없습니다.'} 
-              </Text>
-            </Animated.View>
-          )}
 
-          <View style={styles.calendarWrapper}>
+          <SecondaryGlassCard
+            blur="subtle"
+            opacity="light"
+            style={styles.calendarGlass}
+            accessibilityLabel="Calendar section"
+            accessibilityHint="Swipe horizontally to view different dates"
+          >
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
@@ -649,9 +671,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
               {calendarDates.map((date, index) => {
                 const dateInfo = formatCalendarDate(date);
                 const isSelected = targetDate === dateInfo.dateString;
-                // Mock achievement data (in real app, this would come from habit completion data)
-                const hasAchievement = Math.random() > 0.6; // 40% chance for demo
-                const hasStreak = Math.random() > 0.7; // 30% chance for demo
+                const hasAchievement = Math.random() > 0.6;
+                const hasStreak = Math.random() > 0.7;
                 
                 return (
                   <TouchableOpacity
@@ -683,76 +704,88 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
                 );
               })}
             </ScrollView>
-          </View>
+          </SecondaryGlassCard>
         </View>
 
         <View style={styles.mainContent}>
-          {/* Enhanced Coach Card Loading */}
+          {/* Enhanced Coach Card with GlassCard */}
           {loading ? (
             <SkeletonCard type="coach" />
           ) : (
-            <Animated.View style={[styles.coachCard, { opacity: coachFadeAnimation }]}>
-              <View style={styles.coachHeader}>
-                <Text style={styles.cardTitle}>Coach's Status</Text>
-                <View style={[styles.statusBadge, { backgroundColor: coachStatus.color }]}>
-                  <Text style={styles.statusBadgeText}>Live</Text>
-                </View>
-              </View>
-              
-              <View style={styles.coachContent}>
-                <View style={styles.coachAvatarContainer}>
-                  <Animated.View 
-                    style={[
-                      styles.coachAvatar, 
-                      { 
-                        transform: [{ scale: coachScaleAnimation }],
-                        backgroundColor: coachStatus.color + '20', // 20% opacity
-                      }
-                    ]}
-                  >
-                    <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
-                  </Animated.View>
-                  <View style={[styles.coachPulse, { backgroundColor: coachStatus.color }]} />
+            <Animated.View style={{ opacity: coachFadeAnimation }}>
+              <AccentGlassCard
+                blur="medium"
+                opacity="medium"
+                accessibilityLabel="Coach status card"
+                accessibilityHint="Shows your current progress status with motivational message"
+              >
+                <View style={styles.coachHeader}>
+                  <Text style={styles.cardTitle}>Coach's Status</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: coachStatus.color }]}>
+                    <Text style={styles.statusBadgeText}>Live</Text>
+                  </View>
                 </View>
                 
-                <View style={styles.coachMessageContainer}>
-                  <Text style={styles.coachMessage}>{coachStatus.message}</Text>
-                  <View style={styles.coachMetrics}>
-                    <View style={styles.metricItem}>
-                      <Text style={styles.metricLabel}>Today</Text>
-                      <View style={[styles.metricIndicator, { backgroundColor: coachStatus.color }]} />
+                <View style={styles.coachContent}>
+                  <View style={styles.coachAvatarContainer}>
+                    <Animated.View 
+                      style={[
+                        styles.coachAvatar, 
+                        { 
+                          transform: [{ scale: coachScaleAnimation }],
+                          backgroundColor: coachStatus.color + '20', // 20% opacity
+                        }
+                      ]}
+                    >
+                      <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
+                    </Animated.View>
+                    <View style={[styles.coachPulse, { backgroundColor: coachStatus.color }]} />
+                  </View>
+                  
+                  <View style={styles.coachMessageContainer}>
+                    <Text style={styles.coachMessage}>{coachStatus.message}</Text>
+                    <View style={styles.coachMetrics}>
+                      <View style={styles.metricItem}>
+                        <Text style={styles.metricLabel}>Today</Text>
+                        <View style={[styles.metricIndicator, { backgroundColor: coachStatus.color }]} />
+                      </View>
                     </View>
                   </View>
                 </View>
-              </View>
-              
-              {/* Interactive coach footer */}
-              <TouchableOpacity 
-                style={styles.coachInteraction}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  console.log('Coach interaction tapped');
-                }}
-                activeOpacity={0.8}
-                onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-              >
-                <Text style={styles.coachInteractionText}>💬 Ask Coach</Text>
-                <Text style={styles.coachInteractionArrow}>→</Text>
-              </TouchableOpacity>
+                
+                {/* Interactive coach footer */}
+                <TouchableOpacity 
+                  style={styles.coachInteraction}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    console.log('Coach interaction tapped');
+                  }}
+                  activeOpacity={0.8}
+                  onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                >
+                  <Text style={styles.coachInteractionText}>💬 Ask Coach</Text>
+                  <Text style={styles.coachInteractionArrow}>→</Text>
+                </TouchableOpacity>
+              </AccentGlassCard>
             </Animated.View>
           )}
 
-          {/* Enhanced Todo Card Loading */}
+          {/* Enhanced Todo Card with GlassCard */}
           <Animated.View 
             style={[
-              styles.todoCard,
-              { transform: [{ scale: celebrationScale }] },
-              progressStats.isComplete && {
-                borderColor: colors.success,
-                borderWidth: 2,
-              }
+              { transform: [{ scale: celebrationScale }] }
             ]}
           >
+            <SecondaryGlassCard
+              blur="subtle"
+              opacity="medium"
+              style={progressStats.isComplete && {
+                borderColor: colors.success,
+                borderWidth: 2,
+              }}
+              accessibilityLabel="Today's todo list"
+              accessibilityHint={`${progressStats.completed} of ${progressStats.total} tasks completed`}
+            >
             <View style={styles.todoCardHeader}>
               <Text style={[styles.cardTitle, progressStats.isComplete && styles.cardTitleComplete]}>
                 Today's To-Do
@@ -827,6 +860,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
                 </Animated.View>
               )}
             </ScrollView>
+            </SecondaryGlassCard>
           </Animated.View>
         </View>
       </ScrollView>
@@ -875,17 +909,24 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </PurpleBlueGradient>
   );
 }
 
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
   scrollView: { flex: 1 },
   headerArea: { 
     paddingHorizontal: Spacing.screen.paddingHorizontal, 
     paddingTop: Spacing['5xl'], 
     paddingBottom: Spacing.xl 
+  },
+  mainContent: {
+    paddingHorizontal: Spacing.screen.paddingHorizontal,
+    paddingBottom: Spacing['4xl'],
+    gap: Spacing['2xl'],
   },
   profileHeader: { 
     flexDirection: 'row', 
@@ -943,15 +984,18 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     transform: [{ scale: 0.9 }],
   },
   greetingText: { 
-    fontSize: colors.typography.fontSize['3xl'], 
+    fontSize: colors.typography.fontSize['2xl'], 
     fontWeight: colors.typography.fontWeight.bold, 
     color: colors.text, 
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing['2xl'],
     fontFamily: 'Inter',
-    lineHeight: colors.typography.fontSize['3xl'] * colors.typography.lineHeight.tight,
-    letterSpacing: colors.typography.letterSpacing.tight,
-    // Add subtle gradient text effect preparation
-    textAlign: 'left',
+    lineHeight: colors.typography.fontSize['2xl'] * colors.typography.lineHeight.relaxed,
+    letterSpacing: colors.typography.letterSpacing.normal,
+    textAlign: 'center',
+    // Enhanced styling for Korean greeting
+    textShadowColor: colors.primaryOpacity[20],
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   goalText: { 
     fontSize: colors.typography.fontSize.lg, 
@@ -1104,12 +1148,10 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     shadowRadius: Spacing.lg,
     elevation: 1,
   },
-  mainContent: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: Spacing.screen.paddingHorizontal, 
-    paddingBottom: Spacing['5xl'],
-    gap: Spacing.xl,
+  calendarGlass: {
+    marginHorizontal: -Spacing.md, // Extend to screen edges for glass effect
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
   },
   coachCard: { 
     flex: 1, 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { Animated, StyleSheet, View, ViewStyle } from 'react-native';
 
 interface SkeletonProps {
@@ -55,17 +55,17 @@ const BaseSkeleton: React.FC<SkeletonProps> = ({
 };
 
 // Text Skeleton for Single Lines
-export const SkeletonText: React.FC<SkeletonProps> = (props) => (
+export const SkeletonText: React.FC<SkeletonProps> = memo((props) => (
   <BaseSkeleton height={16} {...props} />
-);
+));
 
 // Large Text Skeleton for Titles
-export const SkeletonTitle: React.FC<SkeletonProps> = (props) => (
+export const SkeletonTitle: React.FC<SkeletonProps> = memo((props) => (
   <BaseSkeleton height={24} borderRadius={6} {...props} />
-);
+));
 
 // Todo Item Skeleton
-export const SkeletonTodo: React.FC = () => (
+export const SkeletonTodo: React.FC = memo(() => (
   <View style={styles.todoContainer}>
     <BaseSkeleton width={16} height={16} borderRadius={4} style={styles.todoCheckbox} />
     <View style={styles.todoTextContainer}>
@@ -73,10 +73,10 @@ export const SkeletonTodo: React.FC = () => (
       <SkeletonText width="60%" style={styles.todoSecondLine} />
     </View>
   </View>
-);
+));
 
 // Card Skeleton for Coach/Achievement Cards
-export const SkeletonCard: React.FC<{ type?: 'coach' | 'achievement' }> = ({ type = 'coach' }) => {
+export const SkeletonCard: React.FC<{ type?: 'coach' | 'achievement' }> = memo(({ type = 'coach' }) => {
   const cardStyle = type === 'achievement' 
     ? [styles.cardContainer, styles.achievementCard]
     : styles.cardContainer;
@@ -101,31 +101,31 @@ export const SkeletonCard: React.FC<{ type?: 'coach' | 'achievement' }> = ({ typ
       )}
     </View>
   );
-};
+});
 
 // Button Skeleton for Loading States
-export const SkeletonButton: React.FC<Omit<SkeletonProps, 'style'>> = (props) => (
+export const SkeletonButton: React.FC<Omit<SkeletonProps, 'style'>> = memo((props) => (
   <BaseSkeleton 
     height={56} 
     borderRadius={28}
     style={styles.buttonSkeleton}
     {...props} 
   />
-);
+));
 
 // Multiple Todo Skeletons
-export const SkeletonTodoList: React.FC<{ count?: number }> = ({ count = 3 }) => (
+export const SkeletonTodoList: React.FC<{ count?: number }> = memo(({ count = 3 }) => (
   <View>
     {Array.from({ length: count }).map((_, index) => (
       <SkeletonTodo key={index} />
     ))}
   </View>
-);
+));
 
 // Shimmer Line for Subtle Loading
-export const SkeletonLine: React.FC<SkeletonProps> = (props) => (
+export const SkeletonLine: React.FC<SkeletonProps> = memo((props) => (
   <BaseSkeleton height={1} borderRadius={0} {...props} />
-);
+));
 
 const styles = StyleSheet.create({
   skeleton: {

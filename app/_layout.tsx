@@ -4,6 +4,7 @@ import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import { supabase } from '../backend/supabase/client';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -202,19 +203,26 @@ export default function RootLayout() {
   }, [isNavigationReady]);
 
   return (
-    <Stack initialRouteName="index">
-      <Stack.Screen 
-        name="index" 
-        options={{ headerShown: false }} 
-      />
-      <Stack.Screen 
-        name="onboarding" 
-        options={{ headerShown: false }} 
-      />
-      <Stack.Screen 
-        name="(tabs)" 
-        options={{ headerShown: false }} 
-      />
-    </Stack>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('Root Layout Error:', error);
+        console.error('Error Info:', errorInfo);
+      }}
+    >
+      <Stack initialRouteName="index">
+        <Stack.Screen 
+          name="index" 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="onboarding" 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="(tabs)" 
+          options={{ headerShown: false }} 
+        />
+      </Stack>
+    </ErrorBoundary>
   );
 }

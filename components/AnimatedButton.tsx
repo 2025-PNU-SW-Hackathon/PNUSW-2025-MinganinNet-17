@@ -142,25 +142,25 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
     onPress();
   };
 
-  const buttonStyle = [
+  const buttonStyle: ViewStyle[] = [
     styles.button,
-    styles[`${size}Button` as keyof typeof styles],
-    variant === 'secondary' && styles.secondaryButton,
-    variant === 'outline' && styles.outlineButton,
-    variant === 'ghost' && styles.ghostButton,
-    variant === 'link' && styles.linkButton,
-    style,
-  ];
+    styles[`${size}Button` as keyof typeof styles] as ViewStyle,
+    variant === 'secondary' ? styles.secondaryButton : {},
+    variant === 'outline' ? styles.outlineButton : {},
+    variant === 'ghost' ? styles.ghostButton : {},
+    variant === 'link' ? styles.linkButton : {},
+    style || {},
+  ].filter(Boolean);
 
-  const buttonTextStyle = [
+  const buttonTextStyle: TextStyle[] = [
     styles.buttonText,
-    styles[`${size}ButtonText` as keyof typeof styles],
-    variant === 'secondary' && styles.secondaryButtonText,
-    variant === 'outline' && styles.outlineButtonText,
-    variant === 'ghost' && styles.ghostButtonText,
-    variant === 'link' && styles.linkButtonText,
-    textStyle,
-  ];
+    styles[`${size}ButtonText` as keyof typeof styles] as TextStyle,
+    variant === 'secondary' ? styles.secondaryButtonText : {},
+    variant === 'outline' ? styles.outlineButtonText : {},
+    variant === 'ghost' ? styles.ghostButtonText : {},
+    variant === 'link' ? styles.linkButtonText : {},
+    textStyle || {},
+  ].filter(Boolean);
 
   const displayText = isLoading ? loadingText : title;
 
@@ -205,14 +205,17 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
             shadowOpacity: animatedShadowOpacity,
             shadowRadius: animatedShadowRadius,
             shadowColor: variant === 'primary' ? colors.primary : colors.text,
-            shadowOffset: { width: 0, height: shadowAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [Spacing.sm, Spacing.md]
-            })},
+            shadowOffset: { 
+              width: 0, 
+              height: shadowAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [Spacing.sm, Spacing.md]
+              })
+            },
             elevation: shadowAnimation.interpolate({
               inputRange: [0, 1],
               outputRange: [Spacing.layout.elevation.sm, Spacing.layout.elevation.md]
-            }),
+            }) as any, // Android elevation needs any for animated values
           },
         ]}
       >
@@ -220,7 +223,7 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
         
         {/* Loading indicator dots */}
         {isLoading && (
-          <Animated.View style={[styles.loadingDots, { opacity: pulseAnimation }]}>
+          <Animated.View style={[styles.loadingDots, { opacity: pulseAnimation } as ViewStyle]}>
             <LoadingDots />
           </Animated.View>
         )}
@@ -268,9 +271,9 @@ const LoadingDots: React.FC = () => {
 
   return (
     <View style={styles.dotsContainer}>
-      <Animated.View style={[styles.dot, { opacity: dot1Animation }]} />
-      <Animated.View style={[styles.dot, { opacity: dot2Animation }]} />
-      <Animated.View style={[styles.dot, { opacity: dot3Animation }]} />
+      <Animated.View style={[styles.dot, { opacity: dot1Animation } as ViewStyle]} />
+      <Animated.View style={[styles.dot, { opacity: dot2Animation } as ViewStyle]} />
+      <Animated.View style={[styles.dot, { opacity: dot3Animation } as ViewStyle]} />
     </View>
   );
 };

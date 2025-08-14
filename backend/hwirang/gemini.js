@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 
 // Get the API key from the app configuration
-const API_KEY = Constants.expoConfig?.extra?.geminiApiKey;
+const API_KEY = Constants.expoConfig?.extra?.geminiApiKey || Constants.manifest?.extra?.geminiApiKey;
 
 // Use the latest available Gemini models
 const GEMINI_PRO_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent';

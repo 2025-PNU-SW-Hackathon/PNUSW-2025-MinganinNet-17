@@ -1,5 +1,6 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import { HapticTab } from '../../components/HapticTab';
 import { IconSymbol } from '../../components/ui/IconSymbol';
@@ -7,9 +8,18 @@ import TabBarBackground from '../../components/ui/TabBarBackground';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../hooks/useColorScheme';
 
-// Custom tab button component for the Add Goal button (UI-only, no navigation)
+// Custom tab button component for the Add Goal button with navigation
 function AddGoalTabButton(props: any) {
   const colorScheme = useColorScheme();
+  const router = useRouter();
+
+  const handlePress = () => {
+    // Add haptic feedback for better UX
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Navigate to goal-setting screen
+    router.push('/goal-setting');
+  };
   
   return (
     <TouchableOpacity
@@ -18,7 +28,7 @@ function AddGoalTabButton(props: any) {
         { backgroundColor: Colors[colorScheme ?? 'light'].tint }
       ]}
       activeOpacity={0.7}
-      // No onPress - UI-only component as requested
+      onPress={handlePress}
     >
       <Text style={styles.plusEmoji}>
         ➕
