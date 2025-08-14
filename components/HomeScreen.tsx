@@ -20,6 +20,7 @@ import { createReport } from '../backend/supabase/reports';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
+import { koreanTextStyle } from '../utils/koreanUtils';
 import { useHabitStore } from '../lib/habitStore';
 import { DailyTodo } from '../types/habit';
 import { AccentGlassCard, SecondaryGlassCard } from './GlassCard';

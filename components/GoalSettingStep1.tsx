@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Alert,
     Dimensions,
@@ -16,6 +16,7 @@ import { submitHabitData } from '../backend/hwirang/habit';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
+import { koreanTextStyle } from '../utils/koreanUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -35,8 +36,8 @@ export default function GoalSettingStep1({
   const styles = createStyles(colors);
   const [habitText, setHabitText] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showModeSelection, setShowModeSelection] = useState(true);
-  const [, setSelectedMode] = useState<'text' | 'voice' | null>(null);
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [isLoadingRouty, setIsLoadingRouty] = useState(true);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
   const {
     setHabitName,
@@ -45,6 +46,23 @@ export default function GoalSettingStep1({
     setDifficultyReason,
     setIntensity,
   } = useHabitStore();
+
+  // Auto-transition from welcome screen to voice chat
+  useEffect(() => {
+    if (showWelcome) {
+      // Clear any existing conversation history
+      useHabitStore.getState().clearConversationHistory();
+      
+      // Auto-transition after 2.5 seconds
+      const timer = setTimeout(() => {
+        setShowWelcome(false);
+        setVoiceChatVisible(true);
+        setIsLoadingRouty(false);
+      }, 2500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showWelcome]);
 
   // 음성 대화에서 목표 정보를 추출하는 함수
   const extractGoalFromTranscript = async (transcript: string) => {
@@ -210,7 +228,7 @@ export default function GoalSettingStep1({
     } catch (error) {
       console.error('Failed to process voice input:', error);
       Alert.alert('오류', '대화 내용을 처리하는 데 실패했습니다. 텍스트 모드로 다시 시도해주세요.');
-      setSelectedMode('text'); // Fallback to text mode
+      // Fallback - close voice chat and show text mode
     } finally {
       setIsSubmitting(false);
     }
@@ -276,8 +294,8 @@ export default function GoalSettingStep1({
     }
   };
 
-  // Mode selection screen
-  if (showModeSelection) {
+  // Welcome loading screen
+  if (showWelcome) {
     return (
       <View style={styles.container}>
         <Text style={styles.stepIndicator}>1 / 6 단계</Text>
@@ -290,43 +308,20 @@ export default function GoalSettingStep1({
           <Text style={styles.backButtonText}>← 이전</Text>
         </TouchableOpacity>
         
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>
-            목표 설정 방법을{'\n'}선택해주세요
+        <View style={styles.welcomeContainer}>
+          <Text style={[styles.welcomeMessage, koreanTextStyle('새로운 여정을 시작해봅시다!')]}>
+            새로운 여정을 시작해봅시다!
           </Text>
-          <Text style={styles.subtitle}>
-            텍스트로 입력하거나 AI와 음성 대화로 설정할 수 있어요
+          <Text style={[styles.loadingMessage, koreanTextStyle('코치 Routy를 불러오고 있습니다...')]}>
+            코치 Routy를 불러오고 있습니다...
           </Text>
-        </View>
-
-        <View style={styles.modeContainer}>
-          <TouchableOpacity
-            style={styles.modeOption}
-            onPress={() => {
-              setSelectedMode('text');
-              setShowModeSelection(false);
-            }}
-          >
-            <Text style={styles.modeIcon}>✏️</Text>
-            <Text style={styles.modeTitle}>텍스트 입력</Text>
-            <Text style={styles.modeDescription}>
-              키보드로 직접 목표를 입력해주세요
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.modeOption}
-            onPress={() => {
-              useHabitStore.getState().clearConversationHistory();
-              setVoiceChatVisible(true); // Immediately open the voice chat
-            }}
-          >
-            <Text style={styles.modeIcon}>🎤</Text>
-            <Text style={styles.modeTitle}>음성 대화</Text>
-            <Text style={styles.modeDescription}>
-              AI와 대화하며 자연스럽게 목표를 설정해보세요
-            </Text>
-          </TouchableOpacity>
+          
+          {/* Loading dots animation */}
+          <View style={styles.loadingDots}>
+            <View style={[styles.dot, styles.dot1]} />
+            <View style={[styles.dot, styles.dot2]} />
+            <View style={[styles.dot, styles.dot3]} />
+          </View>
         </View>
         <VoiceChatScreen
           visible={voiceChatVisible}
@@ -335,7 +330,7 @@ export default function GoalSettingStep1({
           onComplete={handleVoiceGoalSettingComplete}
           onSwitchToText={() => {
             setVoiceChatVisible(false);
-            setShowModeSelection(false);
+            setShowWelcome(false);
             // 음성 모드에서 수집된 정보가 있다면 다음 단계로 진행
             if (useHabitStore.getState().habitName || 
                 useHabitStore.getState().goalPeriod || 
@@ -358,7 +353,7 @@ export default function GoalSettingStep1({
       {/* Back Button */}
       <TouchableOpacity
         style={styles.backButton}
-        onPress={() => setShowModeSelection(true)}
+        onPress={onBack}
         disabled={isSubmitting}
       >
         <Text style={styles.backButtonText}>← 이전</Text>
@@ -396,17 +391,6 @@ export default function GoalSettingStep1({
         </Text>
       </TouchableOpacity>
       
-      {/* Mode switch button */}
-      <TouchableOpacity
-        style={styles.switchModeButton}
-        onPress={() => {
-          useHabitStore.getState().clearConversationHistory();
-          setVoiceChatVisible(true);
-        }}
-      >
-        <Text style={styles.switchModeText}>🎤 음성 모드로 전환</Text>
-      </TouchableOpacity>
-      
       <VoiceChatScreen
         visible={voiceChatVisible}
         mode="goalSetting"
@@ -414,7 +398,6 @@ export default function GoalSettingStep1({
         onComplete={handleVoiceGoalSettingComplete}
         onSwitchToText={() => {
           setVoiceChatVisible(false);
-          setShowModeSelection(false);
           // 음성 모드에서 수집된 정보가 있다면 다음 단계로 진행
           if (useHabitStore.getState().habitName || 
               useHabitStore.getState().goalPeriod || 
@@ -525,59 +508,49 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
-  modeContainer: {
+  // Welcome screen styles
+  welcomeContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: Spacing.screen.paddingHorizontal,
-    gap: Spacing.xl,
-  },
-  modeOption: {
-    backgroundColor: colors.card,
-    borderRadius: Spacing.layout.borderRadius.xl,
-    padding: Spacing['3xl'],
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.neutral[200],
-    shadowColor: colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    paddingHorizontal: Spacing.screen.paddingHorizontal,
   },
-  modeIcon: {
-    fontSize: 48,
-    marginBottom: Spacing.lg,
-  },
-  modeTitle: {
-    fontSize: colors.typography.fontSize.xl,
+  welcomeMessage: {
+    fontSize: 32,
     fontWeight: colors.typography.fontWeight.bold,
-    color: colors.text,
-    marginBottom: Spacing.sm,
-    fontFamily: 'Inter',
+    color: colors.primary,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+    fontFamily: 'sans-serif',
   },
-  modeDescription: {
-    fontSize: colors.typography.fontSize.base,
+  loadingMessage: {
+    fontSize: 18,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: colors.typography.fontSize.base * colors.typography.lineHeight.relaxed,
-    fontFamily: 'Inter',
+    marginBottom: Spacing.lg,
+    fontFamily: 'sans-serif',
   },
-  switchModeButton: {
-    position: 'absolute',
-    bottom: 100,
-    left: 24,
-    right: 24,
-    backgroundColor: colors.card,
-    borderRadius: Spacing.layout.borderRadius.lg,
-    paddingVertical: Spacing.md,
+  // Loading dots styles (similar to SplashScreen)
+  loadingDots: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
+    justifyContent: 'center',
+    marginTop: Spacing.md,
   },
-  switchModeText: {
-    fontSize: colors.typography.fontSize.base,
-    color: colors.primary,
-    fontWeight: colors.typography.fontWeight.semibold,
-    fontFamily: 'Inter',
+  dot: {
+    width: Spacing.md,
+    height: Spacing.md,
+    borderRadius: Spacing.sm,
+    backgroundColor: colors.primary,
+    marginHorizontal: Spacing.sm,
+  },
+  dot1: {
+    opacity: 0.3,
+  },
+  dot2: {
+    opacity: 0.6,
+  },
+  dot3: {
+    opacity: 1,
   },
 }); 

@@ -10,6 +10,8 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { VoiceVisualizerProps } from '../types/voice';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -17,6 +19,11 @@ const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
   state, 
   amplitude = 0.5 
 }) => {
+  // Theme integration
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
+
   // Animation values
   const scale1 = useSharedValue(1);
   const scale2 = useSharedValue(1);
@@ -303,7 +310,7 @@ const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -312,19 +319,20 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   circle: {
-    backgroundColor: 'rgba(255, 255, 255, 1)',
+    backgroundColor: colors.primary,
     position: 'absolute',
   },
   mainCircle: {
     width: Math.min(screenWidth, screenHeight) * 0.4,
     height: Math.min(screenWidth, screenHeight) * 0.4,
     borderRadius: Math.min(screenWidth, screenHeight) * 0.2,
+    backgroundColor: `${colors.primary}80`, // 80% opacity
   },
   errorCircle: {
     width: Math.min(screenWidth, screenHeight) * 0.4,
     height: Math.min(screenWidth, screenHeight) * 0.4,
     borderRadius: Math.min(screenWidth, screenHeight) * 0.2,
-    backgroundColor: 'rgba(255, 107, 107, 0.8)',
+    backgroundColor: `${colors.error}80`, // 80% opacity
   },
   listeningContainer: {
     flexDirection: 'row',
@@ -338,24 +346,28 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginHorizontal: 8,
+    backgroundColor: `${colors.primary}90`, // 90% opacity
   },
   dot2: {
     width: 90,
     height: 90,
     borderRadius: 45,
     marginHorizontal: 8,
+    backgroundColor: `${colors.primary}70`, // 70% opacity
   },
   dot3: {
     width: 110,
     height: 140,
     borderRadius: 55,
     marginHorizontal: 8,
+    backgroundColor: `${colors.primary}80`, // 80% opacity
   },
   dot4: {
     width: 80,
     height: 80,
     borderRadius: 40,
     marginHorizontal: 8,
+    backgroundColor: `${colors.primary}60`, // 60% opacity
   },
   speakingContainer: {
     flexDirection: 'row',
@@ -369,24 +381,28 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 35,
     marginHorizontal: 6,
+    backgroundColor: `${colors.primary}85`, // 85% opacity
   },
   wave2: {
     width: 85,
     height: 85,
     borderRadius: 42.5,
     marginHorizontal: 6,
+    backgroundColor: `${colors.primary}75`, // 75% opacity
   },
   wave3: {
     width: 95,
     height: 95,
     borderRadius: 47.5,
     marginHorizontal: 6,
+    backgroundColor: `${colors.primary}90`, // 90% opacity
   },
   wave4: {
     width: 75,
     height: 75,
     borderRadius: 37.5,
     marginHorizontal: 6,
+    backgroundColor: `${colors.primary}65`, // 65% opacity
   },
   processingContainer: {
     justifyContent: 'center',
@@ -395,7 +411,7 @@ const styles = StyleSheet.create({
     height: screenWidth * 0.6,
   },
   blob: {
-    backgroundColor: 'rgba(255, 255, 255, 1)',
+    backgroundColor: `${colors.primary}70`, // 70% opacity
     position: 'absolute',
   },
   blob1: {
@@ -404,6 +420,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     top: -20,
     left: -20,
+    backgroundColor: `${colors.primary}80`, // 80% opacity
   },
   blob2: {
     width: 180,
@@ -411,6 +428,7 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     top: 10,
     right: -30,
+    backgroundColor: `${colors.primary}60`, // 60% opacity
   },
   blob3: {
     width: 160,
@@ -418,12 +436,13 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     bottom: -10,
     left: 10,
+    backgroundColor: `${colors.primary}75`, // 75% opacity
   },
   smallBlob: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 1)',
+    backgroundColor: `${colors.primary}90`, // 90% opacity
     position: 'absolute',
     bottom: -60,
     left: -20,

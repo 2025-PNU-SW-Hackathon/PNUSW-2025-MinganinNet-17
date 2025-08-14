@@ -31,6 +31,9 @@ module.exports = {
     assetBundlePatterns: [
       "**/*"
     ],
+    fonts: [
+      "./fonts/나눔손글씨 규리의 일기.ttf"
+    ],
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.routy.app"

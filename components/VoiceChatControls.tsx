@@ -8,28 +8,31 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { VoiceChatControlsProps } from '../types/voice';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 const VoiceChatControls: React.FC<VoiceChatControlsProps> = ({
   onPause,
   onResume,
-  onClose,
   isPaused,
   disabled = false,
 }) => {
   const pauseScale = useSharedValue(1);
-  const closeScale = useSharedValue(1);
   const pauseOpacity = useSharedValue(1);
-  const closeOpacity = useSharedValue(1);
+
+  // Theme integration
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
 
   useEffect(() => {
     if (disabled) {
       pauseOpacity.value = withTiming(0.5, { duration: 200 });
-      closeOpacity.value = withTiming(1, { duration: 200 });
     } else {
       pauseOpacity.value = withTiming(1, { duration: 200 });
-      closeOpacity.value = withTiming(1, { duration: 200 });
     }
-  }, [disabled, pauseOpacity, closeOpacity]);
+  }, [disabled, pauseOpacity]);
 
   const handlePausePress = () => {
     if (disabled) return;
@@ -48,25 +51,9 @@ const VoiceChatControls: React.FC<VoiceChatControlsProps> = ({
     }
   };
 
-  const handleClosePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    
-    // Animation
-    closeScale.value = withSpring(0.9, { damping: 15, stiffness: 300 }, () => {
-      closeScale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    });
-    
-    onClose();
-  };
-
   const pauseButtonStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pauseScale.value }],
     opacity: pauseOpacity.value,
-  }));
-
-  const closeButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: closeScale.value }],
-    opacity: closeOpacity.value,
   }));
 
   return (
@@ -76,7 +63,7 @@ const VoiceChatControls: React.FC<VoiceChatControlsProps> = ({
       accessibilityRole="group"
       accessibilityLabel="음성 채팅 제어 버튼"
     >
-      {/* Pause/Resume Button */}
+      {/* Centered Pause/Resume Button */}
       <Animated.View style={[pauseButtonStyle]}>
         <TouchableOpacity
           style={[styles.controlButton, styles.pauseButton]}
@@ -123,73 +110,40 @@ const VoiceChatControls: React.FC<VoiceChatControlsProps> = ({
           )}
         </TouchableOpacity>
       </Animated.View>
-
-      {/* Close Button */}
-      <Animated.View style={[closeButtonStyle]}>
-        <TouchableOpacity
-          style={[styles.controlButton, styles.closeButton]}
-          onPress={handleClosePress}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="음성 채팅 종료"
-          accessibilityHint="두 번 탭하면 음성 채팅을 종료하고 이전 화면으로 돌아갑니다"
-          accessibilityState={{ disabled: false }}
-          accessibilityActions={[
-            { name: 'activate', label: '종료' }
-          ]}
-          onAccessibilityAction={(event: AccessibilityActionEvent) => {
-            if (event.nativeEvent.actionName === 'activate') {
-              handleClosePress();
-            }
-          }}
-        >
-          <Text 
-            style={styles.closeIcon}
-            accessible={false} // Icon is decorative, parent button has label
-          >
-            ✕
-          </Text>
-        </TouchableOpacity>
-      </Animated.View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start', // position button on left
     alignItems: 'center',
     width: '100%',
-    paddingHorizontal: 40,
-    paddingBottom: 60,
+    paddingHorizontal: Spacing['3xl'],
+    paddingBottom: Spacing['5xl'],
     position: 'absolute',
     bottom: 0,
   },
   controlButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 96, // 96px (20% smaller than 120px)
+    height: 96, // 96px (20% smaller than 120px)
+    borderRadius: 48, // 48px radius for 96px diameter
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.neutral[900],
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   pauseButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  closeButton: {
-    backgroundColor: '#FF6B6B',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 107, 107, 0.3)',
+    backgroundColor: colors.surface, // Solid surface background
+    borderWidth: 1,
+    borderColor: colors.border, // Solid border
   },
   pauseIcon: {
     flexDirection: 'row',
@@ -197,10 +151,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pauseBar: {
-    width: 4,
-    height: 20,
-    backgroundColor: '#333',
-    borderRadius: 2,
+    width: 6, // scaled down for 96px button (20% smaller than 7)
+    height: 28, // scaled down for 96px button (20% smaller than 35)
+    backgroundColor: colors.text,
+    borderRadius: 3,
     marginHorizontal: 2,
   },
   playIcon: {
@@ -208,22 +162,15 @@ const styles = StyleSheet.create({
     height: 0,
     backgroundColor: 'transparent',
     borderStyle: 'solid',
-    borderLeftWidth: 12,
+    borderLeftWidth: 18, // scaled down for 96px button (20% smaller than 22)
     borderRightWidth: 0,
-    borderBottomWidth: 8,
-    borderTopWidth: 8,
-    borderLeftColor: '#333',
+    borderBottomWidth: 11, // scaled down for 96px button (20% smaller than 14)
+    borderTopWidth: 11, // scaled down for 96px button (20% smaller than 14)
+    borderLeftColor: colors.text,
     borderRightColor: 'transparent',
     borderBottomColor: 'transparent',
     borderTopColor: 'transparent',
-    marginLeft: 3,
-  },
-  closeIcon: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 24,
+    marginLeft: 5, // scaled down for 96px button (20% smaller than 6)
   },
 });
 

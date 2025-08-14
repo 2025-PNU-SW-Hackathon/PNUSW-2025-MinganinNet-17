@@ -5,6 +5,7 @@ import { signIn } from '../backend/supabase/auth';
 import { supabase } from '../backend/supabase/client';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
+import { koreanTextStyle } from '../utils/koreanUtils';
 import { AnimatedButton } from './AnimatedButton';
 import DebugNextButton from './DebugNextButton';
 
@@ -150,11 +151,11 @@ export default function LoginScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>다시 오신 것을 환영해요!</Text>
-      <Text style={styles.subtitle}>로그인하여 여정을 계속하세요.</Text>
+      <Text style={[styles.title, koreanTextStyle('다시 오신 것을 환영해요!')]}>다시 오신 것을 환영해요!</Text>
+      <Text style={[styles.subtitle, koreanTextStyle('로그인하여 여정을 계속하세요.')]}>로그인하여 여정을 계속하세요.</Text>
 
       <View style={styles.formContainer}>
-        <Text style={styles.label}>이메일 주소</Text>
+        <Text style={[styles.label, koreanTextStyle('이메일 주소')]}>이메일 주소</Text>
         <TextInput
           style={[styles.input, !validateEmail(email) && email.length > 0 && styles.inputError]}
           value={email}
@@ -167,7 +168,7 @@ export default function LoginScreen({
           editable={!isLoading}
         />
 
-        <Text style={styles.label}>비밀번호</Text>
+        <Text style={[styles.label, koreanTextStyle('비밀번호')]}>비밀번호</Text>
         <TextInput
           style={styles.input}
           value={password}

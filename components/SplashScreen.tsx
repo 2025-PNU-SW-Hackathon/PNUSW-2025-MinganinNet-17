@@ -7,6 +7,7 @@ import {
     Text,
     View
 } from 'react-native';
+import { useFonts, Caveat_400Regular, Caveat_700Bold } from '@expo-google-fonts/caveat';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
@@ -20,6 +21,13 @@ interface SplashScreenProps {
 export default function SplashScreen({ onLoadingComplete }: SplashScreenProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  
+  // Load Google Fonts (Caveat)
+  const [fontsLoaded] = useFonts({
+    Caveat_400Regular,
+    Caveat_700Bold,
+  });
+  
   const styles = createStyles(colors);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -84,8 +92,23 @@ export default function SplashScreen({ onLoadingComplete }: SplashScreenProps) {
         ]}
       >
         {/* Logo Text */}
-        <Text style={styles.logoText}>Routy</Text>
-        <Text style={styles.logoSubtext}>AI 습관 관리</Text>
+        <Text style={[
+          styles.logoText,
+          {
+            fontFamily: fontsLoaded ? 'Caveat_400Regular' : 'sans-serif',
+            fontSize: 84,
+            fontWeight: '400',
+            lineHeight: 102,
+            letterSpacing: 2
+          }
+        ]}>Routy</Text>
+        <Text style={[
+          styles.logoSubtext,
+          {
+            fontFamily: 'NanumHandwriting',
+            fontSize: 24,
+          }
+        ]}>AI 습관 관리</Text>
       </Animated.View>
 
       {/* Loading Indicator */}
@@ -122,7 +145,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: colors.typography.fontWeight.bold,
     color: colors.primary,
     textAlign: 'center',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontFamily: 'sans-serif',
     letterSpacing: colors.typography.letterSpacing.widest,
   },
   logoSubtext: {
@@ -130,7 +153,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: Spacing.md,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontFamily: 'sans-serif',
   },
   loadingContainer: {
     position: 'absolute',
@@ -161,6 +184,6 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: colors.typography.fontSize.sm,
     color: colors.textSecondary,
     textAlign: 'center',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontFamily: 'sans-serif',
   },
 }); 

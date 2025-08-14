@@ -8,7 +8,6 @@ export interface VoiceVisualizerProps {
 export interface VoiceChatControlsProps {
   onPause: () => void;
   onResume: () => void;
-  onClose: () => void;
   isPaused: boolean;
   disabled?: boolean;
 }

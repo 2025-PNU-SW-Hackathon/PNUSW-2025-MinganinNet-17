@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
+import { useFonts } from 'expo-font';
 import { supabase } from '../backend/supabase/client';
 import ErrorBoundary from '../components/ErrorBoundary';
 
@@ -11,6 +12,11 @@ export default function RootLayout() {
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const [pendingNotificationRoute, setPendingNotificationRoute] = useState<string | null>(null);
   const [isAutoNavigationHandled, setIsAutoNavigationHandled] = useState(false);
+
+  // Load Korean font globally for the entire app
+  const [koreanFontsLoaded] = useFonts({
+    'NanumHandwriting': require('../fonts/나눔손글씨 규리의 일기.ttf'),
+  });
 
   // 앱 실행 중 알림 클릭 시 즉시 네비게이션 처리 (세션 복원 불필요)
   const handleNotificationNavigation = async (notificationData: any) => {
@@ -201,6 +207,11 @@ export default function RootLayout() {
       notificationListener.remove();
     };
   }, [isNavigationReady]);
+
+  // Don't render app until Korean fonts are loaded
+  if (!koreanFontsLoaded) {
+    return null;
+  }
 
   return (
     <ErrorBoundary

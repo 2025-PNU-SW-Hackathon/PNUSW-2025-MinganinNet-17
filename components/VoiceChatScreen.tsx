@@ -10,6 +10,7 @@ import {
   Platform,
   AppState,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -26,6 +27,10 @@ import VoiceChatControls from './VoiceChatControls';
 import { VoiceChatState, VOICE_STATE_CONFIG } from '../types/voice';
 import { pcmToWavDataUri } from '../utils/audioUtils';
 import { useHabitStore } from '../lib/habitStore';
+import { Colors } from '../constants/Colors';
+import { Spacing } from '../constants/Spacing';
+import { useColorScheme } from '../hooks/useColorScheme';
+import { koreanTextStyle } from '../utils/koreanUtils';
 import {
   GeminiLiveSession,
   startOrGetConversationSession,
@@ -213,6 +218,16 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   const [currentState, setCurrentState] = useState<VoiceChatState>('idle');
   const [isPaused, setIsPaused] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
+  
+  // Typewriter animation states
+  const [animatedText, setAnimatedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [currentlyAnimatingMessage, setCurrentlyAnimatingMessage] = useState('');
+  const [typingTimeoutRef, setTypingTimeoutRef] = useState<NodeJS.Timeout | null>(null);
+  
+  // Theme integration
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
   
   // Use Zustand store for conversation history
   const { conversationHistory, addMessageToHistory } = useHabitStore();
@@ -463,6 +478,81 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   const scaleAnim = useSharedValue(0.8);
   const textFadeAnim = useSharedValue(0);
 
+  // Typewriter animation function
+  const startTypewriterAnimation = useCallback((text: string, typingSpeed: number = 40) => {
+    // Clear any existing animation
+    if (typingTimeoutRef) {
+      clearTimeout(typingTimeoutRef);
+      setTypingTimeoutRef(null);
+    }
+    
+    // Reset animation state
+    setAnimatedText('');
+    setIsTyping(true);
+    setCurrentlyAnimatingMessage(text);
+    
+    // Start character-by-character animation
+    let currentIndex = 0;
+    
+    const animateNextCharacter = () => {
+      if (currentIndex < text.length) {
+        // Handle Korean characters and emojis properly by checking for multi-byte characters
+        const char = text.charAt(currentIndex);
+        const nextChar = text.charAt(currentIndex + 1);
+        
+        // Check if current character is part of a Korean syllable or emoji
+        let characterToAdd = char;
+        let nextIndex = currentIndex + 1;
+        
+        // Handle Korean combining characters and emojis
+        if (char.match(/[\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uAC00-\uD7AF\uD7B0-\uD7FF]/) || 
+            char.match(/[\uD83C-\uDBFF][\uDC00-\uDFFF]|\u2600-\u26FF|\u2700-\u27BF/)) {
+          characterToAdd = char;
+        }
+        
+        setAnimatedText(prev => prev + characterToAdd);
+        currentIndex = nextIndex;
+        
+        const timeout = setTimeout(animateNextCharacter, typingSpeed);
+        setTypingTimeoutRef(timeout);
+      } else {
+        // Animation complete
+        setIsTyping(false);
+        setCurrentlyAnimatingMessage('');
+        setTypingTimeoutRef(null);
+        
+        // Add completed message to conversation history
+        addMessageToHistory({ role: 'model', text: text });
+      }
+    };
+    
+    // Start animation
+    animateNextCharacter();
+  }, [typingTimeoutRef, addMessageToHistory]);
+  
+  // Function to complete animation instantly (for tap-to-complete)
+  const completeTypewriterAnimation = useCallback(() => {
+    if (isTyping && currentlyAnimatingMessage) {
+      // Clear timeout
+      if (typingTimeoutRef) {
+        clearTimeout(typingTimeoutRef);
+        setTypingTimeoutRef(null);
+      }
+      
+      // Complete animation instantly
+      setAnimatedText(currentlyAnimatingMessage);
+      setIsTyping(false);
+      
+      // Add to conversation history if not already added
+      const lastMessage = conversationHistory[conversationHistory.length - 1];
+      if (!lastMessage || lastMessage.text !== currentlyAnimatingMessage) {
+        addMessageToHistory({ role: 'model', text: currentlyAnimatingMessage });
+      }
+      
+      setCurrentlyAnimatingMessage('');
+    }
+  }, [isTyping, currentlyAnimatingMessage, typingTimeoutRef, conversationHistory, addMessageToHistory]);
+
   const stopRecording = useCallback(async () => {
     if (!recordingRef.current) return;
     try {
@@ -674,6 +764,15 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   };
 
   const endSession = useCallback(async () => {
+    // Clean up typewriter animation
+    if (typingTimeoutRef) {
+      clearTimeout(typingTimeoutRef);
+      setTypingTimeoutRef(null);
+    }
+    setIsTyping(false);
+    setAnimatedText('');
+    setCurrentlyAnimatingMessage('');
+    
     await stopRecording();
     await stopPlayback();
     if (userMediaStream.current) {
@@ -682,7 +781,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
     }
     await endConversationSession();
     sessionRef.current = null;
-  }, [stopRecording, stopPlayback]);
+  }, [stopRecording, stopPlayback, typingTimeoutRef]);
 
   const startSession = useCallback(async () => {
     // 이미 세션이 있고 연결된 상태라면 재사용
@@ -916,7 +1015,9 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
           }
         }
         
-        addMessageToHistory({ role: 'model', text: displayText });
+        // Start typewriter animation instead of immediately adding to history
+        console.log('[음성채팅] 타이프라이터 애니메이션 시작:', displayText);
+        startTypewriterAnimation(displayText);
 
         // 중간 응답에서는 정보 추출하지 않음 - 최종 정리 단계에서만 추출
         if (response.text.includes('정리해볼게요') || response.text.includes('맞나요?')) {
@@ -942,10 +1043,10 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
 
         // AI 음성 응답 재생
         if (response.audioData) {
-          console.log('[음성채팅] AI 음성 응답 재생 시작');
+          console.log('[음성채팅] AI 음성 응답 재생 시작 (타이핑 애니메이션과 동시)');
           await playAudio(response.audioData, response.mimeType, response.text);
         } else {
-          console.log('[음성채팅] AI 음성 응답 데이터 없음, 텍스트만 표시');
+          console.log('[음성채팅] AI 음성 응답 데이터 없음, 타이핑 애니메이션만 표시');
           // 음성이 없어도 대화 완료 감지
           if (mode === 'goalSetting' && isConversationComplete(response.text)) {
             console.log('[음성채팅] AI 음성 없음, 대화 완료 감지됨! 골 스텝 5로 이동합니다.');
@@ -1016,6 +1117,14 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
 
   const handleMainAreaPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Check if typewriter animation is active - tap to complete
+    if (isTyping) {
+      console.log('[음성채팅] 탭하여 타이핑 애니메이션 완료');
+      completeTypewriterAnimation();
+      return;
+    }
+    
     if (currentState === 'idle' || currentState === 'error') {
       startRecording();
     } else if (currentState === 'listening') {
@@ -1073,9 +1182,16 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   const modalStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value, transform: [{ scale: scaleAnim.value }] }));
   const textStyle = useAnimatedStyle(() => ({ opacity: textFadeAnim.value }));
 
+  // Create dynamic styles with theme colors
+  const styles = createStyles(colors);
+
   const config = VOICE_STATE_CONFIG[currentState] || VOICE_STATE_CONFIG.idle;
   const lastMessage = conversationHistory[conversationHistory.length - 1]?.text;
-  const displayTranscript = liveTranscript || lastMessage || config.subtitle;
+  
+  // Use animated text when typing, otherwise use normal display logic
+  const displayTranscript = isTyping 
+    ? animatedText 
+    : (liveTranscript || lastMessage || config.subtitle);
   
   // AI 응답을 두 줄로 나누어 표시
   const formattedResponse = formatResponseText(displayTranscript);
@@ -1087,75 +1203,126 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
         <SafeAreaView style={styles.safeArea}>
           <TouchableOpacity style={styles.mainArea} onPress={handleMainAreaPress} activeOpacity={0.95} disabled={isPaused || currentState === 'connecting'}>
             <Animated.View style={[styles.statusContainer, textStyle]}>
-              <Text style={styles.titleText}>{config.title}</Text>
+              <Text style={[styles.titleText, koreanTextStyle(config.title)]}>{config.title}</Text>
               <View style={styles.subtitleContainer}>
                 {formattedResponse.map((line, index) => (
-                  <Text key={index} style={styles.subtitleText}>
+                  <Text key={index} style={[styles.subtitleText, koreanTextStyle(line)]}>
                     {line}
                   </Text>
                 ))}
               </View>
-              {config.showMicIcon && <View style={styles.micIconContainer}><Text style={styles.micIcon}>🎤</Text></View>}
             </Animated.View>
             <View style={styles.visualizerContainer}>
               <VoiceVisualizer state={isPaused ? 'idle' : currentState} amplitude={0.7} />
             </View>
           </TouchableOpacity>
-          <VoiceChatControls onPause={() => setIsPaused(true)} onResume={() => setIsPaused(false)} onClose={() => handleClose()} isPaused={isPaused} disabled={currentState === 'idle' || currentState === 'connecting'} />
+          <VoiceChatControls onPause={() => setIsPaused(true)} onResume={() => setIsPaused(false)} isPaused={isPaused} disabled={currentState === 'idle' || currentState === 'connecting'} />
           
-          {/* 모드 전환 버튼 */}
-          {onSwitchToText && (
-            <TouchableOpacity 
-              style={styles.switchModeButton} 
-              onPress={onSwitchToText}
-              disabled={currentState === 'connecting'}
-            >
-              <Text style={styles.switchModeText}>📝 텍스트 모드로 전환</Text>
-            </TouchableOpacity>
-          )}
+          {/* Report/Document button - positioned in right corner */}
+          <TouchableOpacity 
+            style={styles.reportButton} 
+            onPress={() => {
+              // Enhanced functionality: try text mode switch first, fallback to close
+              if (onSwitchToText) {
+                onSwitchToText();
+              } else {
+                handleClose();
+              }
+            }}
+            disabled={currentState === 'connecting'}
+            accessibilityRole="button"
+            accessibilityLabel="텍스트 모드로 전환"
+            accessibilityHint="두 번 탭하면 텍스트 모드로 전환합니다"
+          >
+            <MaterialIcons 
+              name="description" 
+              size={35} 
+              color={colors.text} 
+              accessible={false}
+            />
+          </TouchableOpacity>
         </SafeAreaView>
       </Animated.View>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
-  modalContainer: { flex: 1, backgroundColor: '#000000' },
-  safeArea: { flex: 1 },
-  mainArea: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
-  statusContainer: { position: 'absolute', top: 120, alignItems: 'center', width: '100%' },
-  titleText: { fontSize: 28, fontWeight: '600', color: '#FFFFFF', marginBottom: 8, textAlign: 'center', letterSpacing: -0.5 },
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+  modalContainer: { 
+    flex: 1, 
+    backgroundColor: colors.background, // Solid background matching app
+  },
+  safeArea: { 
+    flex: 1,
+    backgroundColor: colors.background, // Consistent background
+  },
+  mainArea: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    paddingHorizontal: Spacing.screen.paddingHorizontal,
+    backgroundColor: colors.background, // Solid background
+  },
+  statusContainer: { 
+    position: 'absolute', 
+    top: Spacing['6xl'] + Spacing.xl, // 120px equivalent
+    alignItems: 'center', 
+    width: '100%',
+    backgroundColor: colors.card, // Solid card background
+    borderRadius: Spacing.layout.borderRadius.lg,
+    paddingVertical: Spacing['3xl'], // 24px - increased to accommodate larger text
+    paddingHorizontal: Spacing.xl, // increased from lg
+    marginHorizontal: Spacing.lg,
+  },
+  titleText: { 
+    fontSize: 50, // 50px (40% increase from 36px for Korean readability)
+    fontWeight: colors.typography.fontWeight.semibold,
+    color: colors.text,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+    letterSpacing: colors.typography.letterSpacing.tight,
+    fontFamily: 'sans-serif',
+  },
   subtitleText: { 
-    fontSize: 16, 
-    fontWeight: '400', 
-    color: 'rgba(255, 255, 255, 0.7)', 
+    fontSize: 25, // 25px (40% increase from 18px for Korean readability)
+    fontWeight: colors.typography.fontWeight.regular,
+    color: colors.textSecondary,
     textAlign: 'center', 
-    marginBottom: 8, // 줄간격 줄임
-    paddingHorizontal: 20,
-    lineHeight: 20, // 줄간격 조절
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    lineHeight: 25 * colors.typography.lineHeight.relaxed, // Updated for new font size
+    fontFamily: 'sans-serif',
   },
   subtitleContainer: {
     width: '100%',
     alignItems: 'center',
   },
-  micIconContainer: { marginTop: 8 },
-  micIcon: { fontSize: 24, opacity: 0.7 },
-  visualizerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%', maxHeight: 400 },
-  switchModeButton: { 
-    position: 'absolute', 
-    bottom: 120, 
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)'
+  visualizerContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    width: '100%', 
+    maxHeight: 400,
+    marginTop: Spacing['6xl'],
   },
-  switchModeText: { 
-    color: '#FFFFFF', 
-    fontSize: 16, 
-    fontWeight: '500' 
+  reportButton: { 
+    position: 'absolute', 
+    bottom: Spacing['5xl'], // 40px from bottom
+    right: Spacing['3xl'], // 24px from right edge
+    width: 96, // Match pause button size (20% smaller)
+    height: 96, // Match pause button size (20% smaller)
+    borderRadius: 48, // Circular
+    backgroundColor: colors.surface, // Match pause button background
+    borderWidth: 1,
+    borderColor: colors.border, // Match pause button border
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Simple shadow to match pause button
+    shadowColor: colors.neutral[900],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
 

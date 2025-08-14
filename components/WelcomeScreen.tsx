@@ -3,6 +3,7 @@ import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from '
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
+import { koreanTextStyle } from '../utils/koreanUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,10 +28,10 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
-        <Text style={styles.welcomeTitle}>
+        <Text style={[styles.welcomeTitle, koreanTextStyle('Routy에 오신 것을 환영해요!')]}>
           Routy에 오신 것을 환영해요!
         </Text>
-        <Text style={styles.welcomeSubtitle}>
+        <Text style={[styles.welcomeSubtitle, koreanTextStyle('AI 코치 Routy와 함께')]}>
           AI 코치 'Routy'와 함께{'\n'}당신의 목표를 현실로 만들어보세요.
         </Text>
         
@@ -39,7 +40,7 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
           onPress={handleGetStarted}
           activeOpacity={0.8}
         >
-          <Text style={styles.getStartedButtonText}>
+          <Text style={[styles.getStartedButtonText, koreanTextStyle('시작하기')]}>
             시작하기
           </Text>
         </TouchableOpacity>
@@ -66,14 +67,14 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: colors.text,
     textAlign: 'center',
     marginBottom: Spacing['3xl'],
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontFamily: 'sans-serif',
   },
   welcomeSubtitle: {
     fontSize: colors.typography.fontSize.lg,
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: colors.typography.lineHeight.relaxed * colors.typography.fontSize.lg,
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontFamily: 'sans-serif',
     marginBottom: Spacing['6xl'],
   },
   getStartedButton: {
@@ -96,6 +97,6 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: colors.typography.fontSize.lg,
     fontWeight: colors.typography.fontWeight.semibold,
     textAlign: 'center',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+    fontFamily: 'sans-serif',
   },
 }); 

@@ -149,6 +149,13 @@ export const Colors = {
         widest: 2,
       },
       
+      // Font family helpers
+      fontFamily: {
+        korean: 'NanumHandwriting',
+        default: 'sans-serif',
+        getKoreanFont: (hasKorean: boolean = false) => hasKorean ? 'NanumHandwriting' : 'sans-serif',
+      },
+      
       // Text variants for common use cases
       variants: {
         h1: {
