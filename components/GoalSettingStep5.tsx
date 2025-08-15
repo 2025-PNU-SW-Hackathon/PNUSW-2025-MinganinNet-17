@@ -6,17 +6,6 @@ import { useHabitStore } from '../lib/habitStore';
 import { PlanForCreation } from '../types/habit';
 import DebugNextButton from './DebugNextButton';
 
-// UUID 생성 함수
-const generateUUID = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
-
-// Temporary PersonaType definition to fix the type error locally
-type PersonaType = 'Easy' | 'Medium' | 'Hard' | 'System';
 
 interface GoalSettingStep5Props {
   onComplete: () => void;
