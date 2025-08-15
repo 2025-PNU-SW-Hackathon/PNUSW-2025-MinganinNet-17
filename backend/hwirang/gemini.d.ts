@@ -18,4 +18,13 @@ export function generateDailyFeedback(
 export function generateGoalSettingResponse(
     conversationHistory: Array<{type: string, content: string}>,
     currentGoalData: any
-): Promise<{textResponse: string, goalData: any}>; 
+): Promise<{textResponse: string, goalData: any}>;
+
+export function parsePlanModificationCommand(
+    command: string
+): Promise<{
+    action: 'add_todo' | 'complete_todo' | 'create_report' | 'unknown';
+    payload?: {
+        description: string;
+    };
+}>; 

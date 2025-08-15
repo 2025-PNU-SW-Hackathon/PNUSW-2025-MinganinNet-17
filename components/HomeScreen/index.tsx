@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -12,15 +12,16 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import CalendarScreen from '../backend/calendar/calendar';
-import { generateDailyFeedback, parsePlanModificationCommand } from '../backend/hwirang/gemini';
-import { getActivePlan } from '../backend/supabase/habits';
-import { createReport } from '../backend/supabase/reports';
-import { useHabitStore } from '../lib/habitStore';
-import { DailyTodo } from '../types/habit';
-import ProfileScreen from './ProfileScreen';
-import { SkeletonCard, SkeletonText, SkeletonTodoList } from './SkeletonLoaders';
-import VoiceChatScreen from './VoiceChatScreen';
+import CalendarScreen from '../../backend/calendar/calendar';
+import { generateDailyFeedback, parsePlanModificationCommand } from '../../backend/hwirang/gemini';
+import { getActivePlan } from '../../backend/supabase/habits';
+import { createReport } from '../../backend/supabase/reports';
+import { useHabitStore } from '../../lib/habitStore';
+import { DailyTodo } from '../../types/habit';
+import ProfileScreen from '../ProfileScreen';
+import { SkeletonCard, SkeletonText } from '../SkeletonLoaders';
+import VoiceChatScreen from '../VoiceChatScreen';
+import TodoCard from './TodoCard';
 
 const parseDurationToDays = (duration: string): number => {
   if (duration.includes('개월')) {
@@ -36,7 +37,7 @@ const parseDurationToDays = (duration: string): number => {
     return isNaN(days) ? 0 : days;
   }
   return 0;
-};
+}; // 기간에 해당하는 문자열을 일수로 변환
 
 interface HomeScreenProps {
   selectedDate?: string;
@@ -48,50 +49,7 @@ interface CoachStatus {
   color: string;
 }
 
-interface AnimatedTodoItemProps {
-  todo: DailyTodo;
-  isCompleted: boolean;
-  onToggle: () => void;
-}
-
-const AnimatedTodoItem = ({ todo, isCompleted, onToggle }: AnimatedTodoItemProps) => {
-  const scaleAnimation = useRef(new Animated.Value(1)).current;
-  const checkmarkScale = useRef(new Animated.Value(isCompleted ? 1 : 0)).current;
-  const textOpacity = useRef(new Animated.Value(isCompleted ? 0.6 : 1)).current;
-
-  const handlePress = () => {
-    Animated.sequence([
-      Animated.spring(scaleAnimation, { toValue: 1.05, useNativeDriver: true, tension: 300, friction: 8 }),
-      Animated.spring(scaleAnimation, { toValue: 1, useNativeDriver: true, tension: 300, friction: 8 })
-    ]).start();
-
-    if (!isCompleted) {
-      Animated.parallel([
-        Animated.spring(checkmarkScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 6 }),
-        Animated.timing(textOpacity, { toValue: 0.6, duration: 200, useNativeDriver: true })
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.spring(checkmarkScale, { toValue: 0, useNativeDriver: true, tension: 300, friction: 6 }),
-        Animated.timing(textOpacity, { toValue: 1, duration: 200, useNativeDriver: true })
-      ]).start();
-    }
-    onToggle();
-  };
-
-  return (
-    <Animated.View style={[{ transform: [{ scale: scaleAnimation }] }]}>
-      <TouchableOpacity style={styles.todoItem} onPress={handlePress} activeOpacity={0.8}>
-        <View style={[styles.todoCheckbox, isCompleted && styles.todoCheckedBox]}>
-          <Animated.Text style={[styles.checkmarkText, { transform: [{ scale: checkmarkScale }], opacity: checkmarkScale }]}>✓</Animated.Text>
-        </View>
-        <Animated.Text style={[styles.todoText, isCompleted && styles.todoTextCompleted, { opacity: textOpacity }]} numberOfLines={2} ellipsizeMode="tail">
-          {todo.description}
-        </Animated.Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
+ // 애니메이션 효과 컴포넌트
 
 export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const router = useRouter();
@@ -122,8 +80,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
           setPlan(fetchedPlan);
           setEffectiveStartDate(fetchedPlan.start_date);
           const initialCompletion: { [key: string]: boolean } = {};
-          fetchedPlan.milestones.forEach(m => {
-            m.daily_todos.forEach(todo => {
+          fetchedPlan.milestones.forEach((m: any) => {
+            m.daily_todos.forEach((todo: any) => {
               initialCompletion[todo.id.toString()] = todo.is_completed;
             });
           });
@@ -179,6 +137,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     if (!plan || !effectiveStartDate) return [];
     const selected = new Date(targetDate);
     const startDate = new Date(effectiveStartDate);
+    
     if (selected < startDate) return [];
     const diffDays = Math.floor((selected.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     let dayCounter = 0;
@@ -224,8 +183,13 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       const todayTodos = getTodosForSelectedDate();
       const completedCount = todayTodos.filter(t => todoCompletion[t.id.toString()]).length;
       const achievementScore = todayTodos.length > 0 ? Math.round((completedCount / todayTodos.length) * 10) : 0;
-      const feedback = await generateDailyFeedback(userSummary, achievementScore, todayTodos);
-      await createReport({ report_date: today.toISOString().split('T')[0], achievement_score: achievementScore, ai_coach_feedback: [feedback], daily_activities: { todos: todayTodos }, user_summary: userSummary });
+      const todoItems = todayTodos.map(todo => ({
+        id: todo.id.toString(),
+        description: todo.description,
+        completed: todoCompletion[todo.id.toString()]
+      }));
+      const feedback = await generateDailyFeedback(userSummary, achievementScore, todoItems);
+      await createReport({ report_date: today.toISOString().split('T')[0], achievement_score: achievementScore, ai_coach_feedback: [feedback], daily_activities: { todos: todayTodos } });
       Alert.alert('성공', '오늘의 리포트가 성공적으로 생성되었습니다.');
     } catch (error) {
       console.error('Error creating report:', error);
@@ -266,10 +230,16 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       switch (command.action) {
         case 'add_todo':
           if (newPlan.milestones && newPlan.milestones.length > 0) {
-            const newTodo: DailyTodo = { id: `new-todo-${Date.now()}`, description: command.payload.description, is_completed: false };
+            const newTodo: DailyTodo = { 
+              id: Date.now(), 
+              created_at: new Date().toISOString(),
+              milestone_id: newPlan.milestones[0].id,
+              description: command.payload?.description || '', 
+              is_completed: false 
+            };
             newPlan.milestones[0].daily_todos.push(newTodo);
             setPlan(newPlan);
-            Alert.alert('성공', `'${command.payload.description}' 할 일이 추가되었습니다.`);
+            Alert.alert('성공', `'${command.payload?.description}' 할 일이 추가되었습니다.`);
           } else {
             Alert.alert('오류', '할 일을 추가할 마일스톤이 없습니다.');
           }
@@ -277,14 +247,14 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         case 'complete_todo':
           let todoFound = false;
           for (const milestone of newPlan.milestones) {
-            const todo = milestone.daily_todos.find(t => t.description.includes(command.payload.description));
+            const todo = milestone.daily_todos.find((t: any) => t.description.includes(command.payload?.description || ''));
             if (todo) { todo.is_completed = true; todoFound = true; break; }
           }
           if (todoFound) {
             setPlan(newPlan);
-            Alert.alert('성공', `'${command.payload.description}' 할 일을 완료했습니다.`);
+            Alert.alert('성공', `'${command.payload?.description}' 할 일을 완료했습니다.`);
           } else {
-            Alert.alert('오류', `'${command.payload.description}' 할 일을 찾지 못했습니다.`);
+            Alert.alert('오류', `'${command.payload?.description}' 할 일을 찾지 못했습니다.`);
           }
           break;
         default: Alert.alert('알 수 없는 명령', '지원하지 않는 명령입니다.'); break;
@@ -361,22 +331,14 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
               </View>
             </Animated.View>
           )}
-          <View style={styles.todoCard}>
-            <Text style={styles.cardTitle}>Today&apos;s To-Do</Text>
-            <ScrollView style={styles.todoScrollView} showsVerticalScrollIndicator={false}>
-              {loading ? <SkeletonTodoList count={3} /> : error ? <Text style={styles.emptyTodoText}>{error}</Text> : todosForSelectedDate.length > 0 ? (
-                <Animated.View style={{ opacity: todoFadeAnimation }}>
-                  {todosForSelectedDate.map((todo) => {
-                    const todoKey = todo.id.toString();
-                    const isCompleted = todoCompletion[todoKey];
-                    return <AnimatedTodoItem key={todo.id} todo={todo} isCompleted={isCompleted} onToggle={() => handleTodoToggle(todo.id)} />;
-                  })}
-                </Animated.View>
-              ) : (
-                <Animated.View style={[styles.emptyTodoContainer, { opacity: todoFadeAnimation }]}><Text style={styles.emptyTodoText}>오늘의 할 일이 없습니다.</Text></Animated.View>
-              )}
-            </ScrollView>
-          </View>
+          <TodoCard
+            loading={loading}
+            error={error}
+            todosForSelectedDate={todosForSelectedDate}
+            todoCompletion={todoCompletion}
+            todoFadeAnimation={todoFadeAnimation}
+            onTodoToggle={handleTodoToggle}
+          />
         </View>
       </ScrollView>
 
@@ -430,16 +392,7 @@ const styles = StyleSheet.create({
   coachEmoji: { fontSize: 100, marginBottom: 10 },
   coachMessage: { fontSize: 16, color: '#a9a9c2', textAlign: 'center', marginBottom: 10, fontFamily: 'Inter' },
   coachIndicator: { width: 60, height: 8, borderRadius: 4 },
-  todoCard: { flex: 1, backgroundColor: '#3a3a50', borderRadius: 16, padding: 20, marginLeft: 10, minHeight: 250 },
-  todoScrollView: { flex: 1 },
-  todoItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#4a4a60' },
-  todoCheckbox: { width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: '#a9a9c2', marginRight: 10, justifyContent: 'center', alignItems: 'center' },
-  todoCheckedBox: { backgroundColor: '#6c63ff', borderColor: '#6c63ff' },
-  checkmarkText: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
-  todoText: { fontSize: 14, fontWeight: '500', color: '#ffffff', flex: 1, fontFamily: 'Inter' },
-  todoTextCompleted: { textDecorationLine: 'line-through', color: '#a9a9c2' },
-  emptyTodoContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyTodoText: { fontSize: 14, color: '#a9a9c2', fontFamily: 'Inter' },
+
   modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#1c1c2e', borderRadius: 20, padding: 20, elevation: 5, minWidth: 350, maxWidth: '90%', maxHeight: '90%' },
   closeButton: { marginTop: 16, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20, backgroundColor: '#6c63ff', borderRadius: 20 },
