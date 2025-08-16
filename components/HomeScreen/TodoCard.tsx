@@ -6,17 +6,17 @@ import {
   Text,
   View
 } from 'react-native';
-import { DailyTodo } from '../../types/habit';
+import { DailyTodoInstance } from '../../types/habit';
 import { SkeletonTodoList } from '../SkeletonLoaders';
 import AnimatedTodoItem from './AnimatedTodoItem';
 
 interface TodoCardProps {
   loading: boolean;
   error: string | null;
-  todosForSelectedDate: DailyTodo[];
+  todosForSelectedDate: DailyTodoInstance[];
   todoCompletion: { [key: string]: boolean };
   todoFadeAnimation: Animated.Value;
-  onTodoToggle: (todoId: number) => void;
+  onTodoToggle: (todoId: string) => Promise<void>;
 }
 
 const TodoCard: React.FC<TodoCardProps> = ({
@@ -38,8 +38,7 @@ const TodoCard: React.FC<TodoCardProps> = ({
         ) : todosForSelectedDate.length > 0 ? ( // 3 : 데이터가 있음
           <Animated.View style={{ opacity: todoFadeAnimation }}>
             {todosForSelectedDate.map((todo) => {
-              const todoKey = todo.id.toString();
-              const isCompleted = todoCompletion[todoKey];
+              const isCompleted = todoCompletion[todo.id];
               return (
                 <AnimatedTodoItem
                   key={todo.id}

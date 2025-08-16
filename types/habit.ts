@@ -93,3 +93,40 @@ export interface PlanForCreation {
   available_time: string;
   milestones: MilestoneForCreation[];
 }
+
+// --- Types for Daily Todo Instances ---
+
+/**
+ * Corresponds to the `daily_todo_instances` table.
+ * Represents a daily instance of a todo item for a specific date.
+ */
+export interface DailyTodoInstance {
+  id: string; // UUID
+  user_id: string; // UUID
+  plan_id: string; // UUID
+  original_todo_id: number; // BigInt
+  date: string; // "YYYY-MM-DD" format
+  description: string;
+  is_completed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Type for organizing daily todo instances by date
+ */
+export interface DailyTodosByDate {
+  [date: string]: DailyTodoInstance[];
+}
+
+/**
+ * Represents the data structure needed to create a new daily todo instance.
+ */
+export interface DailyTodoInstanceForCreation {
+  user_id: string;
+  plan_id: string;
+  original_todo_id: number;
+  date: string;
+  description: string;
+  is_completed: boolean;
+}
