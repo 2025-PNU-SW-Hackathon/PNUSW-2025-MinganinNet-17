@@ -46,7 +46,7 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   const backgroundAnimation = useRef(new Animated.Value(0)).current;
   const [isPressed, setIsPressed] = useState(false);
 
-  // Pulse animation for loading state
+  // Pulse animation for loading state - using consistent useNativeDriver: false
   useEffect(() => {
     if (isLoading) {
       const pulse = Animated.loop(
@@ -54,12 +54,12 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
           Animated.timing(pulseAnimation, {
             toValue: 0.85,
             duration: 800,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
           Animated.timing(pulseAnimation, {
             toValue: 1,
             duration: 800,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
         ])
       );
@@ -71,12 +71,12 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
     }
   }, [isLoading]);
 
-  // Disabled state animation
+  // Disabled state animation - using consistent useNativeDriver: false  
   useEffect(() => {
     Animated.timing(opacityAnimation, {
       toValue: disabled ? 0.6 : 1,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   }, [disabled]);
 
@@ -88,12 +88,12 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
     // Enhanced press feedback with haptics
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    // Press animations
+    // Press animations - using consistent useNativeDriver: false for all
     Animated.parallel([
       Animated.timing(scaleAnimation, {
         toValue: 0.96,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(shadowAnimation, {
         toValue: 1,
@@ -113,11 +113,11 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
     
     setIsPressed(false);
     
-    // Release animations
+    // Release animations - using consistent useNativeDriver: false for all
     Animated.parallel([
       Animated.spring(scaleAnimation, {
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: false,
         tension: 300,
         friction: 8,
       }),
@@ -224,7 +224,7 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
         {/* Loading indicator dots */}
         {isLoading && (
           <Animated.View style={[styles.loadingDots, { opacity: pulseAnimation } as ViewStyle]}>
-            <LoadingDots />
+            <LoadingDots dotsContainerStyle={styles.dotsContainer} dotStyle={styles.dot} />
           </Animated.View>
         )}
       </Animated.View>
@@ -233,7 +233,12 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
 };
 
 // Animated loading dots component
-const LoadingDots: React.FC = () => {
+interface LoadingDotsProps {
+  dotsContainerStyle: any;
+  dotStyle: any;
+}
+
+const LoadingDots: React.FC<LoadingDotsProps> = ({ dotsContainerStyle, dotStyle }) => {
   const dot1Animation = useRef(new Animated.Value(0.3)).current;
   const dot2Animation = useRef(new Animated.Value(0.3)).current;
   const dot3Animation = useRef(new Animated.Value(0.3)).current;
@@ -246,12 +251,12 @@ const LoadingDots: React.FC = () => {
           Animated.timing(animValue, {
             toValue: 1,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
           Animated.timing(animValue, {
             toValue: 0.3,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
         ])
       );
@@ -270,10 +275,10 @@ const LoadingDots: React.FC = () => {
   }, []);
 
   return (
-    <View style={styles.dotsContainer}>
-      <Animated.View style={[styles.dot, { opacity: dot1Animation } as ViewStyle]} />
-      <Animated.View style={[styles.dot, { opacity: dot2Animation } as ViewStyle]} />
-      <Animated.View style={[styles.dot, { opacity: dot3Animation } as ViewStyle]} />
+    <View style={dotsContainerStyle}>
+      <Animated.View style={[dotStyle, { opacity: dot1Animation } as ViewStyle]} />
+      <Animated.View style={[dotStyle, { opacity: dot2Animation } as ViewStyle]} />
+      <Animated.View style={[dotStyle, { opacity: dot3Animation } as ViewStyle]} />
     </View>
   );
 };
@@ -299,7 +304,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   mdButton: {
     height: Spacing.layout.button.height.md,
-    paddingHorizontal: Spacing['3xl'],
+    paddingHorizontal: Spacing['2xl'],
     borderRadius: Spacing.layout.borderRadius.lg,
   },
   lgButton: {

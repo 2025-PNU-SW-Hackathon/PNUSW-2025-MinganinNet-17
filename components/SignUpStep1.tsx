@@ -91,7 +91,7 @@ export default function SignUpStep1({
           value={password}
           onChangeText={handlePasswordChange}
           placeholder="비밀번호 입력"
-          placeholderTextColor="colors.textSecondary"
+          placeholderTextColor={colors.textSecondary}
           secureTextEntry
           editable={!isLoading}
         />
@@ -109,7 +109,7 @@ export default function SignUpStep1({
           value={confirmPassword}
           onChangeText={handleConfirmPasswordChange}
           placeholder="비밀번호 확인"
-          placeholderTextColor="colors.textSecondary"
+          placeholderTextColor={colors.textSecondary}
           secureTextEntry
           editable={!isLoading}
         />

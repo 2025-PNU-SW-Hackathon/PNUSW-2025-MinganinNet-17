@@ -66,7 +66,7 @@ export const Colors = {
     tabIconSelected: tintColorLight,
     
     // Interactive elements
-    buttonPrimary: '#6c63ff',
+    buttonPrimary: '#748873',
     buttonSecondary: '#f3f4f6',
     buttonDisabled: '#e5e7eb',
     buttonGhost: 'transparent',
@@ -274,7 +274,7 @@ export const Colors = {
     tabIconSelected: tintColorDark,
     
     // Interactive elements
-    buttonPrimary: '#6c63ff',
+    buttonPrimary: '#748873',
     buttonSecondary: '#4a4a60',
     buttonDisabled: '#4a47cc',
     buttonGhost: 'transparent',

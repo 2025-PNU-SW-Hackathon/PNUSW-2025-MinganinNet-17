@@ -189,6 +189,7 @@ export default function LoginScreen({
         disabled={!email.trim() || !password.trim() || isLoading}
         style={styles.loginButton}
         loadingText="로그인 중..."
+        size="lg"
       />
 
       {/* Enhanced Sign Up Button */}
@@ -198,6 +199,7 @@ export default function LoginScreen({
         disabled={isLoading}
         variant="secondary"
         style={styles.signUpButton}
+        size="lg"
       />
 
       {/* Floating Debug Button - does not interfere with layout */}
@@ -259,8 +261,10 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   loginButton: {
     marginBottom: 16,
+    alignSelf: 'stretch',
   },
   signUpButton: {
     marginBottom: 20,
+    alignSelf: 'stretch',
   },
 }); 
