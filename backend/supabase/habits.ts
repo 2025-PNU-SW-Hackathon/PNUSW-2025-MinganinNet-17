@@ -1,4 +1,4 @@
-import { Plan, PlanForCreation } from '../../types/habit';
+import { DailyTodoInstance, DailyTodoInstanceForCreation, Plan, PlanForCreation } from '../../types/habit';
 import { supabase } from './client';
 
 /**
@@ -175,5 +175,158 @@ export async function createNewHabitAndPlan(
     createdMilestones.push({ ...newMilestone, daily_todos: createdTodos });
   }
 
-  return { ...newPlan, milestones: createdMilestones };
+  // Step 5: Generate daily todo instances based on the created plan and todos
+  const finalPlan = { ...newPlan, milestones: createdMilestones } as Plan;
+  try {
+    await generateDailyTodoInstances(finalPlan);
+    console.log('✅ Daily todo instances generated successfully');
+  } catch (error) {
+    console.error('❌ Error generating daily todo instances:', error);
+    // Proceed without blocking plan creation; instances can be generated later if needed
+  }
+
+  return finalPlan;
+}
+
+/**
+ * Helper function to parse duration string to days using accurate date calculation
+ * @param duration - Duration string (e.g., "3개월", "2주", "7일")
+ * @param startDate - Base date for calculation (important for accurate month calculation)
+ * @returns number of days
+ */
+function parseDurationToDays(duration: string, startDate: Date): number {
+  if (duration.includes('개월')) {
+    const months = parseInt(duration.replace('개월', '').trim(), 10);
+    if (isNaN(months)) return 0;
+    
+    // Use Date.setMonth() for accurate month calculation
+    const endDate = new Date(startDate);
+    endDate.setMonth(startDate.getMonth() + months);
+    
+    const diffTime = endDate.getTime() - startDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
+  }
+  if (duration.includes('주')) {
+    const weeks = parseInt(duration.replace('주', '').trim(), 10);
+    return isNaN(weeks) ? 0 : weeks * 7;
+  }
+  if (duration.includes('일')) {
+    const days = parseInt(duration.replace('일', '').trim(), 10);
+    return isNaN(days) ? 0 : days;
+  }
+  return 0;
+}
+
+/**
+ * Fetches daily todo instances for a specific date.
+ * 
+ * @param date - The date in "YYYY-MM-DD" format
+ * @returns Promise<DailyTodoInstance[]> - Array of daily todo instances for the date
+ */
+export async function getDailyTodosByDate(date: string): Promise<DailyTodoInstance[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.warn('🔓 No authenticated user found, cannot fetch daily todos.');
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('daily_todo_instances')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('date', date)
+    .order('created_at');
+
+  if (error) {
+    console.error('Error fetching daily todos:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Updates the completion status of a daily todo instance.
+ * 
+ * @param instanceId - The UUID of the daily todo instance
+ * @param isCompleted - The new completion status
+ * @returns Promise<void>
+ */
+export async function updateTodoCompletion(
+  instanceId: string, 
+  isCompleted: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('daily_todo_instances')
+    .update({ 
+      is_completed: isCompleted,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', instanceId);
+
+  if (error) {
+    console.error('Error updating todo completion:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generates daily todo instances for all dates in a plan.
+ * This function should be called after creating a new plan.
+ * Uses accurate date calculation for month durations.
+ * 
+ * @param plan - The plan object with milestones and daily todos
+ * @returns Promise<void>
+ */
+export async function generateDailyTodoInstances(plan: Plan): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  const instances: DailyTodoInstanceForCreation[] = [];
+  const startDate = new Date(plan.start_date);
+  
+  let dayCounter = 0;
+  
+  for (const milestone of plan.milestones) {
+    // Use improved parseDurationToDays with startDate for accurate calculation
+    const milestoneStartDate = new Date(startDate);
+    milestoneStartDate.setDate(startDate.getDate() + dayCounter);
+    
+    const durationInDays = parseDurationToDays(milestone.duration, milestoneStartDate);
+    
+    for (let day = 0; day < durationInDays; day++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + dayCounter + day);
+      
+      for (const todo of milestone.daily_todos) {
+        instances.push({
+          user_id: user.id,
+          plan_id: plan.id,
+          original_todo_id: todo.id,
+          date: currentDate.toISOString().split('T')[0],
+          description: todo.description,
+          is_completed: false
+        });
+      }
+    }
+    dayCounter += durationInDays;
+  }
+
+  // Batch insert all instances
+  if (instances.length > 0) {
+    const { error } = await supabase
+      .from('daily_todo_instances')
+      .insert(instances);
+
+    if (error) {
+      console.error('Error generating daily todo instances:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Generated ${instances.length} daily todo instances for plan ${plan.id}`);
+  }
 } 
