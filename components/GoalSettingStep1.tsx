@@ -326,6 +326,7 @@ export default function GoalSettingStep1({
         <VoiceChatScreen
           visible={voiceChatVisible}
           mode="goalSetting"
+          enableStepProgression={true}
           onClose={() => setVoiceChatVisible(false)}
           onComplete={handleVoiceGoalSettingComplete}
           onSwitchToText={() => {
@@ -394,6 +395,7 @@ export default function GoalSettingStep1({
       <VoiceChatScreen
         visible={voiceChatVisible}
         mode="goalSetting"
+        enableStepProgression={true}
         onClose={() => setVoiceChatVisible(false)}
         onComplete={handleVoiceGoalSettingComplete}
         onSwitchToText={() => {

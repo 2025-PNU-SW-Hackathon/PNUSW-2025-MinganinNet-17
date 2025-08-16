@@ -44,9 +44,40 @@ export interface VoiceChatScreenProps {
   onComplete: (data: any) => void;
   onError?: (error: string) => void;
   onSwitchToText?: () => void; // 텍스트 모드로 전환하는 콜백 추가
+  enableStepProgression?: boolean; // 단계별 진행 활성화 여부
 }
 
-const getSystemInstructionForMode = (mode: VoiceChatScreenProps['mode']): string => {
+// 6단계 목표 설정 데이터 구조
+interface GoalSettingStepData {
+  habitName?: string;
+  goalPeriod?: string;
+  availableTime?: string;
+  difficultyReason?: string;
+  restrictedApps?: string;
+  persona?: 'Easy' | 'Medium' | 'Hard';
+}
+
+// 단계별 요구사항 정의
+const STEP_REQUIREMENTS: Record<number, (keyof GoalSettingStepData)[]> = {
+  1: ['habitName'],
+  2: ['habitName', 'goalPeriod'],
+  3: ['habitName', 'goalPeriod', 'availableTime'],
+  4: ['habitName', 'goalPeriod', 'availableTime', 'difficultyReason'],
+  5: ['habitName', 'goalPeriod', 'availableTime', 'difficultyReason', 'restrictedApps'],
+  6: ['habitName', 'goalPeriod', 'availableTime', 'difficultyReason', 'restrictedApps', 'persona']
+};
+
+// 단계별 제목 정의
+const STEP_TITLES: Record<number, string> = {
+  1: '당신이 이루고 싶은 목표는 무엇인가요?',
+  2: '목표를 언제까지 달성하고 싶으신가요?',
+  3: '언제 시간을 내서 실천하고 싶으신가요?',
+  4: '이 습관을 형성하는 데 어려운 점이 있나요?',
+  5: '어떤 앱을 제한하고 싶으신가요?',
+  6: '어떤 코칭 스타일을 원하시나요?'
+};
+
+const getSystemInstructionForMode = (mode: VoiceChatScreenProps['mode'], currentStep?: number): string => {
   const basePrompt = `You are '루티' (Routy), a friendly Korean habit coach.
 
 RULES: Korean only, ALWAYS speak numbers in Korean (삼개월, 백만원, 여섯시, 일곱시, 여덟시), NEVER use English numbers, summarize as "~~가 목표시군요", one question at a time, handle interruptions, 2-3 sentences max.
@@ -195,8 +226,42 @@ RULES: Stay on topic, summarize input, handle interruptions
 
 EMOTION: "음... 그렇군요", "힘내세요!"`;
 
+  // 단계별 목표 설정 프롬프트 생성
+  const getStepSpecificGoalPrompt = (step: number): string => {
+    const stepPrompts = {
+      1: `FOCUS: Ask for the user's specific habit goal. Be encouraging and help them be specific.
+QUESTION: "어떤 새로운 습관을 만들고 싶으신가요?"
+EXAMPLES: "매일 운동하기", "책 읽기", "일찍 일어나기"`,
+      
+      2: `FOCUS: Ask for the goal period/timeline. Help them set realistic timeframes.
+QUESTION: "언제까지 이 목표를 달성하고 싶으신가요?"
+EXAMPLES: "3개월", "6개월", "1년"`,
+      
+      3: `FOCUS: Ask for available time when they can practice this habit.
+QUESTION: "언제 시간을 내서 이 습관을 실천하고 싶으신가요?"
+EXAMPLES: "아침 7시", "저녁 9시", "퇴근 후"`,
+      
+      4: `FOCUS: Ask about difficulties they might face in forming this habit.
+QUESTION: "이 습관을 형성하는 데 어떤 어려운 점이 있을 것 같나요?"
+EXAMPLES: "동기 부족", "시간 관리 어려움", "일관성 유지 어려움"`,
+      
+      5: `FOCUS: Ask about apps they want to restrict to help form the habit.
+QUESTION: "습관 형성을 위해 어떤 앱을 제한하고 싶으신가요?"
+EXAMPLES: "유튜브", "인스타그램", "게임"`,
+      
+      6: `FOCUS: Ask about coaching style preference.
+QUESTION: "어떤 코칭 스타일을 원하시나요? 부드럽게, 보통으로, 아니면 강하게?"
+EXAMPLES: "부드럽게 (Easy)", "보통으로 (Medium)", "강하게 (Hard)"`
+    };
+    
+    return stepPrompts[step as keyof typeof stepPrompts] || stepPrompts[1];
+  };
+
   switch (mode) {
     case 'goalSetting':
+      if (currentStep && currentStep >= 1 && currentStep <= 6) {
+        return basePrompt + goalSettingFlow + '\n\nCURRENT STEP FOCUS:\n' + getStepSpecificGoalPrompt(currentStep);
+      }
       return basePrompt + goalSettingFlow;
     case 'plan':
       return basePrompt + planFlow;
@@ -214,6 +279,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   onComplete,
   onError,
   onSwitchToText,
+  enableStepProgression = true,
 }) => {
   const [currentState, setCurrentState] = useState<VoiceChatState>('idle');
   const [isPaused, setIsPaused] = useState(false);
@@ -242,6 +308,16 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
     isComplete: false
   });
 
+  // 단계별 진행 관리 (목표 설정 모드에서만 활성화)
+  const shouldEnableStepProgression = mode === 'goalSetting' && enableStepProgression;
+  const [currentStep, setCurrentStep] = useState(1);
+  const [stepData, setStepData] = useState<GoalSettingStepData>({});
+  const [progressValue, setProgressValue] = useState(0);
+  
+  // 애니메이션 값들
+  const stepProgressAnim = useSharedValue(1);
+  const progressBarAnim = useSharedValue(0);
+
   // 새로운 대화 시작 시 데이터 초기화
   const resetGoalData = useCallback(() => {
     const initialData = {
@@ -253,8 +329,76 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       isComplete: false
     };
     setGoalData(initialData);
-    console.log('[음성채팅] 목표 데이터 초기화됨');
-  }, []);
+    
+    // 단계별 진행 상태도 초기화
+    if (shouldEnableStepProgression) {
+      setCurrentStep(1);
+      setStepData({});
+      setProgressValue(0);
+      stepProgressAnim.value = 1;
+      progressBarAnim.value = 0;
+    }
+    
+    console.log('[음성채팅] 목표 데이터 및 단계 상태 초기화됨');
+  }, [shouldEnableStepProgression, stepProgressAnim, progressBarAnim]);
+
+  // 실시간 단계 감지 함수
+  const detectCurrentStep = useCallback((collectedData: GoalSettingStepData): number => {
+    if (!shouldEnableStepProgression) return 1;
+    
+    // 역순으로 확인하여 가장 높은 완성된 단계 반환
+    for (let step = 6; step >= 1; step--) {
+      const requiredFields = STEP_REQUIREMENTS[step];
+      const hasAllFields = requiredFields.every(field => {
+        const value = collectedData[field];
+        return value && value.trim().length > 0;
+      });
+      
+      if (hasAllFields) {
+        console.log(`[단계감지] Step ${step} 조건 충족:`, {
+          step,
+          requiredFields,
+          collectedData: requiredFields.reduce((acc, field) => ({
+            ...acc,
+            [field]: collectedData[field]
+          }), {})
+        });
+        return step;
+      }
+    }
+    
+    return 1; // 기본값
+  }, [shouldEnableStepProgression]);
+
+  // 부드러운 단계 전환 애니메이션
+  const triggerStepTransition = useCallback((newStep: number) => {
+    if (!shouldEnableStepProgression || newStep === currentStep) return;
+    
+    console.log(`[단계전환] Step ${currentStep} → Step ${newStep}`);
+    
+    // 단계 표시기 애니메이션
+    stepProgressAnim.value = withTiming(newStep, {
+      duration: 800,
+      easing: Easing.bezier(0.4, 0.0, 0.2, 1),
+    });
+    
+    // 프로그레스 바 애니메이션
+    const newProgress = (newStep / 6) * 100;
+    progressBarAnim.value = withTiming(newProgress, {
+      duration: 800,
+      easing: Easing.bezier(0.4, 0.0, 0.2, 1),
+    });
+    
+    // 상태 업데이트
+    setCurrentStep(newStep);
+    setProgressValue(newProgress);
+    
+    // 햅틱 피드백
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // 단계별 시스템 지시사항 업데이트 (향후 AI 응답에 반영)
+    console.log(`[단계전환] 새로운 단계 ${newStep}에 맞는 AI 프롬프트 준비됨`);
+  }, [shouldEnableStepProgression, currentStep, stepProgressAnim, progressBarAnim]);
 
   // 최종 정리 단계에서만 정보 추출하는 함수
   const extractFinalGoalInfo = useCallback((aiResponse: string) => {
@@ -467,7 +611,124 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
     return finalGoalData;
   }, []);
 
-
+  // 실시간 데이터 추출 및 단계 감지 함수 (모든 AI 응답에서 호출)
+  const processResponseForStepDetection = useCallback((aiResponse: string) => {
+    if (!shouldEnableStepProgression) return;
+    
+    console.log('[단계감지] AI 응답 실시간 처리 시작:', aiResponse.substring(0, 100) + '...');
+    
+    let updatedStepData = { ...stepData };
+    let hasNewData = false;
+    
+    // 1. 습관 목표 추출
+    if (!updatedStepData.habitName) {
+      // 구조화된 형식에서 추출
+      const structuredGoalMatch = aiResponse.match(/목표:\s*([^\n]+)/);
+      if (structuredGoalMatch) {
+        updatedStepData.habitName = structuredGoalMatch[1].trim();
+        hasNewData = true;
+        console.log('[단계감지] 습관 목표 추출됨 (구조화):', updatedStepData.habitName);
+      } else {
+        // 자연어에서 추출 - "~을/를 ~하고 싶으시고" 패턴
+        const naturalGoalMatch = aiResponse.match(/([가-힣\s]+(?:을|를))\s+([가-힣\s]+(?:하고|하며|하면서))\s+싶으시/);
+        if (naturalGoalMatch) {
+          const goal = naturalGoalMatch[1].trim() + ' ' + naturalGoalMatch[2].replace('하고', '하기').replace('하며', '하기').replace('하면서', '하기');
+          updatedStepData.habitName = goal;
+          hasNewData = true;
+          console.log('[단계감지] 습관 목표 추출됨 (자연어):', updatedStepData.habitName);
+        }
+      }
+    }
+    
+    // 2. 목표 기간 추출
+    if (!updatedStepData.goalPeriod) {
+      const structuredPeriodMatch = aiResponse.match(/기간:\s*([^\n]+)/);
+      if (structuredPeriodMatch) {
+        updatedStepData.goalPeriod = structuredPeriodMatch[1].trim();
+        hasNewData = true;
+        console.log('[단계감지] 목표 기간 추출됨 (구조화):', updatedStepData.goalPeriod);
+      } else {
+        const naturalPeriodMatch = aiResponse.match(/(삼개월|육개월|구개월|일년|한달|두달|세달|네달|다섯달|여섯달|[0-9]+개월|[0-9]+년)/);
+        if (naturalPeriodMatch) {
+          let period = naturalPeriodMatch[1];
+          // 한국어 숫자를 아라비아 숫자로 변환
+          period = period.replace(/삼개월/, '3개월').replace(/육개월/, '6개월').replace(/구개월/, '9개월');
+          period = period.replace(/일년/, '1년').replace(/한달/, '1개월').replace(/두달/, '2개월');
+          period = period.replace(/세달/, '3개월').replace(/네달/, '4개월').replace(/다섯달/, '5개월').replace(/여섯달/, '6개월');
+          updatedStepData.goalPeriod = period;
+          hasNewData = true;
+          console.log('[단계감지] 목표 기간 추출됨 (자연어):', updatedStepData.goalPeriod);
+        }
+      }
+    }
+    
+    // 3. 가용 시간 추출
+    if (!updatedStepData.availableTime) {
+      const structuredTimeMatch = aiResponse.match(/시간:\s*([^\n]+)/);
+      if (structuredTimeMatch) {
+        updatedStepData.availableTime = structuredTimeMatch[1].trim();
+        hasNewData = true;
+        console.log('[단계감지] 가용 시간 추출됨 (구조화):', updatedStepData.availableTime);
+      } else {
+        const naturalTimeMatch = aiResponse.match(/(오후|오전|아침|저녁|새벽)\s*([가-힣0-9\s]+시)/);
+        if (naturalTimeMatch) {
+          const time = naturalTimeMatch[1] + ' ' + naturalTimeMatch[2];
+          updatedStepData.availableTime = time;
+          hasNewData = true;
+          console.log('[단계감지] 가용 시간 추출됨 (자연어):', updatedStepData.availableTime);
+        }
+      }
+    }
+    
+    // 4. 어려운 점 추출
+    if (!updatedStepData.difficultyReason) {
+      const structuredDifficultyMatch = aiResponse.match(/어려운\s*점:\s*([^\n]+)/);
+      if (structuredDifficultyMatch) {
+        updatedStepData.difficultyReason = structuredDifficultyMatch[1].trim();
+        hasNewData = true;
+        console.log('[단계감지] 어려운 점 추출됨 (구조화):', updatedStepData.difficultyReason);
+      } else {
+        const naturalDifficultyMatch = aiResponse.match(/([가-힣\s]+(?:가\s+어려운\s*점|이\s+어려운\s*점|어려움))/);
+        if (naturalDifficultyMatch) {
+          updatedStepData.difficultyReason = naturalDifficultyMatch[1].trim();
+          hasNewData = true;
+          console.log('[단계감지] 어려운 점 추출됨 (자연어):', updatedStepData.difficultyReason);
+        }
+      }
+    }
+    
+    // 5. 제한할 앱 추출 (간단한 패턴)
+    if (!updatedStepData.restrictedApps) {
+      const appMentions = aiResponse.match(/(유튜브|인스타그램|틱톡|페이스북|게임|앱)/i);
+      if (appMentions) {
+        updatedStepData.restrictedApps = appMentions[1];
+        hasNewData = true;
+        console.log('[단계감지] 제한할 앱 추출됨:', updatedStepData.restrictedApps);
+      }
+    }
+    
+    // 6. 강도/코칭 스타일 추출
+    if (!updatedStepData.persona) {
+      const intensityMatch = aiResponse.match(/(높음|보통|낮음)/);
+      if (intensityMatch) {
+        const intensityToPersona = { '높음': 'Hard' as const, '보통': 'Medium' as const, '낮음': 'Easy' as const };
+        updatedStepData.persona = intensityToPersona[intensityMatch[1] as keyof typeof intensityToPersona];
+        hasNewData = true;
+        console.log('[단계감지] 코칭 스타일 추출됨:', updatedStepData.persona);
+      }
+    }
+    
+    // 데이터가 업데이트되었으면 단계 감지 실행
+    if (hasNewData) {
+      setStepData(updatedStepData);
+      
+      const newStep = detectCurrentStep(updatedStepData);
+      if (newStep > currentStep) {
+        console.log('[단계감지] 단계 전환 트리거:', { currentStep, newStep, updatedStepData });
+        triggerStepTransition(newStep);
+      }
+    }
+  }, [shouldEnableStepProgression, stepData, currentStep, detectCurrentStep, triggerStepTransition]);
 
   const sessionRef = useRef<GeminiLiveSession | null>(null);
   const recordingRef = useRef<any>(null);
@@ -582,7 +843,25 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   const isConversationComplete = (text: string): boolean => {
     console.log('[음성채팅] isConversationComplete 호출됨. 텍스트:', text);
     
-    // 루티가 "루틴을 만들어드릴게요"라고 말하면 골 스텝 5로 이동
+    // 단계별 진행 모드에서는 모든 6단계가 완료되었을 때만 완료로 인식
+    if (shouldEnableStepProgression) {
+      const allStepsComplete = currentStep >= 6 && detectCurrentStep(stepData) >= 6;
+      if (allStepsComplete) {
+        console.log('[음성채팅] 단계별 진행: 모든 6단계 완료됨');
+        return true;
+      }
+      
+      // 단계별 모드에서는 완료 문구만으로는 완료되지 않음
+      if (text.includes('루틴을 만들어드릴게요') && allStepsComplete) {
+        console.log('[음성채팅] 단계별 진행: 완료 문구 + 모든 단계 완료');
+        return true;
+      }
+      
+      console.log('[음성채팅] 단계별 진행: 아직 완료되지 않음', { currentStep, detectedStep: detectCurrentStep(stepData) });
+      return false;
+    }
+    
+    // 기존 완료 감지 로직 (단계별 진행이 아닌 경우)
     const completionPhrases = [
       '루틴을 만들어드릴게요',
       '루틴을 만들어 드릴게요',
@@ -711,27 +990,39 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       console.log('[음성채팅] handleConversationComplete 시작');
       setCurrentState('processing');
       
+      // 단계별 진행 모드인 경우 stepData 사용, 아니면 기존 goalData 사용
+      const dataToValidate = shouldEnableStepProgression ? stepData : goalData;
+      const habitName = dataToValidate.habitName || goalData.habitName;
+      const goalPeriod = dataToValidate.goalPeriod || goalData.goalPeriod;
+      
       // 목표 데이터 유효성 검사
-      if (!goalData.habitName || goalData.habitName === '') {
+      if (!habitName || habitName === '') {
         console.warn('[음성채팅] 습관 이름이 비어있음 - 대화 완료 처리 중단');
         setCurrentState('idle');
         return;
       }
       
-      if (!goalData.goalPeriod || goalData.goalPeriod === '') {
+      if (!goalPeriod || goalPeriod === '') {
         console.warn('[음성채팅] 목표 기간이 비어있음 - 대화 완료 처리 중단');
         setCurrentState('idle');
         return;
       }
       
-      // 구조화된 목표 데이터 사용
+      // 구조화된 목표 데이터 사용 (단계별 데이터 우선)
       const finalGoalData = {
-        ...goalData,
+        habitName: habitName,
+        goalPeriod: goalPeriod,
+        availableTime: dataToValidate.availableTime || goalData.availableTime || '오후 6시',
+        difficultyReason: dataToValidate.difficultyReason || goalData.difficultyReason || '동기 부족',
+        restrictedApps: dataToValidate.restrictedApps || '유튜브',
+        intensity: dataToValidate.persona === 'Hard' ? '높음' : dataToValidate.persona === 'Easy' ? '낮음' : '보통',
         transcript: conversationHistory.map(m => `${m.role}: ${m.text}`).join('\n'),
         mode: 'goalSetting',
         source: 'voice',
         timestamp: new Date().toISOString(),
-        isVoiceComplete: true // 음성 채팅 완료 플래그
+        isVoiceComplete: true, // 음성 채팅 완료 플래그
+        currentStep: shouldEnableStepProgression ? currentStep : 6,
+        stepData: shouldEnableStepProgression ? stepData : null
       };
       
       console.log('[음성채팅] 최종 목표 데이터:', finalGoalData);
@@ -800,7 +1091,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       if (Platform.OS !== 'web') {
         await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true, interruptionModeIOS: 2, interruptionModeAndroid: 2 });
       }
-      const systemInstruction = getSystemInstructionForMode(mode);
+      const systemInstruction = getSystemInstructionForMode(mode, shouldEnableStepProgression ? currentStep : undefined);
       const session = await startOrGetConversationSession(systemInstruction);
       sessionRef.current = session;
       setCurrentState('idle');
@@ -1019,6 +1310,9 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
         console.log('[음성채팅] 타이프라이터 애니메이션 시작:', displayText);
         startTypewriterAnimation(displayText);
 
+        // 실시간 단계 감지 (모든 AI 응답에서 실행)
+        processResponseForStepDetection(response.text);
+
         // 중간 응답에서는 정보 추출하지 않음 - 최종 정리 단계에서만 추출
         if (response.text.includes('정리해볼게요') || response.text.includes('맞나요?')) {
           console.log('[음성채팅] 최종 정리 단계 감지 - 정보 추출 진행');
@@ -1201,6 +1495,23 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <Animated.View style={[styles.modalContainer, modalStyle]}>
         <SafeAreaView style={styles.safeArea}>
+          {/* 단계별 진행 표시기 (목표 설정 모드에서만 표시) */}
+          {shouldEnableStepProgression && (
+            <View style={styles.stepProgressContainer}>
+              <View style={styles.stepIndicatorContainer}>
+                <Text style={styles.stepIndicatorText}>
+                  Step {currentStep}/6
+                </Text>
+                <Text style={styles.stepDescriptionText}>
+                  {STEP_TITLES[currentStep]}
+                </Text>
+              </View>
+              <View style={styles.progressBarContainer}>
+                <Animated.View style={[styles.progressBarFill, { width: `${progressValue}%` }]} />
+              </View>
+            </View>
+          )}
+          
           <TouchableOpacity style={styles.mainArea} onPress={handleMainAreaPress} activeOpacity={0.95} disabled={isPaused || currentState === 'connecting'}>
             <Animated.View style={[styles.statusContainer, textStyle]}>
               <Text style={[styles.titleText, koreanTextStyle(config.title)]}>{config.title}</Text>
@@ -1323,6 +1634,45 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  // 단계별 진행 표시기 스타일
+  stepProgressContainer: {
+    paddingTop: Spacing['7xl'], // Further increased for more breathing room from top edge
+    paddingHorizontal: Spacing.screen.paddingHorizontal,
+    paddingBottom: Spacing.md,
+    backgroundColor: colors.background,
+  },
+  stepIndicatorContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  stepIndicatorText: {
+    fontSize: colors.typography.fontSize.base,
+    fontWeight: colors.typography.fontWeight.bold,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontFamily: 'Inter',
+    marginBottom: Spacing.xs, // Small gap between step number and description
+  },
+  stepDescriptionText: {
+    fontSize: colors.typography.fontSize.sm,
+    fontWeight: colors.typography.fontWeight.medium,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontFamily: 'Inter',
+    opacity: 0.8,
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: colors.surface,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginHorizontal: Spacing.lg,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 2,
   },
 });
 
