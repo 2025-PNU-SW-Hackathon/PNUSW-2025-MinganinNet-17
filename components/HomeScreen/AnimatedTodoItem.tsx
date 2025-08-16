@@ -1,14 +1,14 @@
 import React, { useRef } from 'react';
 import {
-    Animated,
-    StyleSheet,
-    TouchableOpacity,
-    View
+  Animated,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { DailyTodo } from '../../types/habit';
+import { DailyTodo, DailyTodoInstance } from '../../types/habit';
 
 interface AnimatedTodoItemProps {
-  todo: DailyTodo;
+  todo: DailyTodo | DailyTodoInstance;
   isCompleted: boolean;
   onToggle: () => void;
 }
