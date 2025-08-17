@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import HomeScreen from '../../components/HomeScreen';
+import HomeScreen from '../../components/HomeScreen/index';
 
 export default function HomeTab() {
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);

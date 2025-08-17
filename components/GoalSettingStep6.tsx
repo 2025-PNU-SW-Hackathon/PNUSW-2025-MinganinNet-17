@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
 import { Colors } from '../constants/Colors';
@@ -19,58 +19,27 @@ export default function GoalSettingStep6({
   const colors = Colors[colorScheme];
   const styles = createStyles(colors);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { plan, setPlan } = useHabitStore();
+  const { plan, setPlan, habitName } = useHabitStore();
 
-  // Debug navigation handler - creates mock plan data if missing
+  // 습관 시작하기 - 저장은 이미 Step 5에서 완료됨
+  const handleStartHabit = async () => {
+    if (!plan || !habitName) {
+      Alert.alert('오류', '습관 정보가 없습니다. 이전 단계로 돌아가서 다시 시도해주세요.');
+      return;
+    }
+
+    console.log('✅ Habit and plan already saved in Step 5, proceeding to completion...');
+    
+    // 저장은 이미 Step 5에서 완료되었으므로 바로 완료 화면으로 전환
+    onComplete();
+  };
+
+  // Debug navigation handler - bypasses to completion
   const handleDebugComplete = () => {
     try {
+      console.log('🐛 DEBUG: GoalStep6 - Going directly to completion');
       console.log('🐛 DEBUG: GoalStep6 - Current plan state:', plan);
       
-      // If no plan exists, create mock plan data for debug mode
-      if (!plan) {
-        console.log('🐛 DEBUG: GoalStep6 - Creating mock plan data');
-        const mockPlan = {
-          id: 'debug-plan-' + Date.now(),
-          habit_id: 'debug-habit',
-          plan_title: 'Debug Plan: 건강한 습관 만들기',
-          milestones: [
-            {
-              id: 'debug-milestone-1',
-              title: '1주차: 기초 습관 형성',
-              duration: '7일',
-              daily_todos: [
-                {
-                  id: 'debug-todo-1',
-                  description: '물 2잔 마시기',
-                },
-                {
-                  id: 'debug-todo-2', 
-                  description: '5분 스트레칭하기',
-                }
-              ]
-            },
-            {
-              id: 'debug-milestone-2',
-              title: '2주차: 습관 강화',
-              duration: '7일',
-              daily_todos: [
-                {
-                  id: 'debug-todo-3',
-                  description: '물 4잔 마시기',
-                },
-                {
-                  id: 'debug-todo-4',
-                  description: '10분 운동하기',
-                }
-              ]
-            }
-          ]
-        };
-        setPlan(mockPlan);
-        console.log('🐛 DEBUG: GoalStep6 - Mock plan created:', mockPlan);
-      }
-      
-      console.log('🐛 DEBUG: GoalStep6 - onComplete callback exists:', !!onComplete);
       if (!onComplete) {
         console.error('🐛 DEBUG: GoalStep6 - ERROR: onComplete callback is missing!');
         return;
@@ -89,7 +58,6 @@ export default function GoalSettingStep6({
         <TouchableOpacity
           style={styles.backButton}
           onPress={onBack}
-          disabled={isSubmitting}
         >
           <Text style={styles.backButtonText}>← 이전</Text>
         </TouchableOpacity>
@@ -104,8 +72,7 @@ export default function GoalSettingStep6({
         <DebugNextButton
           to="Home Screen"
           onPress={handleDebugComplete}
-          label="Debug: Create Mock Plan"
-          disabled={isSubmitting}
+          label="Debug: Skip to Completion"
         />
       </View>
     );
@@ -116,7 +83,6 @@ export default function GoalSettingStep6({
       <TouchableOpacity
         style={styles.backButton}
         onPress={onBack}
-        disabled={isSubmitting}
       >
         <Text style={styles.backButtonText}>← 이전</Text>
       </TouchableOpacity>
@@ -152,15 +118,11 @@ export default function GoalSettingStep6({
       </ScrollView>
 
       <TouchableOpacity
-        style={[
-          styles.submitButton,
-          isSubmitting && styles.submitButtonDisabled,
-        ]}
-        onPress={onComplete}
-        disabled={isSubmitting}
+        style={styles.submitButton}
+        onPress={handleStartHabit}
       >
         <Text style={styles.submitButtonText}>
-          {isSubmitting ? '시작하는 중...' : '완료하고 시작하기'}
+          습관 시작하기
         </Text>
       </TouchableOpacity>
       
@@ -168,8 +130,7 @@ export default function GoalSettingStep6({
       <DebugNextButton
         to="Home Screen"
         onPress={handleDebugComplete}
-        label="Debug: Skip Completion"
-        disabled={isSubmitting}
+        label="Debug: Skip to Completion"
       />
     </View>
   );

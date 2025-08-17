@@ -9,14 +9,14 @@ import {
 import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import { useColorScheme } from '../../hooks/useColorScheme';
-import { DailyTodo } from '../../types/habit';
+import { DailyTodo, DailyTodoInstance } from '../../types/habit';
 import { SkeletonTodoList } from '../SkeletonLoaders';
 import AnimatedTodoItem from './AnimatedTodoItem';
 
 interface TodoCardProps {
   loading: boolean;
   error: string | null;
-  todosForSelectedDate: DailyTodo[];
+  todosForSelectedDate: (DailyTodo | DailyTodoInstance)[];
   todoCompletion: { [key: string]: boolean };
   todoFadeAnimation: Animated.Value;
   progressStats: {
@@ -27,7 +27,7 @@ interface TodoCardProps {
   };
   progressBarAnimation: Animated.Value;
   completionGlow: Animated.Value;
-  onTodoToggle: (todoId: number) => void;
+  onTodoToggle: (todoId: string | number) => void;
 }
 
 const TodoCard: React.FC<TodoCardProps> = ({
@@ -105,7 +105,7 @@ const TodoCard: React.FC<TodoCardProps> = ({
               const isCompleted = todoCompletion[todoKey];
               return (
                 <AnimatedTodoItem
-                  key={todo.id} // Use the unique ID for the key
+                  key={todo.id}
                   todo={todo}
                   isCompleted={isCompleted}
                   onToggle={() => onTodoToggle(todo.id)}

@@ -1,16 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { submitHabitData } from '../backend/hwirang/habit';
 import { createNewHabitAndPlan } from '../backend/supabase/habits';
 import { useHabitStore } from '../lib/habitStore';
-import { PlanForCreation } from '../types/habit'; // Import the new type
+import { PlanForCreation } from '../types/habit';
 import DebugNextButton from './DebugNextButton';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
 
-// Temporary PersonaType definition to fix the type error locally
-type PersonaType = 'Easy' | 'Medium' | 'Hard' | 'System';
 
 interface GoalSettingStep5Props {
   onComplete: () => void;
@@ -239,36 +237,67 @@ export default function GoalSettingStep5({
       return;
     }
 
-    console.log('🔄 Starting final submission step 5...', { habitName, goalPeriod, availableTime, difficultyReason, intensity });
+    console.log('🔄 Starting AI routine generation and DB save step 5...', { habitName, goalPeriod, availableTime, difficultyReason, intensity });
     setIsSubmitting(true);
 
     try {
-      // AI 계획 생성 제거 - 단순히 습관 정보만 저장
-      console.log('✅ Skipping AI plan generation, saving habit information only');
+      // AI 루틴 생성 요청
+      console.log('🤖 Requesting AI routine generation...');
       
-      // 기본적인 습관 정보만 저장
-      const basicHabitData = {
+      // intensity를 persona로 변환
+      const personaMap: { [key: string]: 'Easy' | 'Medium' | 'Hard' } = {
+        '높음': 'Hard',
+        '보통': 'Medium', 
+        '낮음': 'Easy'
+      };
+      const persona = personaMap[intensity] || 'Medium';
+      
+      // AI 루틴 생성 함수 호출
+      const generatedPlan = await submitHabitData(
         habitName,
-        goalPeriod,
         availableTime,
         difficultyReason,
-        intensity,
-        createdAt: new Date().toISOString()
+        persona,
+        goalPeriod
+      );
+      
+      console.log('✅ AI routine generation completed:', generatedPlan);
+      
+      // PlanForCreation으로 변환하여 DB 저장
+      const planForCreation: PlanForCreation = {
+        plan_title: generatedPlan.plan_title,
+        status: generatedPlan.status,
+        start_date: generatedPlan.start_date,
+        difficulty_reason: difficultyReason,
+        intensity: intensity,
+        available_time: availableTime,
+        milestones: generatedPlan.milestones.map((milestone) => ({
+          title: milestone.title,
+          duration: milestone.duration,
+          status: milestone.status,
+          daily_todos: milestone.daily_todos.map((todo) => ({
+            description: todo.description,
+            is_completed: todo.is_completed
+          }))
+        }))
       };
       
-      console.log('💾 Saving basic habit information:', basicHabitData);
+      console.log('💾 Saving habit and plan to database...');
+      const finalPlan = await createNewHabitAndPlan(habitName, planForCreation);
+      console.log('✅ Successfully saved to database:', finalPlan);
       
-      // 여기서는 단순히 완료 처리만 하고, 실제 저장은 나중에 처리
-      console.log('🎉 Basic habit information processed successfully');
-      Alert.alert('성공', '습관 정보가 성공적으로 처리되었습니다!');
+      // 저장된 결과를 store에 설정
+      setPlan(finalPlan);
+      
+      Alert.alert('성공', 'AI가 맞춤형 루틴을 생성하고 저장했습니다!');
       onComplete();
       
     } catch (error) {
-      console.error('💥 Error in final submission:', error);
-      Alert.alert('오류', '습관 처리에 실패했습니다. 다시 시도해주세요.');
+      console.error('💥 Error in AI routine generation and DB save:', error);
+      Alert.alert('오류', 'AI 루틴 생성 및 저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
-      console.log('🏁 Finished final submission');
+      console.log('🏁 Finished AI routine generation and DB save');
     }
   };
 

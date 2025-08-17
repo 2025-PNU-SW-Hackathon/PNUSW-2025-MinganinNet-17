@@ -8,10 +8,10 @@ import {
 import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import { useColorScheme } from '../../hooks/useColorScheme';
-import { DailyTodo } from '../../types/habit';
+import { DailyTodo, DailyTodoInstance } from '../../types/habit';
 
 interface AnimatedTodoItemProps {
-  todo: DailyTodo;
+  todo: DailyTodo | DailyTodoInstance;
   isCompleted: boolean;
   onToggle: () => void;
 }

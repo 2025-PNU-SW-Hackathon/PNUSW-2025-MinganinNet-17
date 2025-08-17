@@ -11,7 +11,7 @@ import GoalSettingStep5 from './GoalSettingStep5';
 import GoalSettingStep6 from './GoalSettingStep6';
 import GoalSetupCompleteScreen from './GoalSetupCompleteScreen';
 import HabitSetupScreen, { HabitData } from './HabitSetupScreen';
-import HomeScreen from './HomeScreen';
+import HomeScreen from './HomeScreen/index';
 import LoginScreen from './LoginScreen';
 import RoutineResultScreen from './RoutineResultScreen';
 import ScreenTransitionManager from './ScreenTransitionManager';
