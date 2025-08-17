@@ -1,5 +1,5 @@
 import { Platform, StyleSheet, Text, TouchableOpacity, ViewStyle, Alert } from 'react-native';
-import { IS_DEBUG_MODE_ENABLED } from '../src/config/debug';
+import { useIsDebugMode } from '../src/config/debug';
 
 interface DebugNextButtonProps {
   to: string;
@@ -16,8 +16,10 @@ export default function DebugNextButton({
   disabled = false,
   style,
 }: DebugNextButtonProps) {
-  // Only show in debug mode
-  if (!IS_DEBUG_MODE_ENABLED) {
+  const isDebugEnabled = useIsDebugMode();
+  
+  // Only show if in dev build AND debug mode is manually enabled
+  if (!__DEV__ || !isDebugEnabled) {
     return null;
   }
 

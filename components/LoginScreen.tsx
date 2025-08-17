@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { signIn } from '../backend/supabase/auth';
 import { supabase } from '../backend/supabase/client';
 import { Colors } from '../constants/Colors';
@@ -8,6 +8,7 @@ import { useColorScheme } from '../hooks/useColorScheme';
 import { koreanTextStyle } from '../utils/koreanUtils';
 import { AnimatedButton } from './AnimatedButton';
 import DebugNextButton from './DebugNextButton';
+import { useDebugStore } from '../src/config/debug';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -24,6 +25,9 @@ export default function LoginScreen({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Debug mode state
+  const { isDebugEnabled, toggleDebug } = useDebugStore();
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -202,6 +206,25 @@ export default function LoginScreen({
         size="lg"
       />
 
+      {/* Debug Mode Toggle - Only visible in dev builds */}
+      {__DEV__ && (
+        <TouchableOpacity 
+          style={styles.debugToggle}
+          onPress={toggleDebug}
+          onLongPress={() => {
+            Alert.alert(
+              'Debug Mode', 
+              `Currently: ${isDebugEnabled ? 'ON' : 'OFF'}\n\n${isDebugEnabled ? 'All skip buttons will be visible throughout the app' : 'Normal mode - database logic will be used'}`,
+              [{ text: 'OK' }]
+            );
+          }}
+        >
+          <Text style={styles.debugToggleText}>
+            🐛 Debug: {isDebugEnabled ? 'ON' : 'OFF'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Floating Debug Button - does not interfere with layout */}
       <DebugNextButton
         to="Goal Setting"
@@ -266,5 +289,30 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   signUpButton: {
     marginBottom: 20,
     alignSelf: 'stretch',
+  },
+  debugToggle: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    backgroundColor: 'rgba(255, 107, 107, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    zIndex: 1000,
+    // Enhanced styling
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  debugToggleText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontFamily: 'Inter',
   },
 }); 

@@ -23,6 +23,7 @@ import { useColorScheme } from '../../hooks/useColorScheme';
 import { koreanTextStyle } from '../../utils/koreanUtils';
 import { useHabitStore } from '../../lib/habitStore';
 import { DailyTodo } from '../../types/habit';
+import { useIsDebugMode } from '../../src/config/debug';
 import { AccentGlassCard, SecondaryGlassCard } from '../GlassCard';
 import VintagePaperBackground from '../VintagePaperBackground';
 import ProfileScreen from '../ProfileScreen';
@@ -71,6 +72,9 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const { plan, setPlan } = useHabitStore();
   const [loading, setLoading] = useState(true);
   
+  // Debug mode detection
+  const isDebugEnabled = useIsDebugMode();
+  
   // Safety effect to ensure loading doesn't stay true indefinitely
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -110,8 +114,37 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     const fetchPlan = async () => {
       try {
         setLoading(true);
+        
+        // 🐛 DEBUG MODE: If debug enabled and plan exists in store, use it directly
+        if (isDebugEnabled && plan) {
+          console.log('🐛 DEBUG MODE: Plan found in memory store, using directly');
+          console.log('🐛 DEBUG MODE: Plan milestones count:', plan.milestones?.length);
+          console.log('🐛 DEBUG MODE: Skipping database validation');
+          
+          // Use the plan from store directly, set up todos
+          setEffectiveStartDate(plan.start_date);
+          const initialCompletion: { [key: string]: boolean } = {};
+          plan.milestones.forEach(m => {
+            m.daily_todos.forEach(todo => {
+              initialCompletion[todo.id.toString()] = todo.is_completed;
+            });
+          });
+          setTodoCompletion(initialCompletion);
+          setLoading(false);
+          return; // Exit early, skip database logic
+        }
+        
+        // 🔄 PRODUCTION MODE: Original database logic (unchanged)
+        console.log('🔍 PRODUCTION MODE: Fetching plan from database...');
+        
+        // Add a small delay to ensure database consistency after goal setting
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const fetchedPlan = await getActivePlan();
+        console.log('📋 HomeScreen: Retrieved plan from database:', fetchedPlan ? 'Found' : 'Not found');
+        
         if (fetchedPlan) {
+          console.log('✅ HomeScreen: Setting plan in store and initializing todos');
           setPlan(fetchedPlan);
           setEffectiveStartDate(fetchedPlan.start_date);
           const initialCompletion: { [key: string]: boolean } = {};
@@ -122,23 +155,25 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
           });
           setTodoCompletion(initialCompletion);
         } else {
-          router.replace('/goal-setting');
+          console.log('⚠️ HomeScreen: No plan found in database, waiting before redirect...');
+          // Add a longer delay before redirecting to allow for race conditions
+          setTimeout(() => {
+            console.log('🔄 HomeScreen: Redirecting to goal setting after delay');
+            router.replace('/goal-setting');
+          }, 1000);
         }
       } catch (e) {
+        console.error('💥 HomeScreen: Error fetching plan:', e);
         setError('Failed to fetch habit plan.');
-        console.error(e);
+        // Don't redirect immediately on error, let user see the error
       } finally {
         setLoading(false);
       }
     };
-    if (!plan) {
-        fetchPlan();
-    } else {
-        // If plan already exists, set loading to false
-        console.log('Plan exists, setting loading to false');
-        setLoading(false);
-    }
-  }, [plan, router]);
+    
+    // Updated condition: Always call fetchPlan, let it decide what to do
+    fetchPlan();
+  }, [plan, router, isDebugEnabled]);
 
   const getCoachStatus = (): CoachStatus => {
     const todos = getTodosForSelectedDate();
@@ -1316,3 +1351,5 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     lineHeight: 28,
   },
 }); 
+
+export default HomeScreen;

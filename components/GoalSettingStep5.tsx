@@ -8,6 +8,8 @@ import DebugNextButton from './DebugNextButton';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
+import { useIsDebugMode } from '../src/config/debug';
+import { MOCK_PLAN, MOCK_PLAN_STUDY } from '../src/data/mockPlan';
 
 
 interface GoalSettingStep5Props {
@@ -41,6 +43,9 @@ export default function GoalSettingStep5({
     goalPeriod,
     setPlan,
   } = useHabitStore();
+  
+  // Debug mode detection
+  const isDebugEnabled = useIsDebugMode();
 
   // 음성모드에서 전달받은 데이터가 있으면 표시
   useEffect(() => {
@@ -266,7 +271,7 @@ export default function GoalSettingStep5({
       // PlanForCreation으로 변환하여 DB 저장
       const planForCreation: PlanForCreation = {
         plan_title: generatedPlan.plan_title,
-        status: generatedPlan.status,
+        status: 'in_progress', // Force status to be 'in_progress' for HomeScreen compatibility
         start_date: generatedPlan.start_date,
         difficulty_reason: difficultyReason,
         intensity: intensity,
@@ -283,11 +288,14 @@ export default function GoalSettingStep5({
       };
       
       console.log('💾 Saving habit and plan to database...');
+      console.log('📝 Plan status being saved:', planForCreation.status);
       const finalPlan = await createNewHabitAndPlan(habitName, planForCreation);
-      console.log('✅ Successfully saved to database:', finalPlan);
+      console.log('✅ Successfully saved to database with ID:', finalPlan?.id);
+      console.log('📊 Final plan status:', finalPlan?.status);
       
       // 저장된 결과를 store에 설정
       setPlan(finalPlan);
+      console.log('🏪 Plan set in store, proceeding to next step...');
       
       Alert.alert('성공', 'AI가 맞춤형 루틴을 생성하고 저장했습니다!');
       onComplete();
@@ -315,6 +323,27 @@ export default function GoalSettingStep5({
       console.log('🐛 DEBUG: GoalStep5 - navigation callback called successfully');
     } catch (error) {
       console.error('🐛 DEBUG: GoalStep5 - Error in debug handler:', error);
+    }
+  };
+
+  // Debug handlers for mock data
+  const handleDebugWithHealthPlan = () => {
+    if (isDebugEnabled) {
+      console.log('🐛 DEBUG: Using mock health plan');
+      setPlan(MOCK_PLAN);
+      Alert.alert('Debug Mode', '건강 습관 모크 데이터가 로드되었습니다!', [
+        { text: 'OK', onPress: onComplete }
+      ]);
+    }
+  };
+
+  const handleDebugWithStudyPlan = () => {
+    if (isDebugEnabled) {
+      console.log('🐛 DEBUG: Using mock study plan');
+      setPlan(MOCK_PLAN_STUDY);
+      Alert.alert('Debug Mode', '학습 습관 모크 데이터가 로드되었습니다!', [
+        { text: 'OK', onPress: onComplete }
+      ]);
     }
   };
 
@@ -383,11 +412,28 @@ export default function GoalSettingStep5({
         </Text>
       </TouchableOpacity>
       
+      {/* Debug buttons for mock data */}
       <DebugNextButton
         to="Home Screen"
         onPress={handleDebugComplete}
         label="Debug: Skip AI Generation"
         disabled={isSubmitting}
+      />
+      
+      <DebugNextButton
+        to="Home Screen"
+        onPress={handleDebugWithHealthPlan}
+        label="🏃‍♂️ Health Mock Data"
+        disabled={isSubmitting}
+        style={{ bottom: 60 }}
+      />
+      
+      <DebugNextButton
+        to="Home Screen"
+        onPress={handleDebugWithStudyPlan}
+        label="📚 Study Mock Data"
+        disabled={isSubmitting}
+        style={{ bottom: 20 }}
       />
     </View>
   );
