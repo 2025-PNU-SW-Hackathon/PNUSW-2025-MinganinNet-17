@@ -27,4 +27,26 @@ export function parsePlanModificationCommand(
     payload?: {
         description: string;
     };
-}>; 
+}>;
+
+export function generateDailyReflectionChatResponse(
+    messages: Array<{role: 'user' | 'coach', content: string, timestamp: Date}>,
+    todos: Array<{id: string, description: string, completed: boolean}>,
+    achievementScore: number
+): Promise<string>;
+
+export function evaluateDailyReflectionCompletion(
+    messages: Array<{role: 'user' | 'coach', content: string, timestamp: Date}>,
+    minimumExchanges?: number
+): Promise<{
+    isComplete: boolean;
+    reason: string;
+    completionScore: number;
+    missingAspects: string[];
+}>;
+
+export function generateFinalDailyReflectionSummary(
+    messages: Array<{role: 'user' | 'coach', content: string, timestamp: Date}>,
+    todos: Array<{id: string, description: string, completed: boolean}>,
+    achievementScore: number
+): Promise<string>; 

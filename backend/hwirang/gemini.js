@@ -336,6 +336,184 @@ export const extractGoalFromTranscript = async (transcript) => {
 };
 
 /**
+ * Generates AI coach response for daily reflection chat conversation.
+ * @param {Array<object>} messages Array of conversation messages with {role, content, timestamp}.
+ * @param {Array<object>} todos Today's todo items with completion status.
+ * @param {number} achievementScore User's self-assessed achievement score (1-10).
+ * @returns {Promise<string>} AI coach response.
+ */
+export const generateDailyReflectionChatResponse = async (messages, todos, achievementScore) => {
+  const completedCount = todos.filter(t => t.completed).length;
+  const totalCount = todos.length;
+  
+  const conversationHistory = messages.map(msg => 
+    `${msg.role === 'user' ? '사용자' : 'AI 코치'}: ${msg.content}`
+  ).join('\n');
+
+  const todoListString = todos.map(t => 
+    `- ${t.description} (${t.completed ? '완료✅' : '미완료❌'})`
+  ).join('\n');
+
+  const prompt = `
+당신은 '루티(Routy)'라는 이름의 따뜻하고 공감적인 AI 코치입니다. 사용자와 자연스러운 대화를 통해 하루를 돌아보고 내일을 위한 인사이트를 제공하는 것이 목표입니다.
+
+**대화 상황:**
+- 사용자의 오늘 달성 점수: ${achievementScore}/10
+- 할 일 완료 현황: ${completedCount}/${totalCount}개 완료
+- 할 일 목록:
+${todoListString}
+
+**지금까지의 대화:**
+${conversationHistory}
+
+**대화 원칙:**
+1. **자연스러운 대화**: 마치 친근한 코치와 대화하는 것처럼 자연스럽고 편안하게
+2. **깊이 있는 질문**: 단순한 사실 수집을 넘어서 감정, 배운 점, 의미 등을 탐구
+3. **공감과 격려**: 사용자의 경험과 감정에 공감하며 긍정적인 에너지 제공
+4. **점진적 탐구**: 한 번에 너무 많은 것을 묻지 말고, 사용자의 답변에 따라 자연스럽게 이어가기
+5. **개인화된 접근**: 할 일 완료 현황을 참고하여 구체적이고 개인화된 질문과 피드백
+
+**탐구할 영역들 (자연스럽게 대화 중에 포함):**
+- 오늘의 주요 경험과 감정
+- 할 일을 완료하거나 완료하지 못한 이유와 그때의 기분
+- 예상과 다르게 진행된 일들
+- 배운 점이나 깨달은 점
+- 어려웠던 순간과 그것을 어떻게 극복했는지
+- 뿌듯했거나 기묤던 순간들
+- 내일 더 잘하기 위한 아이디어나 계획
+
+**응답 스타일:**
+- 300자 이내의 간결하고 따뜻한 응답
+- 이모지 적절히 사용 (🤔💭✨😊💪 등)
+- 열린 질문을 통해 대화를 이어가기
+- 사용자의 답변에 구체적으로 반응하기
+
+이제 사용자의 마지막 메시지에 자연스럽고 공감적으로 응답해주세요.
+  `;
+
+  return await sendMessageFlash(prompt); // Flash 모델 사용 (빠른 응답)
+};
+
+/**
+ * Detects if the daily reflection conversation is complete and ready for final analysis.
+ * @param {Array<object>} messages Array of conversation messages.
+ * @param {number} minimumExchanges Minimum number of user-AI exchanges required.
+ * @returns {Promise<object>} {isComplete: boolean, reason: string, completionScore: number}
+ */
+export const evaluateDailyReflectionCompletion = async (messages, minimumExchanges = 4) => {
+  const userMessages = messages.filter(msg => msg.role === 'user');
+  const totalWords = userMessages.reduce((sum, msg) => sum + msg.content.split(' ').length, 0);
+  
+  const conversationHistory = messages.map(msg => 
+    `${msg.role === 'user' ? '사용자' : 'AI 코치'}: ${msg.content}`
+  ).join('\n');
+
+  const prompt = `
+당신은 대화 분석 전문가입니다. 다음 일간 성찰 대화가 충분히 완료되었는지 평가해주세요.
+
+**대화 내용:**
+${conversationHistory}
+
+**통계:**
+- 사용자 메시지 수: ${userMessages.length}
+- 총 단어 수: ${totalWords}
+- 최소 요구 교환 수: ${minimumExchanges}
+
+**평가 기준:**
+1. **충분한 대화량**: 최소 ${minimumExchanges}번의 사용자-AI 교환이 있었는가?
+2. **감정적 깊이**: 사용자가 감정이나 느낌을 표현했는가?
+3. **구체적 경험**: 오늘의 구체적인 경험이나 상황을 공유했는가?
+4. **성찰의 질**: 단순한 사실 나열을 넘어서 의미나 배운 점을 언급했는가?
+5. **미래 지향**: 내일이나 앞으로에 대한 생각을 언급했는가?
+
+**응답 형식 (반드시 유효한 JSON):**
+{
+  "isComplete": true/false,
+  "reason": "완료/미완료 이유 설명",
+  "completionScore": 0-100,
+  "missingAspects": ["부족한 영역들"]
+}
+
+예시:
+{
+  "isComplete": true,
+  "reason": "사용자가 충분한 감정적 깊이와 구체적 경험을 공유했으며, 내일에 대한 계획도 언급했습니다.",
+  "completionScore": 85,
+  "missingAspects": []
+}
+  `;
+
+  const responseText = await sendMessage(prompt);
+  
+  try {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error("No valid JSON found in response");
+  } catch (error) {
+    console.error("Failed to parse completion evaluation:", error);
+    // Fallback evaluation based on simple metrics
+    const isComplete = userMessages.length >= minimumExchanges && totalWords >= 50;
+    return {
+      isComplete,
+      reason: isComplete ? "기본 조건 충족" : "더 많은 대화 필요",
+      completionScore: Math.min(100, (userMessages.length / minimumExchanges) * 50 + (totalWords / 100) * 50),
+      missingAspects: isComplete ? [] : ["더 많은 대화 필요"]
+    };
+  }
+};
+
+/**
+ * Generates final comprehensive analysis from the daily reflection conversation.
+ * @param {Array<object>} messages Array of conversation messages.
+ * @param {Array<object>} todos Today's todo items.
+ * @param {number} achievementScore User's self-assessed score.
+ * @returns {Promise<string>} Comprehensive daily reflection summary.
+ */
+export const generateFinalDailyReflectionSummary = async (messages, todos, achievementScore) => {
+  const completedCount = todos.filter(t => t.completed).length;
+  const totalCount = todos.length;
+  
+  const conversationHistory = messages.map(msg => 
+    `${msg.role === 'user' ? '사용자' : 'AI 코치'}: ${msg.content}`
+  ).join('\n');
+
+  const todoListString = todos.map(t => 
+    `- ${t.description} (${t.completed ? '완료✅' : '미완료❌'})`
+  ).join('\n');
+
+  const prompt = `
+당신은 전문적인 성장 코치입니다. 사용자와의 깊이 있는 대화를 바탕으로 종합적인 일간 성찰 분석을 제공해주세요.
+
+**대화 전체:**
+${conversationHistory}
+
+**객관적 데이터:**
+- 자체 평가 점수: ${achievementScore}/10
+- 할 일 완료: ${completedCount}/${totalCount}개
+- 할 일 목록:
+${todoListString}
+
+**분석 요청사항:**
+1. **감정 상태 분석**: 오늘 사용자가 경험한 주요 감정들
+2. **성취와 도전**: 잘한 점과 어려웠던 점 분석
+3. **성장 포인트**: 대화에서 드러난 배운 점이나 깨달음
+4. **내일을 위한 제안**: 구체적이고 실행 가능한 개선점 2-3가지
+5. **격려 메시지**: 따뜻하고 희망적인 마무리
+
+**응답 형식:**
+마크다운 형식으로 작성하되, 전체 분석은 800자를 넘지 않도록 해주세요.
+각 섹션은 2-3문장으로 간결하게 정리해주세요.
+이모지를 적절히 사용하여 가독성을 높여주세요.
+
+이제 위의 대화를 바탕으로 종합적이고 통찰력 있는 일간 성찰 분석을 작성해주세요.
+  `;
+
+  return await sendMessage(prompt); // Pro 모델 사용 (종합 분석)
+};
+
+/**
  * Parses a natural language command to modify a to-do list.
  * @param {string} command The natural language command from the user.
  * @returns {Promise<object>} A structured action object.
