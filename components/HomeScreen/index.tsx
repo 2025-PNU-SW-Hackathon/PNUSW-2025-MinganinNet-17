@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -15,40 +15,24 @@ import {
 } from 'react-native';
 import CalendarScreen from '../../backend/calendar/calendar';
 import { generateDailyFeedback, parsePlanModificationCommand } from '../../backend/hwirang/gemini';
-import { getActivePlan } from '../../backend/supabase/habits';
+import { getDailyTodosByDate, updateTodoCompletion } from '../../backend/supabase/habits';
 import { createReport } from '../../backend/supabase/reports';
 import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import { useColorScheme } from '../../hooks/useColorScheme';
-import { koreanTextStyle } from '../../utils/koreanUtils';
 import { useHabitStore } from '../../lib/habitStore';
-import { DailyTodo } from '../../types/habit';
-import { useIsDebugMode } from '../../src/config/debug';
+
+import { DailyTodo, DailyTodosByDate } from '../../types/habit';
 import { AccentGlassCard, SecondaryGlassCard } from '../GlassCard';
-import VintagePaperBackground from '../VintagePaperBackground';
 import ProfileScreen from '../ProfileScreen';
 import { SkeletonCard } from '../SkeletonLoaders';
+import VintagePaperBackground from '../VintagePaperBackground';
 import VoiceChatScreen from '../VoiceChatScreen';
 import TodoCard from './TodoCard';
 
 const { width } = Dimensions.get('window');
 
-// Helper function to parse duration strings into days
-const parseDurationToDays = (duration: string): number => {
-  if (duration.includes('개월')) {
-    const months = parseInt(duration.replace('개월', '').trim(), 10);
-    return isNaN(months) ? 0 : months * 30; // Approximation
-  }
-  if (duration.includes('주')) {
-    const weeks = parseInt(duration.replace('주', '').trim(), 10);
-    return isNaN(weeks) ? 0 : weeks * 7;
-  }
-  if (duration.includes('일')) {
-    const days = parseInt(duration.replace('일', '').trim(), 10);
-    return isNaN(days) ? 0 : days;
-  }
-  return 0;
-};
+
 
 interface HomeScreenProps {
   selectedDate?: string;
@@ -71,9 +55,10 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const [internalSelectedDate, setInternalSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const { plan, setPlan } = useHabitStore();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dailyTodosByDate, setDailyTodosByDate] = useState<DailyTodosByDate>({});
   
-  // Debug mode detection
-  const isDebugEnabled = useIsDebugMode();
+
   
   // Safety effect to ensure loading doesn't stay true indefinitely
   useEffect(() => {
@@ -86,9 +71,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     
     return () => clearTimeout(timeout);
   }, [loading]);
-  const [error, setError] = useState<string | null>(null);
-  const [todoCompletion, setTodoCompletion] = useState<{ [key: string]: boolean }>({});
-  const [effectiveStartDate, setEffectiveStartDate] = useState<string | null>(null);
+
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
   const [reportVoiceChatVisible, setReportVoiceChatVisible] = useState(false);
@@ -110,79 +93,51 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const celebrationScale = useRef(new Animated.Value(1)).current;
   const completionGlow = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    const fetchPlan = async () => {
-      try {
-        setLoading(true);
-        
-        // 🐛 DEBUG MODE: If debug enabled and plan exists in store, use it directly
-        if (isDebugEnabled && plan) {
-          console.log('🐛 DEBUG MODE: Plan found in memory store, using directly');
-          console.log('🐛 DEBUG MODE: Plan milestones count:', plan.milestones?.length);
-          console.log('🐛 DEBUG MODE: Skipping database validation');
-          
-          // Use the plan from store directly, set up todos
-          setEffectiveStartDate(plan.start_date);
-          const initialCompletion: { [key: string]: boolean } = {};
-          plan.milestones.forEach(m => {
-            m.daily_todos.forEach(todo => {
-              initialCompletion[todo.id.toString()] = todo.is_completed;
-            });
-          });
-          setTodoCompletion(initialCompletion);
-          setLoading(false);
-          return; // Exit early, skip database logic
-        }
-        
-        // 🔄 PRODUCTION MODE: Original database logic (unchanged)
-        console.log('🔍 PRODUCTION MODE: Fetching plan from database...');
-        
-        // Add a small delay to ensure database consistency after goal setting
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const fetchedPlan = await getActivePlan();
-        console.log('📋 HomeScreen: Retrieved plan from database:', fetchedPlan ? 'Found' : 'Not found');
-        
-        if (fetchedPlan) {
-          console.log('✅ HomeScreen: Setting plan in store and initializing todos');
-          setPlan(fetchedPlan);
-          setEffectiveStartDate(fetchedPlan.start_date);
-          const initialCompletion: { [key: string]: boolean } = {};
-          fetchedPlan.milestones.forEach(m => {
-            m.daily_todos.forEach(todo => {
-              initialCompletion[todo.id.toString()] = todo.is_completed;
-            });
-          });
-          setTodoCompletion(initialCompletion);
-        } else {
-          console.log('⚠️ HomeScreen: No plan found in database, waiting before redirect...');
-          // Add a longer delay before redirecting to allow for race conditions
-          setTimeout(() => {
-            console.log('🔄 HomeScreen: Redirecting to goal setting after delay');
-            router.replace('/goal-setting');
-          }, 1000);
-        }
-      } catch (e) {
-        console.error('💥 HomeScreen: Error fetching plan:', e);
-        setError('Failed to fetch habit plan.');
-        // Don't redirect immediately on error, let user see the error
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    // Updated condition: Always call fetchPlan, let it decide what to do
-    fetchPlan();
-  }, [plan, router, isDebugEnabled]);
+  // 1. db에서 인자로 입력받은 날짜의 할 일 목록 가져와서 로컬 상태에 추가
+  const fetchTodosForDate = async (date: string) => {
+    try {
+      setLoading(true); // 스켈레톤 로딩
+      setError(null);
+      const todos = await getDailyTodosByDate(date);
+      setDailyTodosByDate(prev => ({ // prev: 기존 할일에 추가
+        ...prev,
+        [date]: todos
+      }));
+    } catch (err) {
+      setError('할 일을 불러오는 데 실패했습니다.');
+      console.error('Error fetching todos for date:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // 4. targetDate가 변경되면, 해당 날짜를 인자로 1. 실행
+  useEffect(() => {
+    if (targetDate) {
+      fetchTodosForDate(targetDate);
+    }
+  }, [targetDate]);
+
+  // 2. 저장된 로컬 상태 중에서, targetDate에 해당하는 할 일 목록 가져오기
+  const todosForSelectedDate = useMemo(() => {
+    return dailyTodosByDate[targetDate] || [];
+  }, [dailyTodosByDate, targetDate]);
+
+  // 3. 할 일 완료 상태 계산
+  const todoCompletion = useMemo(() => {
+    return todosForSelectedDate.reduce((acc, todo) => {
+      acc[todo.id] = todo.is_completed;
+      return acc;
+    }, {} as { [key: string]: boolean });
+  }, [todosForSelectedDate]);
+
+  // 사용자의 할 일 완료율에 따른 이모지와 메시지 생성
   const getCoachStatus = (): CoachStatus => {
-    const todos = getTodosForSelectedDate();
-    if (!plan || todos.length === 0) {
+    if (todosForSelectedDate.length === 0) {
       return { emoji: '😊', message: '오늘도 화이팅!', color: '#4CAF50' };
     }
-    // Updated to use the new todo completion state
-    const completedCount = todos.filter(todo => todoCompletion[todo.id.toString()]).length;
-    const avgRate = completedCount / todos.length;
+    const completedCount = todosForSelectedDate.filter(todo => todo.is_completed).length;
+    const avgRate = completedCount / todosForSelectedDate.length;
     if (avgRate >= 1) return { emoji: '🥳', message: '완벽한 하루!', color: '#4CAF50' };
     if (avgRate >= 0.7) return { emoji: '😊', message: '정말 잘하고 있어요!', color: '#8BC34A' };
     if (avgRate >= 0.5) return { emoji: '😌', message: '꾸준히 실천 중이네요', color: '#FFC107' };
@@ -218,39 +173,38 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     return dates;
   };
 
-  const getTodosForSelectedDate = (): DailyTodo[] => {
-    if (!plan || !effectiveStartDate) return [];
-    const selected = new Date(targetDate);
-    const startDate = new Date(effectiveStartDate);
-    if (selected < startDate) return [];
-    const diffDays = Math.floor((selected.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    let dayCounter = 0;
-    for (const milestone of plan.milestones) {
-      const durationInDays = parseDurationToDays(milestone.duration);
-      if (diffDays >= dayCounter && diffDays < dayCounter + durationInDays) {
-        return milestone.daily_todos;
-      }
-      dayCounter += durationInDays;
-    }
-    return [];
-  };
 
-  // Optimized: Memoized todo toggle handler
-  const handleTodoToggle = useCallback((todoId: number): void => {
-    const todoKey = todoId.toString();
-    const willBeCompleted = !todoCompletion[todoKey];
+
+  // 할 일 완료 상태 변경
+  const handleTodoToggle = async (todoId: string | number): Promise<void> => {
+    const idString = todoId.toString();
+    const todo = todosForSelectedDate.find(t => t.id === idString);
+    if (!todo) return;
     
-    // Haptic feedback for satisfying feel
-    if (willBeCompleted) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } else {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      // 햅틱 피드백
+      const willBeCompleted = !todo.is_completed;
+      if (willBeCompleted) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      
+      // DB 업데이트
+      await updateTodoCompletion(idString, willBeCompleted);
+      
+      // 로컬 상태 업데이트
+      setDailyTodosByDate(prev => ({
+        ...prev,
+        [targetDate]: prev[targetDate]?.map(t => 
+          t.id === idString ? { ...t, is_completed: willBeCompleted } : t
+        ) || []
+      }));
+    } catch (error) {
+      console.error('Failed to update todo completion:', error);
+      setError('할 일 완료 상태 업데이트에 실패했습니다.');
     }
-    
-    setTodoCompletion(prev => ({ ...prev, [todoKey]: !prev[todoKey] }));
-    // Here you would also add a call to a Supabase function to update `is_completed` in the DB.
-    // e.g., updateTodoStatus(todoId, willBeCompleted);
-  }, [todoCompletion]);
+  };
   
   const formatCalendarDate = (date: Date) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -285,11 +239,17 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     try {
       const userSummary = data.transcript.split('\n').pop() || '';
       const today = new Date();
-      const todayTodos = getTodosForSelectedDate();
-      const completedCount = todayTodos.filter(t => todoCompletion[t.id.toString()]).length;
+      const todayDate = today.toISOString().split('T')[0];
+      const todayTodos = dailyTodosByDate[todayDate] || [];
+      const completedCount = todayTodos.filter(t => t.is_completed).length;
       const achievementScore = todayTodos.length > 0 ? Math.round((completedCount / todayTodos.length) * 10) : 0;
-      const feedback = await generateDailyFeedback(userSummary, achievementScore, todayTodos);
-      await createReport({ report_date: today.toISOString().split('T')[0], achievement_score: achievementScore, ai_coach_feedback: [feedback], daily_activities: { todos: todayTodos }, user_summary: userSummary });
+      const todoItems = todayTodos.map(todo => ({
+        id: todo.id,
+        description: todo.description,
+        completed: todo.is_completed
+      }));
+      const feedback = await generateDailyFeedback(userSummary, achievementScore, todoItems);
+      await createReport({ report_date: todayDate, achievement_score: achievementScore, ai_coach_feedback: [feedback], daily_activities: { todos: todayTodos } });
       Alert.alert('성공', '오늘의 리포트가 성공적으로 생성되었습니다.');
     } catch (error) {
       console.error('Error creating report:', error);
@@ -359,21 +319,15 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     }
   };
 
-  // Optimized memoization with specific dependencies
-  const coachStatus = useMemo(() => {
-    const status = getCoachStatus();
-    console.log('Coach status updated:', status);
-    return status;
-  }, [plan?.milestones, todoCompletion, targetDate]);
-  const calendarDates = useMemo(() => getCalendarDates(), []); // Static, no dependencies needed
-  const todosForSelectedDate = useMemo(() => getTodosForSelectedDate(), [plan?.milestones, effectiveStartDate, targetDate]);
+  const coachStatus = useMemo(() => getCoachStatus(), [todosForSelectedDate, todoCompletion]);
+  const calendarDates = useMemo(() => getCalendarDates(), []);
   
   // Optimized: Memoized progress statistics calculation
   const progressStats = useMemo(() => {
     const todos = todosForSelectedDate;
     if (todos.length === 0) return { completed: 0, total: 0, percentage: 0, isComplete: false };
     
-    const completedCount = todos.filter(todo => todoCompletion[todo.id.toString()]).length;
+    const completedCount = todos.filter(todo => todo.is_completed).length;
     const percentage = Math.round((completedCount / todos.length) * 100);
     const isComplete = percentage === 100;
     
@@ -1352,4 +1306,4 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
 }); 
 
-export default HomeScreen;
+
