@@ -1,16 +1,16 @@
-import React from 'react';
+import { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
 import { IconSymbol } from './ui/IconSymbol';
 
-// Types
+// 타임라인의 각 이벤트를 나타내는 타입
 interface TimelineEvent {
   id: string;
   time: string;
@@ -22,11 +22,12 @@ interface TimelineEvent {
   icon: string;
 }
 
+// 캘린더의 각 날짜를 나타내는 타입
 interface DayData {
-  date: number;
-  dayName: string;
-  isToday: boolean;
-  activities: { color: string }[];
+  dayName: string;        // "월", "화", "수" 등
+  dayNumber: string;      // "01", "02", "03" 등 (2자리 패딩)
+  isToday: boolean;       // 오늘 여부
+  activities: { color: string }[];  // 활동 점들의 색상 배열
 }
 
 // Sample data
@@ -100,20 +101,57 @@ const SAMPLE_EVENTS: TimelineEvent[] = [
   },
 ];
 
-const WEEK_DATA: DayData[] = [
-  { date: 27, dayName: '일', isToday: false, activities: [{ color: '#ef4444' }, { color: '#3b82f6' }] },
-  { date: 28, dayName: '월', isToday: false, activities: [{ color: '#ef4444' }, { color: '#3b82f6' }] },
-  { date: 29, dayName: '화', isToday: false, activities: [{ color: '#ef4444' }, { color: '#3b82f6' }] },
-  { date: 30, dayName: '수', isToday: false, activities: [{ color: '#ef4444' }, { color: '#3b82f6' }] },
-  { date: 31, dayName: '목', isToday: false, activities: [{ color: '#ef4444' }, { color: '#3b82f6' }] },
-  { date: 1, dayName: '금', isToday: false, activities: [{ color: '#ef4444' }, { color: '#3b82f6' }] },
-  { date: 2, dayName: '토', isToday: true, activities: [{ color: '#10b981' }, { color: '#ef4444' }, { color: '#3b82f6' }] },
-];
+
 
 export default function TimelineView() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
+  // 상태 관리
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // 날짜 관련 함수들 (HomeScreen에서 복사/수정)
+  const getCalendarDates = (): Date[] => {
+    const dates: Date[] = [];
+    const today = new Date();
+    for (let i = -3; i <= 3; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const formatCalendarDate = (date: Date) => {
+    const days = ['일', '월', '화', '수', '목', '금', '토']; // 한글로 변경
+    return {
+      dayName: days[date.getDay()],
+      dayNumber: date.getDate().toString().padStart(2, '0'),
+      isToday: date.toDateString() === new Date().toDateString(),
+      dateString: date.toISOString().split('T')[0]
+    };
+  };
+
+  // 활동 데이터 생성 함수
+  const generateActivitiesForDate = (date: Date) => {
+    // 임시로 랜덤하게 activities 생성
+    const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b'];
+    const activityCount = Math.floor(Math.random() * 3) + 1; // 1-3개
+    return Array.from({ length: activityCount }, () => ({
+      color: colors[Math.floor(Math.random() * colors.length)]
+    }));
+  };
+
+  // 메모 함수들
+  const calendarDates = useMemo(() => getCalendarDates(), []);
+  const weekData = useMemo(() => 
+    calendarDates.map(date => ({
+      ...formatCalendarDate(date),
+      activities: generateActivitiesForDate(date)
+    })), 
+  [calendarDates]);
+
+  // 이벤트 타입에 따라 배경색을 결정하는 유틸리티 함수
   const getEventBackgroundColor = (type: TimelineEvent['type']) => {
     switch (type) {
       case 'alarm':
@@ -125,51 +163,66 @@ export default function TimelineView() {
         return colors.neutral[300]; // gray/tan
     }
   };
-
+  
+  // 캘린더 헤더 렌더링
   const renderCalendarHeader = () => (
     <View style={styles.calendarHeader}>
       <Text style={[styles.monthYear, { color: colors.text }]}>
-        <Text style={{ color: colors.primary }}>2025년</Text> 8월
+        <Text style={{ color: colors.primary }}>
+          {new Date().getFullYear()}년
+        </Text> {new Date().getMonth() + 1}월
       </Text>
       <View style={styles.weekStrip}>
-        {WEEK_DATA.map((day) => (
-          <TouchableOpacity
-            key={day.date}
-            style={[
-              styles.dayContainer,
-              day.isToday && { backgroundColor: colors.primary },
-            ]}
-            onPress={() => {/* Handle date selection */}}
-          >
-            <Text style={[
-              styles.dayName,
-              { color: day.isToday ? '#ffffff' : colors.textMuted }
-            ]}>
-              {day.dayName}
-            </Text>
-            <Text style={[
-              styles.dayNumber,
-              { color: day.isToday ? '#ffffff' : colors.text }
-            ]}>
-              {day.date}
-            </Text>
-            <View style={styles.activityDots}>
-              {day.activities.map((activity, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.activityDot,
-                    { backgroundColor: activity.color }
-                  ]}
-                />
-              ))}
-            </View>
-          </TouchableOpacity>
-        ))}
+        {weekData.map((day) => {
+          // 우선순위: 선택된 날짜 > 오늘 날짜
+          const isSelected = selectedDate === day.dateString;
+          const highlightStyle = isSelected ? { backgroundColor: colors.primary } : 
+                                day.isToday ? { backgroundColor: colors.neutral[200] } : null;
+
+          // 텍스트 색상도 우선순위에 따라 조정
+          const textColor = isSelected ? '#ffffff' : 
+                           day.isToday ? colors.text : colors.textMuted;
+
+          return (
+            <TouchableOpacity
+              key={day.dayNumber}
+              style={[
+                styles.dayContainer,
+                highlightStyle,
+              ]}
+              onPress={() => setSelectedDate(day.dateString)}
+            >
+              <Text style={[
+                styles.dayName,
+                { color: textColor }
+              ]}>
+                {day.dayName}
+              </Text>
+              <Text style={[
+                styles.dayNumber,
+                { color: textColor }
+              ]}>
+                {day.dayNumber}
+              </Text>
+                         <View style={styles.activityDots}>
+               {day.activities.map((activity, index) => (
+                 <View
+                   key={index}
+                   style={[
+                     styles.activityDot,
+                     { backgroundColor: activity.color }
+                   ]}
+                 />
+               ))}
+             </View>
+           </TouchableOpacity>
+         );
+        })}
       </View>
     </View>
   );
 
+  // 타임라인의 각 이벤트를 렌더링하는 함수
   const renderTimelineEvent = ({ item, index }: { item: TimelineEvent; index: number }) => {
     const backgroundColor = getEventBackgroundColor(item.type);
     const isCurrentTime = item.time === '5:10';
