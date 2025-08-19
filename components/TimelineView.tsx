@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -8,19 +8,11 @@ import {
 } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../hooks/useColorScheme';
+import { fetchTimelineEventsForDate } from '../services/timelineService';
+import { TimelineEvent } from '../utils/timelineConverter';
 import { IconSymbol } from './ui/IconSymbol';
 
-// 타임라인의 각 이벤트를 나타내는 타입
-interface TimelineEvent {
-  id: string;
-  time: string;
-  title: string;
-  subtitle?: string;
-  type: 'alarm' | 'scheduled' | 'general';
-  completed?: boolean;
-  progress?: { current: number; total: number };
-  icon: string;
-}
+// TimelineEvent 타입은 utils/timelineConverter.ts에서 import
 
 // 캘린더의 각 날짜를 나타내는 타입
 interface DayData {
@@ -30,76 +22,7 @@ interface DayData {
   activities: { color: string }[];  // 활동 점들의 색상 배열
 }
 
-// Sample data
-const SAMPLE_EVENTS: TimelineEvent[] = [
-  {
-    id: '1',
-    time: '7:00',
-    title: '산뜻한 시작',
-    subtitle: '오전 7:00 ⟲',
-    type: 'alarm',
-    icon: 'alarm',
-  },
-  {
-    id: '2',
-    time: '9:00',
-    title: 'Zz 휴식을 마쳤어요. 다시 알으로!',
-    subtitle: '',
-    type: 'general',
-    icon: 'zzz',
-  },
-  {
-    id: '3',
-    time: '12:00',
-    title: '웹개발 끝내기',
-    subtitle: '오후 12:00-1:00 (1시간)',
-    type: 'scheduled',
-    icon: 'doc.text',
-  },
-  {
-    id: '4',
-    time: '1:00',
-    title: '준비하세요, 다음 일정까지 5분 남았어요.',
-    subtitle: '',
-    type: 'general',
-    icon: 'clock',
-  },
-  {
-    id: '5',
-    time: '5:10',
-    title: 'Structured와 함께 시작!',
-    subtitle: '팀허들 기본 사항 알아보기',
-    type: 'general',
-    completed: false,
-    icon: 'list.bullet',
-  },
-  {
-    id: '6',
-    time: '5:20',
-    title: '첫 일정 추가하기',
-    subtitle: '하루를 체계적으로 만들기',
-    type: 'general',
-    progress: { current: 0, total: 5 },
-    icon: 'plus',
-  },
-  {
-    id: '7',
-    time: '5:25',
-    title: '보관함 채우기',
-    subtitle: '뭔드시 깜빡하지 않도록',
-    type: 'general',
-    icon: 'archivebox',
-  },
-  {
-    id: '8',
-    time: '5:30',
-    title: '나만의 스타일로 만들기',
-    subtitle: '캘린더 등등과 연결하기',
-    type: 'general',
-    progress: { current: 0, total: 5 },
-    icon: 'gearshape',
-  },
-];
+// 하드코딩된 샘플 데이터는 제거하고 실제 DB 데이터를 사용합니다.
 
 
 
@@ -109,6 +32,8 @@ export default function TimelineView() {
 
   // 상태 관리
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // 날짜 관련 함수들 (HomeScreen에서 복사/수정)
   const getCalendarDates = (): Date[] => {
@@ -237,7 +162,7 @@ export default function TimelineView() {
           ]}>
             {item.time}
           </Text>
-          {index < SAMPLE_EVENTS.length - 1 && (
+          {index < timelineEvents.length - 1 && (
             <View style={[styles.timelineLine, { borderColor: colors.border }]} />
           )}
         </View>
@@ -290,16 +215,43 @@ export default function TimelineView() {
     );
   };
 
+  // selectedDate가 변경될 때마다 DB에서 데이터 가져오기
+  useEffect(() => {
+    const loadTimelineEvents = async () => {
+      setLoading(true);
+      try {
+        console.log(`📅 선택된 날짜: ${selectedDate}`);
+        const events = await fetchTimelineEventsForDate(selectedDate);
+        setTimelineEvents(events);
+        console.log(`✅ 로드된 이벤트: ${events.length}개`);
+      } catch (error) {
+        console.error('타임라인 이벤트 로딩 실패:', error);
+        setTimelineEvents([]); // 에러 시 빈 배열
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadTimelineEvents();
+  }, [selectedDate]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {renderCalendarHeader()}
       <FlatList
-        data={SAMPLE_EVENTS}
+        data={timelineEvents} // SAMPLE_EVENTS 대신 실제 DB 데이터 사용
         renderItem={renderTimelineEvent}
         keyExtractor={(item) => item.id}
         style={styles.timeline}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.timelineContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              {loading ? '로딩 중...' : '이 날짜에는 일정이 없습니다'}
+            </Text>
+          </View>
+        }
       />
     </View>
   );
@@ -446,5 +398,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffffff',
     backgroundColor: 'transparent',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
 });

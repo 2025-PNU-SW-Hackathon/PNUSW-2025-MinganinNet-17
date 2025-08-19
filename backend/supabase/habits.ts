@@ -329,4 +329,58 @@ export async function generateDailyTodoInstances(plan: Plan): Promise<void> {
     
     console.log(`✅ Generated ${instances.length} daily todo instances for plan ${plan.id}`);
   }
+}
+
+/**
+ * 특정 날짜의 타임라인 이벤트 데이터를 가져옵니다.
+ * daily_todo_instances를 중심으로 관련 테이블들을 JOIN하여 
+ * 타임라인 표시에 필요한 모든 정보를 한 번에 가져옵니다.
+ *
+ * @param userId - 사용자 ID
+ * @param date - 조회할 날짜 (YYYY-MM-DD 형식)
+ * @returns {Promise<any[]>} 타임라인 이벤트 데이터 배열
+ */
+export async function getTimelineEventsForDate(userId: string, date: string): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('daily_todo_instances')
+      .select(`
+        id,
+        description,
+        is_completed,
+        date,
+        created_at,
+        daily_todos (
+          id,
+          milestones (
+            id,
+            title,
+            duration,
+            status,
+            plans (
+              id,
+              available_time,
+              plan_title,
+              intensity,
+              status
+            )
+          )
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('date', date)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Supabase error fetching timeline events:', error);
+      return [];
+    }
+
+    console.log(`✅ Fetched ${data?.length || 0} timeline events for date ${date}`);
+    return data || [];
+    
+  } catch (error) {
+    console.error('Error fetching timeline events for date:', date, error);
+    return [];
+  }
 } 
