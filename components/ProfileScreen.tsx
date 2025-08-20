@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { disableAllNotifications, enableAllNotifications, isNotificationsEnabled, sendNotification } from '../backend/hwirang/notifications';
+import { disableAllNotifications, enableAllNotifications, isNotificationsEnabled, sendNotification } from '../backend/notifications/notifications';
 import { getCurrentUser, signOut } from '../backend/supabase/auth';
 import { getActivePlan } from '../backend/supabase/habits';
 import { getCompletedGoalsCount, getConsecutiveCompletionStreak, getThisWeekTodosCompletionRate } from '../backend/supabase/profile';
