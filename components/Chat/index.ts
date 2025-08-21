@@ -1,4 +1,4 @@
-export { default as ChatContainer, type ChatMessage } from './ChatContainer';
+export { default as ChatContainer, type ChatMessageType } from './ChatContainer';
 export { default as ChatHeader } from './ChatHeader';
 export { default as ChatInput } from './ChatInput';
 export { default as ChatMessageComponent } from './ChatMessage';

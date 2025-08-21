@@ -14,17 +14,21 @@ import { useColorScheme } from '../../hooks/useColorScheme';
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   onVoicePress?: () => void;
+  onSubmitConversation?: () => void;
   disabled?: boolean;
   placeholder?: string;
   showVoiceButton?: boolean;
+  showSubmitButton?: boolean;
 }
 
 export default function ChatInput({ 
   onSendMessage, 
   onVoicePress,
+  onSubmitConversation,
   disabled = false,
   placeholder = "오늘 하루에 대해 이야기해보세요...",
-  showVoiceButton = true
+  showVoiceButton = true,
+  showSubmitButton = false
 }: ChatInputProps) {
   const [inputText, setInputText] = useState('');
   const colorScheme = useColorScheme();
@@ -44,6 +48,12 @@ export default function ChatInput({
     }
   };
 
+  const handleSubmitConversation = () => {
+    if (onSubmitConversation && !disabled) {
+      onSubmitConversation();
+    }
+  };
+
   const canSend = inputText.trim().length > 0 && !disabled;
 
   return (
@@ -51,6 +61,20 @@ export default function ChatInput({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
+      {showSubmitButton && (
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            disabled && styles.buttonDisabled
+          ]}
+          onPress={handleSubmitConversation}
+          disabled={disabled}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.submitButtonText}>✓ 대화 완료</Text>
+        </TouchableOpacity>
+      )}
+      
       <View style={styles.inputContainer}>
         <TextInput
           style={[
@@ -196,6 +220,25 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'right',
     marginTop: 4,
+    fontFamily: 'Inter',
+  },
+  submitButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    marginBottom: 8,
+    alignSelf: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  submitButtonText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '600',
     fontFamily: 'Inter',
   },
 });
