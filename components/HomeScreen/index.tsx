@@ -21,6 +21,7 @@ import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { useHabitStore } from '../../lib/habitStore';
+import { useDebugStore, useIsDebugMode } from '../../src/config/debug';
 
 import { DailyTodo, DailyTodosByDate } from '../../types/habit';
 import { AccentGlassCard, SecondaryGlassCard } from '../GlassCard';
@@ -54,6 +55,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
   const [internalSelectedDate, setInternalSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const { plan, setPlan } = useHabitStore();
+  const { toggleDebug } = useDebugStore();
+  const isDebugMode = useIsDebugMode();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dailyTodosByDate, setDailyTodosByDate] = useState<DailyTodosByDate>({});
@@ -475,13 +478,39 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>🌱</Text>
+              {/* Debug Mode Status Indicator */}
+              {__DEV__ && isDebugMode && (
+                <View style={styles.debugIndicator}>
+                  <Text style={styles.debugIndicatorText}>🐛 DEBUG</Text>
+                </View>
+              )}
             </View>
-            <TouchableOpacity 
-              style={styles.profileButton}
-              onPress={() => setCurrentScreen('settings')}
-            >
-              <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {/* Debug Toggle Button (Development Only) */}
+              {__DEV__ && (
+                <TouchableOpacity 
+                  style={[styles.debugToggleButton, isDebugMode && styles.debugToggleButtonActive]}
+                  onPress={() => {
+                    toggleDebug();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    // Refresh data when toggling debug mode
+                    if (targetDate) {
+                      fetchTodosForDate(targetDate);
+                    }
+                  }}
+                >
+                  <Text style={styles.debugToggleText}>
+                    {isDebugMode ? '🐛' : '🔧'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={styles.profileButton}
+                onPress={() => setCurrentScreen('settings')}
+              >
+                <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <Text style={styles.greetingText}>{getGreeting()}</Text>
@@ -688,20 +717,25 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   scrollView: { flex: 1 },
   headerArea: { 
     paddingHorizontal: Spacing.screen.paddingHorizontal, 
-    paddingTop: Spacing['5xl'], 
+    paddingTop: Spacing['2xl'], 
     paddingBottom: Spacing.xl 
   },
   mainContent: {
     paddingHorizontal: Spacing.screen.paddingHorizontal,
     paddingBottom: Spacing['4xl'],
-    gap: Spacing['2xl'],
+    gap: Spacing.lg,
   },
   profileHeader: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginBottom: Spacing['3xl'],
+    marginBottom: Spacing.lg,
     paddingTop: Spacing.md,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
   },
   logoContainer: { 
     flexDirection: 'row', 
@@ -713,15 +747,13 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: colors.primaryOpacity[10],
   },
   logoText: { 
-    fontSize: 40, 
+    fontSize: 32, 
     color: colors.primary, 
     fontWeight: colors.typography.fontWeight.bold,
     // Enhanced shadow for depth
     textShadowColor: colors.primaryOpacity[20],
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
-    // Add subtle scaling transform for better visual impact
-    transform: [{ scale: 1.1 }],
   },
   profileButton: { 
     padding: Spacing.md,
@@ -730,9 +762,9 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: 'transparent',
   },
   profileIcon: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
     backgroundColor: colors.card, 
     justifyContent: 'center', 
     alignItems: 'center',
@@ -746,18 +778,18 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     elevation: Spacing.layout.elevation.sm,
   },
   profileIconText: { 
-    fontSize: 28, 
+    fontSize: 24, 
     color: colors.primary,
     // Add subtle transform for better visual balance
     transform: [{ scale: 0.9 }],
   },
   greetingText: { 
-    fontSize: colors.typography.fontSize['2xl'], 
+    fontSize: colors.typography.fontSize.xl, 
     fontWeight: colors.typography.fontWeight.bold, 
     color: colors.text, 
-    marginBottom: Spacing['2xl'],
+    marginBottom: Spacing.lg,
     fontFamily: 'Inter',
-    lineHeight: colors.typography.fontSize['2xl'] * colors.typography.lineHeight.relaxed,
+    lineHeight: colors.typography.fontSize.xl * colors.typography.lineHeight.relaxed,
     letterSpacing: colors.typography.letterSpacing.normal,
     textAlign: 'center',
     // Enhanced styling for Korean greeting
@@ -789,7 +821,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   calendarDate: { 
-    width: Spacing['6xl'] + Spacing.sm, // ~64px for better proportion
+    width: Spacing['5xl'], // ~48px for more compact appearance
     height: 88, 
     borderRadius: Spacing.layout.borderRadius.lg, 
     backgroundColor: colors.card, 
@@ -919,7 +951,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   calendarGlass: {
     marginHorizontal: -Spacing.md, // Extend to screen edges for glass effect
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   coachCard: { 
     flex: 1, 
@@ -1303,6 +1335,39 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: 28,
     textAlign: 'center',
     lineHeight: 28,
+  },
+  // Debug UI Styles (Development Only)
+  debugIndicator: {
+    marginLeft: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs / 2,
+    backgroundColor: colors.warning + '20',
+    borderRadius: Spacing.layout.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  debugIndicatorText: {
+    fontSize: colors.typography.fontSize.xs,
+    color: colors.warning,
+    fontWeight: colors.typography.fontWeight.bold,
+    letterSpacing: colors.typography.letterSpacing.wide,
+  },
+  debugToggleButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.neutral[300],
+  },
+  debugToggleButtonActive: {
+    backgroundColor: colors.warning + '20',
+    borderColor: colors.warning,
+  },
+  debugToggleText: {
+    fontSize: 14,
   },
 }); 
 

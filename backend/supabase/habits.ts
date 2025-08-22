@@ -1,5 +1,7 @@
 import { DailyTodoInstance, DailyTodoInstanceForCreation, Plan, PlanForCreation } from '../../types/habit';
 import { supabase } from './client';
+import { useDebugStore } from '../../src/config/debug';
+import { MOCK_PLAN } from '../../src/data/mockPlan';
 
 /**
  * Checks if the current user has any habits in the database.
@@ -220,12 +222,46 @@ function parseDurationToDays(duration: string, startDate: Date): number {
 }
 
 /**
+ * Generates mock daily todo instances from the mock plan for debug mode
+ * 
+ * @param date - The date in "YYYY-MM-DD" format  
+ * @returns DailyTodoInstance[] - Array of mock daily todo instances
+ */
+function generateMockTodoInstances(date: string): DailyTodoInstance[] {
+  console.log('🐛 DEBUG MODE: Generating mock todo instances for date:', date);
+  
+  // Use first milestone todos for simplicity in debug mode
+  const firstMilestone = MOCK_PLAN.milestones[0];
+  if (!firstMilestone) return [];
+
+  return firstMilestone.daily_todos.map(todo => ({
+    id: `mock-instance-${todo.id}-${date}`,
+    user_id: 'mock-user-debug',
+    plan_id: MOCK_PLAN.id,
+    original_todo_id: todo.id.toString(),
+    date: date,
+    description: todo.description,
+    is_completed: todo.is_completed,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }));
+}
+
+/**
  * Fetches daily todo instances for a specific date.
+ * In debug mode, returns mock data instead of querying the database.
  * 
  * @param date - The date in "YYYY-MM-DD" format
  * @returns Promise<DailyTodoInstance[]> - Array of daily todo instances for the date
  */
 export async function getDailyTodosByDate(date: string): Promise<DailyTodoInstance[]> {
+  // Check for debug mode first
+  const { isDebugEnabled } = useDebugStore.getState();
+  if (__DEV__ && isDebugEnabled) {
+    console.log('🐛 DEBUG MODE: Using mock data instead of database');
+    return generateMockTodoInstances(date);
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     console.warn('🔓 No authenticated user found, cannot fetch daily todos.');
@@ -249,6 +285,7 @@ export async function getDailyTodosByDate(date: string): Promise<DailyTodoInstan
 
 /**
  * Updates the completion status of a daily todo instance.
+ * In debug mode, simulates the update without touching the database.
  * 
  * @param instanceId - The UUID of the daily todo instance
  * @param isCompleted - The new completion status
@@ -258,6 +295,14 @@ export async function updateTodoCompletion(
   instanceId: string, 
   isCompleted: boolean
 ): Promise<void> {
+  // Check for debug mode first
+  const { isDebugEnabled } = useDebugStore.getState();
+  if (__DEV__ && isDebugEnabled) {
+    console.log('🐛 DEBUG MODE: Simulating todo completion update for:', instanceId, isCompleted);
+    // In debug mode, we don't actually update anything - the UI state will handle this
+    return;
+  }
+
   const { error } = await supabase
     .from('daily_todo_instances')
     .update({ 
