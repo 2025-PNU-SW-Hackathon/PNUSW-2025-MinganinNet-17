@@ -327,23 +327,95 @@ export default function GoalSettingStep5({
   };
 
   // Debug handlers for mock data
-  const handleDebugWithHealthPlan = () => {
+  const handleDebugWithHealthPlan = async () => {
     if (isDebugEnabled) {
-      console.log('🐛 DEBUG: Using mock health plan');
-      setPlan(MOCK_PLAN);
-      Alert.alert('Debug Mode', '건강 습관 모크 데이터가 로드되었습니다!', [
-        { text: 'OK', onPress: onComplete }
-      ]);
+      try {
+        console.log('🐛 DEBUG: Using mock health plan with database save');
+        setIsSubmitting(true);
+        
+        // Convert MOCK_PLAN to PlanForCreation format
+        const planForCreation: PlanForCreation = {
+          plan_title: MOCK_PLAN.plan_title,
+          status: 'in_progress',
+          start_date: MOCK_PLAN.start_date,
+          difficulty_reason: MOCK_PLAN.difficulty_reason,
+          intensity: MOCK_PLAN.intensity,
+          available_time: MOCK_PLAN.available_time,
+          milestones: MOCK_PLAN.milestones.map((milestone) => ({
+            title: milestone.title,
+            duration: milestone.duration,
+            status: milestone.status,
+            daily_todos: milestone.daily_todos.map((todo) => ({
+              description: todo.description,
+              is_completed: todo.is_completed
+            }))
+          }))
+        };
+        
+        console.log('🐛 DEBUG: Saving mock health plan to database...');
+        const finalPlan = await createNewHabitAndPlan(MOCK_PLAN.plan_title, planForCreation);
+        
+        if (finalPlan) {
+          setPlan(finalPlan);
+          console.log('🐛 DEBUG: Mock health plan saved successfully with ID:', finalPlan.id);
+          Alert.alert('Debug Mode', '건강 습관 모크 데이터가 로드되고 저장되었습니다!', [
+            { text: 'OK', onPress: onComplete }
+          ]);
+        } else {
+          throw new Error('Failed to save mock plan to database');
+        }
+      } catch (error) {
+        console.error('🐛 DEBUG: Error saving mock health plan:', error);
+        Alert.alert('Debug Error', '모크 데이터 저장에 실패했습니다.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
-  const handleDebugWithStudyPlan = () => {
+  const handleDebugWithStudyPlan = async () => {
     if (isDebugEnabled) {
-      console.log('🐛 DEBUG: Using mock study plan');
-      setPlan(MOCK_PLAN_STUDY);
-      Alert.alert('Debug Mode', '학습 습관 모크 데이터가 로드되었습니다!', [
-        { text: 'OK', onPress: onComplete }
-      ]);
+      try {
+        console.log('🐛 DEBUG: Using mock study plan with database save');
+        setIsSubmitting(true);
+        
+        // Convert MOCK_PLAN_STUDY to PlanForCreation format
+        const planForCreation: PlanForCreation = {
+          plan_title: MOCK_PLAN_STUDY.plan_title,
+          status: 'in_progress',
+          start_date: MOCK_PLAN_STUDY.start_date,
+          difficulty_reason: MOCK_PLAN_STUDY.difficulty_reason,
+          intensity: MOCK_PLAN_STUDY.intensity,
+          available_time: MOCK_PLAN_STUDY.available_time,
+          milestones: MOCK_PLAN_STUDY.milestones.map((milestone) => ({
+            title: milestone.title,
+            duration: milestone.duration,
+            status: milestone.status,
+            daily_todos: milestone.daily_todos.map((todo) => ({
+              description: todo.description,
+              is_completed: todo.is_completed
+            }))
+          }))
+        };
+        
+        console.log('🐛 DEBUG: Saving mock study plan to database...');
+        const finalPlan = await createNewHabitAndPlan(MOCK_PLAN_STUDY.plan_title, planForCreation);
+        
+        if (finalPlan) {
+          setPlan(finalPlan);
+          console.log('🐛 DEBUG: Mock study plan saved successfully with ID:', finalPlan.id);
+          Alert.alert('Debug Mode', '학습 습관 모크 데이터가 로드되고 저장되었습니다!', [
+            { text: 'OK', onPress: onComplete }
+          ]);
+        } else {
+          throw new Error('Failed to save mock plan to database');
+        }
+      } catch (error) {
+        console.error('🐛 DEBUG: Error saving mock study plan:', error);
+        Alert.alert('Debug Error', '모크 데이터 저장에 실패했습니다.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -396,8 +468,6 @@ export default function GoalSettingStep5({
         </ScrollView>
       )}
 
-      {/* 빈 공간을 위한 Spacer */}
-      <View style={styles.spacer} />
 
       <TouchableOpacity
         style={[
@@ -445,6 +515,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: colors.background,
     paddingHorizontal: 24,
     paddingTop: 100,
+    paddingBottom: 120,
   },
   stepIndicator: {
     fontSize: 16,
@@ -481,24 +552,24 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     maxHeight: 200,
   },
   habitInfoContainer: {
-    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
-    marginBottom: 40,
+    marginBottom: 160,
     maxHeight: 300,
     borderWidth: 1,
-    borderColor: 'rgba(108, 99, 255, 0.3)',
+    borderColor: colors.border,
   },
   habitInfoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     marginBottom: 16,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   habitInfoText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: colors.text,
     lineHeight: 24,
     marginBottom: 8,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -519,7 +590,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   submitButton: {
     backgroundColor: colors.primary,
     borderRadius: 28,
-    paddingVertical: 19,
+    paddingVertical: 12,
     alignItems: 'center',
     height: 56,
     justifyContent: 'center',
@@ -533,7 +604,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     opacity: 0.5,
   },
   submitButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: colors.text,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -552,8 +623,5 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  spacer: {
-    height: 40, // Adjust as needed for spacing
   },
 }); 

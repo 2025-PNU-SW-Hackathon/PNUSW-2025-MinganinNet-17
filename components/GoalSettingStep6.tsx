@@ -165,7 +165,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     flex: 1,
   },
   milestoneContainer: {
-    backgroundColor: '#2c2c3e',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
@@ -176,7 +176,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#4a4a5e',
+    borderBottomColor: colors.border,
     paddingBottom: 10,
   },
   milestoneTitle: {
@@ -197,7 +197,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   todoDescription: {
     fontSize: 15,
-    color: '#e0e0e0',
+    color: colors.text,
     flex: 1,
     marginRight: 10,
     lineHeight: 22,

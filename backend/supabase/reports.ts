@@ -1,4 +1,6 @@
 import { supabase } from './client';
+import { useDebugStore } from '../../src/config/debug';
+import { MOCK_DAILY_REPORTS, calculateMockWeeklyStats, getMockWeekRange } from '../../src/data/mockDailyReports';
 
 /**
  * daily_activities 필드에 저장되는 개별 작업 항목의 타입입니다.
@@ -75,11 +77,22 @@ export const fetchReports = async (): Promise<{
   todayReport: ReportFromSupabase | null;
   historicalReports: ReportFromSupabase[];
 }> => {
-  // 1. 현재 사용자 정보 가져오기
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error('사용자가 인증되지 않았습니다.');
-    return { todayReport: null, historicalReports: [] };
+  // 1. 현재 사용자 정보 가져오기 (디버그 모드에서는 목 사용자 사용)
+  const { isDebugEnabled } = useDebugStore.getState();
+  let user;
+
+  if (isDebugEnabled) {
+    // Debug mode: use mock user with valid UUID format
+    user = { id: '00000000-0000-0000-0000-000000000001' };
+    console.log('🐛 DEBUG MODE: Using mock user for fetchReports');
+  } else {
+    // Production mode: get real authenticated user
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    user = authUser;
+    if (!user) {
+      console.error('사용자가 인증되지 않았습니다.');
+      return { todayReport: null, historicalReports: [] };
+    }
   }
 
   // 2. 현재 사용자의 모든 리포트 데이터 가져오기 (최신순으로 정렬)
@@ -117,11 +130,22 @@ export const createReport = async (reportData: {
   ai_coach_feedback: string[];
   daily_activities: any; // 오늘 할일 목록 데이터
 }): Promise<ReportFromSupabase | null> => {
-  // 1. 현재 사용자 정보 가져오기
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error('사용자가 인증되지 않아 리포트를 생성할 수 없습니다.');
-    return null;
+  // 1. 현재 사용자 정보 가져오기 (디버그 모드에서는 목 사용자 사용)
+  const { isDebugEnabled } = useDebugStore.getState();
+  let user;
+
+  if (isDebugEnabled) {
+    // Debug mode: use mock user with valid UUID format
+    user = { id: '00000000-0000-0000-0000-000000000001' };
+    console.log('🐛 DEBUG MODE: Using mock user for createReport');
+  } else {
+    // Production mode: get real authenticated user
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    user = authUser;
+    if (!user) {
+      console.error('사용자가 인증되지 않아 리포트를 생성할 수 없습니다.');
+      return null;
+    }
   }
 
   // 2. 전달받은 데이터와 사용자 ID를 합쳐 새로운 리포트 객체 생성
@@ -160,8 +184,46 @@ export const aggregateWeeklyReports = async (): Promise<{
   dailyScores: number[];
   dailyReports: ReportFromSupabase[];
 } | null> => {
-  // 1. 현재 사용자 정보 가져오기
-  const { data: { user } } = await supabase.auth.getUser();
+  // 1. 현재 사용자 정보 가져오기 (디버그 모드에서는 목 사용자 사용)
+  const { isDebugEnabled } = useDebugStore.getState();
+  console.log('🐛 aggregateWeeklyReports called - Debug mode enabled:', isDebugEnabled);
+  
+  let user;
+
+  if (isDebugEnabled) {
+    // Debug mode: use mock user with valid UUID format
+    user = { id: '00000000-0000-0000-0000-000000000001' };
+    console.log('🐛 DEBUG MODE: Using mock user for aggregateWeeklyReports');
+    
+    // Use static imports for mock data
+    console.log('🐛 DEBUG: Using static mock daily reports...');
+    
+    const weekRange = getMockWeekRange();
+    const weeklyStats = calculateMockWeeklyStats();
+    
+    console.log('🐛 DEBUG MODE: Using mock daily reports for weekly aggregation');
+    console.log(`🐛 DEBUG: Week range: ${weekRange.weekStart} ~ ${weekRange.weekEnd}`);
+    console.log(`🐛 DEBUG: Average score: ${weeklyStats.averageScore}, Days completed: ${weeklyStats.daysCompleted}`);
+    console.log(`🐛 DEBUG: Daily scores: [${weeklyStats.dailyScores.join(', ')}]`);
+    console.log(`🐛 DEBUG: Mock reports count: ${MOCK_DAILY_REPORTS.length}`);
+    
+    const result = {
+      weekStart: weekRange.weekStart,
+      weekEnd: weekRange.weekEnd,
+      averageScore: weeklyStats.averageScore,
+      daysCompleted: weeklyStats.daysCompleted,
+      dailyScores: weeklyStats.dailyScores,
+      dailyReports: MOCK_DAILY_REPORTS
+    };
+    
+    console.log('🐛 DEBUG: Returning mock aggregated data:', result);
+    return result;
+  }
+  
+  // Production mode: get real authenticated user
+  console.log('🐛 Using production mode for aggregateWeeklyReports');
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  user = authUser;
   if (!user) {
     console.error('사용자가 인증되지 않았습니다.');
     return null;
@@ -397,11 +459,22 @@ export const generateWeeklyInsights = async (
 export const createWeeklyReport = async (
   reportData: WeeklyReportInput
 ): Promise<WeeklyReportFromSupabase | null> => {
-  // 1. 현재 사용자 정보 가져오기
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error('사용자가 인증되지 않아 주간 리포트를 생성할 수 없습니다.');
-    return null;
+  // 1. 현재 사용자 정보 가져오기 (디버그 모드에서는 목 사용자 사용)
+  const { isDebugEnabled } = useDebugStore.getState();
+  let user;
+
+  if (isDebugEnabled) {
+    // Debug mode: use mock user with valid UUID format
+    user = { id: '00000000-0000-0000-0000-000000000001' };
+    console.log('🐛 DEBUG MODE: Using mock user for createWeeklyReport');
+  } else {
+    // Production mode: get real authenticated user
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    user = authUser;
+    if (!user) {
+      console.error('사용자가 인증되지 않아 주간 리포트를 생성할 수 없습니다.');
+      return null;
+    }
   }
 
   // 2. 전달받은 데이터와 사용자 ID를 합쳐 새로운 주간 리포트 객체 생성
@@ -494,11 +567,22 @@ export const generateAndSaveWeeklyReport = async (): Promise<WeeklyReportFromSup
  * @returns 주간 리포트 배열 또는 빈 배열
  */
 export const fetchWeeklyReports = async (): Promise<WeeklyReportFromSupabase[]> => {
-  // 1. 현재 사용자 정보 가져오기
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error('사용자가 인증되지 않았습니다.');
-    return [];
+  // 1. 현재 사용자 정보 가져오기 (디버그 모드에서는 목 사용자 사용)
+  const { isDebugEnabled } = useDebugStore.getState();
+  let user;
+
+  if (isDebugEnabled) {
+    // Debug mode: use mock user with valid UUID format
+    user = { id: '00000000-0000-0000-0000-000000000001' };
+    console.log('🐛 DEBUG MODE: Using mock user for fetchWeeklyReports');
+  } else {
+    // Production mode: get real authenticated user
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    user = authUser;
+    if (!user) {
+      console.error('사용자가 인증되지 않았습니다.');
+      return [];
+    }
   }
 
   // 2. 현재 사용자의 모든 주간 리포트 데이터 가져오기 (최신순으로 정렬)
@@ -527,9 +611,20 @@ export const fetchWeeklyReports = async (): Promise<WeeklyReportFromSupabase[]> 
  * @returns 존재 여부
  */
 export const checkWeeklyReportExists = async (weekStart: string): Promise<boolean> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return false;
+  const { isDebugEnabled } = useDebugStore.getState();
+  let user;
+
+  if (isDebugEnabled) {
+    // Debug mode: use mock user with valid UUID format
+    user = { id: '00000000-0000-0000-0000-000000000001' };
+    console.log('🐛 DEBUG MODE: Using mock user for checkWeeklyReportExists');
+  } else {
+    // Production mode: get real authenticated user
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    user = authUser;
+    if (!user) {
+      return false;
+    }
   }
 
   const { data, error } = await supabase
@@ -553,10 +648,21 @@ export const checkWeeklyReportExists = async (weekStart: string): Promise<boolea
  * @returns 주간 리포트 데이터 또는 null
  */
 export const fetchWeeklyReportByWeek = async (weekStart: string): Promise<WeeklyReportFromSupabase | null> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error('사용자가 인증되지 않았습니다.');
-    return null;
+  const { isDebugEnabled } = useDebugStore.getState();
+  let user;
+
+  if (isDebugEnabled) {
+    // Debug mode: use mock user with valid UUID format
+    user = { id: '00000000-0000-0000-0000-000000000001' };
+    console.log('🐛 DEBUG MODE: Using mock user for fetchWeeklyReportByWeek');
+  } else {
+    // Production mode: get real authenticated user
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    user = authUser;
+    if (!user) {
+      console.error('사용자가 인증되지 않았습니다.');
+      return null;
+    }
   }
 
   const { data, error } = await supabase

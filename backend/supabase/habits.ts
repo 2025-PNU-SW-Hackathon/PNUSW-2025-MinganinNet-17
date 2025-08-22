@@ -34,10 +34,21 @@ export async function checkUserHasHabits(): Promise<boolean> {
 /**
  * Fetches the currently active plan for the logged-in user.
  * It retrieves a nested structure of Plan -> Milestones -> Daily_Todos.
+ * In debug mode, returns mock data for testing purposes.
  *
  * @returns {Promise<Plan | null>} A promise that resolves to the user's active plan or null if not found.
  */
 export async function getActivePlan(): Promise<Plan | null> {
+  // Check if debug mode is enabled
+  const { isDebugEnabled } = useDebugStore.getState();
+  
+  if (isDebugEnabled) {
+    console.log('🐛 DEBUG MODE: Using mock plan data');
+    console.log('🐛 DEBUG: Mock plan has', MOCK_PLAN.milestones.length, 'milestones');
+    console.log('🐛 DEBUG: First milestone has', MOCK_PLAN.milestones[0]?.daily_todos?.length || 0, 'todos');
+    return MOCK_PLAN;
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -73,7 +84,11 @@ export async function getActivePlan(): Promise<Plan | null> {
     return null;
   }
 
-  return planData as Plan;
+  const plan = planData as Plan;
+  console.log('✅ Successfully fetched plan from database');
+  console.log('📊 Plan has', plan.milestones?.length || 0, 'milestones');
+  
+  return plan;
 }
 
 /**

@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { createReport } from '../../../../backend/supabase/reports';
+import { Colors } from '../../../../constants/Colors';
+import { useColorScheme } from '../../../../hooks/useColorScheme';
 import { DailyTodo } from '../../../../types/habit';
 
 const { width, height } = Dimensions.get('window');
@@ -35,6 +37,8 @@ export default function DailyReportResultScreen({
   aiReportText,
   todos
 }: DailyReportResultScreenProps) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -122,13 +126,13 @@ export default function DailyReportResultScreen({
   }, [achievementScore]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Screen Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={onBack} style={[styles.backButton, { backgroundColor: colors.card }]}>
+          <Text style={[styles.backButtonText, { color: colors.text }]}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Today&apos;s Daily Report</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Today&apos;s Daily Report</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -139,11 +143,11 @@ export default function DailyReportResultScreen({
           <View style={styles.topSection}>
             {/* Left Half - Coach's Status */}
             <View style={styles.leftHalf}>
-              <View style={styles.coachCard}>
-                <Text style={styles.cardTitle}>Coach&apos;s Status</Text>
+              <View style={[styles.coachCard, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Coach&apos;s Status</Text>
                 <View style={styles.coachContent}>
                   <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
-                  <Text style={styles.coachMessage}>{coachStatus.message}</Text>
+                  <Text style={[styles.coachMessage, { color: colors.textSecondary }]}>{coachStatus.message}</Text>
                   <View style={[styles.coachIndicator, { backgroundColor: coachStatus.color }]} />
                 </View>
               </View>
@@ -151,15 +155,15 @@ export default function DailyReportResultScreen({
 
             {/* Right Half - Achievement Score */}
             <View style={styles.rightHalf}>
-              <View style={styles.achievementCard}>
-                <Text style={styles.cardTitle}>Achievement Score</Text>
+              <View style={[styles.achievementCard, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Achievement Score</Text>
                 <View style={styles.achievementContent}>
                   <Text style={styles.achievementScore}>
                     {displayScore}
                   </Text>
-                  <Text style={styles.achievementTotal}>/10</Text>
+                  <Text style={[styles.achievementTotal, { color: colors.textSecondary }]}>/10</Text>
                 </View>
-                <View style={styles.achievementBar}>
+                <View style={[styles.achievementBar, { backgroundColor: colors.border }]}>
                   <Animated.View 
                     style={[
                       styles.achievementProgress, 
@@ -177,15 +181,54 @@ export default function DailyReportResultScreen({
             </View>
           </View>
 
+          {/* Todo List Section */}
+          <View style={styles.todoSection}>
+            <View style={[styles.todoCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Today&apos;s Tasks</Text>
+              {todos.length > 0 ? (
+                <ScrollView 
+                  style={styles.todoListScroll}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {todos.map((todo, index) => (
+                    <View key={todo.id} style={[styles.todoItem, { borderBottomColor: colors.border }]}>
+                      <View style={[
+                        styles.todoCheckbox,
+                        todo.is_completed && { backgroundColor: colors.success }
+                      ]}>
+                        {todo.is_completed && (
+                          <Text style={styles.todoCheckmark}>✓</Text>
+                        )}
+                      </View>
+                      <Text style={[
+                        styles.todoText,
+                        { color: colors.text },
+                        todo.is_completed && styles.todoTextCompleted
+                      ]} numberOfLines={2}>
+                        {todo.description}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.noTodosContainer}>
+                  <Text style={[styles.noTodosText, { color: colors.textMuted }]}>
+                    오늘의 할 일이 없습니다
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
           {/* Bottom Section - 50% of main content */}
           <View style={styles.bottomSection}>
-            <View style={styles.reportCard}>
-              <Text style={styles.cardTitle}>AI Generated Report</Text>
+            <View style={[styles.reportCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>AI Generated Report</Text>
               <ScrollView 
                 style={styles.reportScrollView}
                 showsVerticalScrollIndicator={false}
               >
-                <Text style={styles.reportText}>{aiReportText}</Text>
+                <Text style={[styles.reportText, { color: colors.text }]}>{aiReportText}</Text>
               </ScrollView>
             </View>
           </View>
@@ -195,9 +238,9 @@ export default function DailyReportResultScreen({
       {/* Footer Button */}
       <View style={styles.footer}>
         {isSaving ? (
-          <ActivityIndicator size="large" color="#6c63ff" />
+          <ActivityIndicator size="large" color={colors.primary} />
         ) : (
-          <TouchableOpacity style={styles.saveButton} onPress={handleSaveReport} disabled={isSaving}>
+          <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.buttonPrimary }]} onPress={handleSaveReport} disabled={isSaving}>
             <Text style={styles.saveButtonText}>완료 및 리포트 저장</Text>
           </TouchableOpacity>
         )}
@@ -210,7 +253,6 @@ export default function DailyReportResultScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c2e',
   },
   header: {
     flexDirection: 'row',
@@ -220,25 +262,21 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#3a3a50',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#3a3a50',
     justifyContent: 'center',
     alignItems: 'center',
   },
   backButtonText: {
     fontSize: 20,
-    color: '#ffffff',
     fontWeight: 'bold',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#ffffff',
     fontFamily: 'Inter',
   },
   headerSpacer: {
@@ -267,14 +305,12 @@ const styles = StyleSheet.create({
   },
   coachCard: {
     flex: 1,
-    backgroundColor: '#3a3a50',
     borderRadius: 16,
     padding: 20,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
     marginBottom: 15,
     fontFamily: 'Inter',
   },
@@ -289,7 +325,6 @@ const styles = StyleSheet.create({
   },
   coachMessage: {
     fontSize: 16,
-    color: '#a9a9c2',
     textAlign: 'center',
     marginBottom: 10,
     fontFamily: 'Inter',
@@ -301,7 +336,6 @@ const styles = StyleSheet.create({
   },
   achievementCard: {
     flex: 1,
-    backgroundColor: '#3a3a50',
     borderRadius: 16,
     padding: 20,
   },
@@ -320,13 +354,11 @@ const styles = StyleSheet.create({
   achievementTotal: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#a9a9c2',
     fontFamily: 'Inter',
     marginLeft: 8,
   },
   achievementBar: {
     height: 8,
-    backgroundColor: '#2a2a40',
     borderRadius: 4,
     marginTop: 16,
   },
@@ -336,7 +368,6 @@ const styles = StyleSheet.create({
   },
   reportCard: {
     flex: 1,
-    backgroundColor: '#3a3a50',
     borderRadius: 16,
     padding: 20,
   },
@@ -345,7 +376,6 @@ const styles = StyleSheet.create({
   },
   reportText: {
     fontSize: 16,
-    color: '#ffffff',
     lineHeight: 24,
     fontFamily: 'Inter',
   },
@@ -357,7 +387,6 @@ const styles = StyleSheet.create({
   saveButton: {
     width: '100%',
     height: 50,
-    backgroundColor: '#6c63ff',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -374,5 +403,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     fontFamily: 'Inter',
+  },
+  // Todo Section Styles
+  todoSection: {
+    marginBottom: 20,
+  },
+  todoCard: {
+    borderRadius: 16,
+    padding: 20,
+  },
+  todoListScroll: {
+    maxHeight: 200,
+  },
+  todoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  todoCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todoCheckmark: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  todoText: {
+    fontSize: 16,
+    flex: 1,
+    fontFamily: 'Inter',
+  },
+  todoTextCompleted: {
+    textDecorationLine: 'line-through',
+    opacity: 0.6,
+  },
+  noTodosContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noTodosText: {
+    fontSize: 16,
+    fontFamily: 'Inter',
+    textAlign: 'center',
   },
 }); 

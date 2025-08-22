@@ -24,11 +24,26 @@ export default function WeeklyReportStep1({ onComplete, onBack }: WeeklyReportSt
   useEffect(() => {
     const loadWeeklyData = async () => {
       try {
+        console.log('🐛 WeeklyReportStep1: Starting to load weekly data...');
         setLoading(true);
         const data = await aggregateWeeklyReports();
+        console.log('🐛 WeeklyReportStep1: Received weekly data:', data);
         setWeeklyData(data);
+        
+        if (data) {
+          console.log('🐛 WeeklyReportStep1: Weekly data loaded successfully');
+          console.log('🐛 WeeklyReportStep1: Data details:', {
+            weekStart: data.weekStart,
+            weekEnd: data.weekEnd,
+            averageScore: data.averageScore,
+            daysCompleted: data.daysCompleted,
+            reportsCount: data.dailyReports.length
+          });
+        } else {
+          console.log('🐛 WeeklyReportStep1: No weekly data received (null)');
+        }
       } catch (error) {
-        console.error('주간 데이터 로딩 실패:', error);
+        console.error('🐛 WeeklyReportStep1: 주간 데이터 로딩 실패:', error);
       } finally {
         setLoading(false);
       }
@@ -150,50 +165,71 @@ export default function WeeklyReportStep1({ onComplete, onBack }: WeeklyReportSt
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Weekly Summary */}
-        {weeklyData && (
-          <View style={styles.summaryContainer}>
-            <Text style={[styles.summaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-              이번 주 요약
-            </Text>
-            <View style={styles.summaryStats}>
-              <View style={styles.summaryStat}>
-                <Text style={[styles.summaryStatValue, { color: Colors[colorScheme ?? 'light'].tint }]}>
-                  {weeklyData.averageScore.toFixed(1)}
-                </Text>
-                <Text style={[styles.summaryStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
-                  평균 점수
-                </Text>
+        {weeklyData ? (
+          <>
+            {/* Weekly Summary */}
+            <View style={styles.summaryContainer}>
+              <Text style={[styles.summaryTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+                이번 주 요약
+              </Text>
+              <View style={styles.summaryStats}>
+                <View style={styles.summaryStat}>
+                  <Text style={[styles.summaryStatValue, { color: Colors[colorScheme ?? 'light'].tint }]}>
+                    {weeklyData.averageScore.toFixed(1)}
+                  </Text>
+                  <Text style={[styles.summaryStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                    평균 점수
+                  </Text>
+                </View>
+                <View style={styles.summaryStat}>
+                  <Text style={[styles.summaryStatValue, { color: Colors[colorScheme ?? 'light'].tint }]}>
+                    {weeklyData.daysCompleted}/7
+                  </Text>
+                  <Text style={[styles.summaryStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                    완료된 날
+                  </Text>
+                </View>
               </View>
-              <View style={styles.summaryStat}>
-                <Text style={[styles.summaryStatValue, { color: Colors[colorScheme ?? 'light'].tint }]}>
-                  {weeklyData.daysCompleted}/7
-                </Text>
-                <Text style={[styles.summaryStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
-                  완료된 날
-                </Text>
-              </View>
+            </View>
+
+            {/* Daily Analysis */}
+            <View style={styles.analysisContainer}>
+              <Text style={[styles.analysisTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+                일별 분석
+              </Text>
+              {renderDailyTasks()}
+            </View>
+
+            {/* Create Button */}
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={handleCreateWeeklyReport}
+            >
+              <Text style={styles.createButtonText}>
+                주간 리포트 생성하기
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          /* No Weekly Data Available */
+          <View style={styles.noDataContainer}>
+            <View style={styles.noDataCard}>
+              <Text style={[styles.noDataIcon, { color: Colors[colorScheme ?? 'light'].icon }]}>
+                📅
+              </Text>
+              <Text style={[styles.noDataTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+                주간 리포트를 생성할 수 없습니다
+              </Text>
+              <Text style={[styles.noDataMessage, { color: Colors[colorScheme ?? 'light'].textSecondary }]}>
+                이번 주에 작성된 일간 리포트가 부족합니다.{'\n'}
+                최소 3일 이상의 일간 리포트가 필요합니다.
+              </Text>
+              <Text style={[styles.noDataHint, { color: Colors[colorScheme ?? 'light'].textMuted }]}>
+                일간 리포트를 더 작성한 후 다시 시도해보세요.
+              </Text>
             </View>
           </View>
         )}
-
-        {/* Daily Analysis */}
-        <View style={styles.analysisContainer}>
-          <Text style={[styles.analysisTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
-            일별 분석
-          </Text>
-          {renderDailyTasks()}
-        </View>
-
-        {/* Create Button */}
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={handleCreateWeeklyReport}
-        >
-          <Text style={styles.createButtonText}>
-            주간 리포트 생성하기
-          </Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -301,5 +337,39 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  noDataCard: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    maxWidth: 300,
+  },
+  noDataIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  noDataTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  noDataMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  noDataHint: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
