@@ -7,6 +7,7 @@
 - 시스템 구성도, 플로우차트
 
 ## 파일 명명 규칙
+- `architecture.png` - 아키텍쳐
 - `onboarding-screen.png` - 온보딩 화면
 - `home-screen.png` - 홈 화면
 - `voice-goal-setting.png` - 음성 목표 설정
