@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { submitHabitData } from '../backend/hwirang/habit';
 import { createNewHabitAndPlan } from '../backend/supabase/habits';
+import { supabase } from '../backend/supabase/client';
 import { useHabitStore } from '../lib/habitStore';
+import { validateAndRecoverSession } from '../utils/sessionRecovery';
 import { PlanForCreation } from '../types/habit';
 import DebugNextButton from './DebugNextButton';
 import { Colors } from '../constants/Colors';
@@ -289,6 +291,23 @@ export default function GoalSettingStep5({
       
       console.log('💾 Saving habit and plan to database...');
       console.log('📝 Plan status being saved:', planForCreation.status);
+      
+      // DEBUG: Validate session before habit creation
+      console.log('🔍 DEBUG: Validating session before habit creation...');
+      const sessionValid = await validateAndRecoverSession();
+      
+      if (!sessionValid) {
+        Alert.alert(
+          '인증 오류', 
+          '세션이 만료되었습니다. 다시 로그인해주세요.',
+          [{ text: '확인', onPress: () => {
+            // Could navigate to login screen here
+            console.log('🔧 RECOVERY: User needs to login again');
+          }}]
+        );
+        return;
+      }
+      
       const finalPlan = await createNewHabitAndPlan(habitName, planForCreation);
       console.log('✅ Successfully saved to database with ID:', finalPlan?.id);
       console.log('📊 Final plan status:', finalPlan?.status);

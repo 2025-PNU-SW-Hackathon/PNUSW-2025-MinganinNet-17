@@ -152,6 +152,15 @@ export async function submitHabitData(
       jsonString = markdownMatch[1].trim();
     }
 
+    // DEBUG: Log JSON string before parsing to identify malformation
+    console.log('🔍 DEBUG: Raw AI response length:', aiResponse.length);
+    console.log('🔍 DEBUG: JSON string to parse:', jsonString.substring(0, 200) + '...');
+    console.log('🔍 DEBUG: JSON string has escape chars:', jsonString.includes('\\'));
+    
+    // Clean up common JSON malformation issues
+    jsonString = jsonString.replace(/\\\n/g, ''); // Remove literal \n
+    jsonString = jsonString.replace(/\\"/g, '"'); // Fix escaped quotes
+    
     const plan = JSON.parse(jsonString) as PlanForCreation; // <-- Cast to the new type
     return plan;
 
