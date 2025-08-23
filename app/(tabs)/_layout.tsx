@@ -66,8 +66,8 @@ function HomeTabButton(props: any) {
   );
 }
 
-// Plan tab with warm tan glass background
-function PlanTabButton(props: any) {
+// Home tab with warm tan glass background
+function HomeTabButtonNew(props: any) {
   const colorScheme = useColorScheme();
   const backgroundColor = Colors[colorScheme ?? 'light'].neutral[300];
   
@@ -188,9 +188,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="plan"
+        name="home"
         options={{
-          title: 'Plan',
+          title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={focused ? 28 : 24} 
@@ -198,7 +198,7 @@ export default function TabLayout() {
               color={color} 
             />
           ),
-          tabBarButton: PlanTabButton,
+          tabBarButton: HomeTabButtonNew,
         }}
       />
       <Tabs.Screen
