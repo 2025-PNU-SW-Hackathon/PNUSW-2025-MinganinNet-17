@@ -43,7 +43,8 @@ module.exports = {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#1c1c2e"
       },
-      package: "com.routy.app"
+      package: "com.routy.app",
+      permissions: ["RECORD_AUDIO"]
     },
     web: {
       favicon: "./assets/images/favicon.png",

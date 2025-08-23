@@ -1,438 +1,303 @@
 /**
- * Gemini Multimodal Live API를 사용한 실시간 네이티브 오디오 처리
- * 진짜 Google 네이티브 오디오 출력을 제공합니다!
+ * Supabase Edge Functions를 활용한 AI 음성 채팅 처리
+ * Gemini 2.5 Flash API와 Google Cloud Speech/TTS API를 조합하여 사용
  */
 
-import { GoogleGenAI, Modality } from '@google/genai';
 import Constants from 'expo-constants';
+import { createClient } from '@supabase/supabase-js';
 
-// API 설정 - 기존 Gemini API와 동일한 방식으로 설정
-const API_KEY = Constants.expoConfig?.extra?.geminiApiKey || Constants.manifest?.extra?.geminiApiKey;
+// Supabase 설정 - .env에서 직접 읽기
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
-if (!API_KEY) {
-  console.error('Available Constants:', {
-    expoConfig: Constants.expoConfig?.extra,
-    manifest: Constants.manifest?.extra,
-    executionEnvironment: Constants.executionEnvironment
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('환경변수 확인:', {
+    SUPABASE_URL: SUPABASE_URL ? '설정됨' : '설정되지 않음',
+    SUPABASE_ANON_KEY: SUPABASE_ANON_KEY ? '설정됨' : '설정되지 않음',
+    availableEnvVars: Object.keys(process.env).filter(key => key.includes('SUPABASE'))
   });
-  throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.');
+  throw new Error('SUPABASE_URL과 SUPABASE_ANON_KEY 환경변수가 설정되지 않았습니다.');
 }
 
-// Gemini Live API 클라이언트 초기화
-const genAI = new GoogleGenAI({ apiKey: API_KEY });
+// Supabase 클라이언트 초기화
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 로그 토글 (기본 true로 복구)
-const LIVE_DEBUG = true;
-
-// Live API 지원 최신 Gemini 2.5 모델들
-const LIVE_MODELS = {
-  FLASH_2_5: "gemini-2.5-flash",
-  PRO_2_5: "gemini-2.5-pro", 
-  FLASH_LIVE: "gemini-live-2.5-flash-preview", // 실제 Live API 모델
-  PRO_TTS: "gemini-2.5-pro" // TTS 전용
-};
-
-// 음성 모드용 모델 (Gemini 2.5 Flash Live)
-const CURRENT_MODEL = LIVE_MODELS.FLASH_LIVE;
+// 디버그 로그 토글
+const DEBUG = true;
 
 /**
- * Gemini Live API 세션 관리 클래스
+ * Supabase Edge Functions를 통한 AI 음성 채팅 처리 클래스
  */
-class GeminiLiveSession {
+class SupabaseAIVoiceChat {
   constructor() {
-    this.session = null;
-    this.isConnected = false;
-    this.responseQueue = [];
-    this.audioBuffer = [];
-    
-    // 메시지 처리 정보 수집용 변수들
-    this.hasModelTurn = false;
-    this.hasInputTranscription = false;
-    this.hasOutputTranscription = false;
-    this.turnComplete = false;
+    this.isProcessing = false;
+    this.currentRequestId = null;
   }
 
   /**
-   * Live API 세션 시작
+   * 음성 파일을 Supabase Edge Function으로 전송하여 AI 응답 생성
+   * @param {Blob|File} audioFile - 녹음된 음성 파일 (.m4a, .wav 등)
+   * @param {string} systemInstruction - AI 시스템 프롬프트
+   * @param {Function} onAudioChunk - 오디오 청크 수신 시 콜백
+   * @param {Function} onComplete - 완료 시 콜백
+   * @param {Function} onError - 오류 시 콜백
    */
-  async connect(systemInstruction) {
-    if (!systemInstruction) {
-      throw new Error('시스템 프롬프트가 제공되지 않았습니다.');
+  async processVoiceToAI(
+    audioFile, 
+    systemInstruction, 
+    onAudioChunk, 
+    onComplete, 
+    onError
+  ) {
+    if (this.isProcessing) {
+      throw new Error('이미 처리 중인 요청이 있습니다.');
     }
-    
-    // 시스템 프롬프트 저장 (재연결 시 사용)
-    this.lastSystemInstruction = systemInstruction;
+
+    this.isProcessing = true;
     
     try {
-      if (LIVE_DEBUG) console.log('🎤 Gemini Live API 연결 중...');
-      if (LIVE_DEBUG) console.log('📝 시스템 프롬프트:', systemInstruction);
-
-      // Live API 연결 시도 - systemInstruction을 사용하여 역할 지정
-      this.session = await genAI.live.connect({
-        model: CURRENT_MODEL,
-        callbacks: {
-          onopen: () => {
-            if (LIVE_DEBUG) console.log('✅ Gemini Live API 연결 성공!');
-            this.isConnected = true;
-          },
-          onmessage: (message) => {
-            // 메시지 수신 로그 제거 (과도한 로그 방지)
-            this.responseQueue.push(message);
-          },
-          onerror: (error) => {
-            console.error('❌ Live API 연결 오류');
-            this.isConnected = false;
-          },
-          onclose: (event) => {
-            if (LIVE_DEBUG) console.log('🔌 Live API 연결 종료:', event?.reason || 'Unknown reason');
-            this.isConnected = false;
-          }
-        },
-        config: {
-          systemInstruction: {
-            parts: [{ text: systemInstruction }]
-          },
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: { 
-              prebuiltVoiceConfig: { 
-                voiceName: "Aoede"
-              }
-            }
-          },
-          outputAudioTranscription: {},
-          // 연결 안정성 향상을 위한 추가 설정
-          maxOutputTokens: 4096,
-          temperature: 0.7,
-          topP: 0.8,
-          topK: 40
-        }
-      });
-
-      if (LIVE_DEBUG) console.log('🚀 Live API 세션 설정 완료');
-      return this.session;
-    } catch (error) {
-      console.error('❌ Live API 연결 실패');
-      this.isConnected = false;
-      throw error;
-    }
-  }
-
-  /**
-   * 오디오 입력 전송 (PCM 16kHz 16-bit)
-   */
-  async sendAudio(audioData, mimeType = "audio/pcm;rate=16000") {
-    if (!this.isConnected || !this.session) {
-      if (LIVE_DEBUG) console.log('🔄 세션 재연결 시도...');
-      await this.reconnect();
-    }
-
-    try {
-      // Live API 공식 문서 기준 올바른 메서드 사용
-      await this.session.sendRealtimeInput({
-        audio: {
-          data: audioData,
-          mimeType: mimeType
-        }
-      });
-      if (LIVE_DEBUG) console.log('🎤 오디오 입력 전송 완료');
-    } catch (error) {
-      console.error('오디오 전송 실패:', error);
+      if (DEBUG) console.log('🎤 음성 파일 AI 처리 시작...');
       
-      // 연결 오류인 경우 재연결 시도
-      if (error.message.includes('연결') || error.message.includes('세션') || error.message.includes('Live API')) {
-        if (LIVE_DEBUG) console.log('🔄 연결 오류로 인한 세션 재연결 시도...');
-        await this.reconnect();
-        // 재연결 후 다시 시도
-        await this.session.sendRealtimeInput({
-          audio: {
-            data: audioData,
-            mimeType: mimeType
-          }
-        });
-        if (LIVE_DEBUG) console.log('✅ 재연결 후 오디오 데이터 전송 성공');
-      } else {
-        throw error;
+      // 1. 음성 파일을 Supabase Storage에 업로드
+      const fileName = `voice_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.m4a`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('voice-chat')
+        .upload(fileName, audioFile);
+
+      if (uploadError) {
+        throw new Error(`음성 파일 업로드 실패: ${uploadError.message}`);
       }
-    }
-  }
 
-  /**
-   * 텍스트 입력 전송 (2025년 8월 최신 API 스펙)
-   */
-  async sendText(text) {
-    if (!this.isConnected || !this.session) {
-      throw new Error('Live API 세션이 연결되지 않았습니다.');
-    }
+      if (DEBUG) console.log('✅ 음성 파일 업로드 완료:', fileName);
 
-    try {
-      // 2025년 8월 최신 공식 문서 기준 올바른 구조 사용
-      await this.session.sendClientContent({
-        turns: [{
-          role: "user",
-          parts: [{ text: text }]
-        }],
-        turnComplete: true
+      // 2. Edge Function 호출하여 AI 처리 시작
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('ai-voice-chat', {
+        body: {
+          audioFileName: fileName,
+          systemInstruction: systemInstruction,
+          requestId: this.currentRequestId = Date.now().toString()
+        }
       });
-      if (LIVE_DEBUG) console.log('💬 텍스트 입력 전송');
+
+      if (aiError) {
+        throw new Error(`AI 처리 시작 실패: ${aiError.message}`);
+      }
+
+      if (DEBUG) console.log('🚀 AI 처리 시작됨:', aiResponse);
+
+      // 3. 스트리밍 응답 대기
+      await this.waitForStreamingResponse(
+        fileName,
+        onAudioChunk,
+        onComplete,
+        onError
+      );
+
     } catch (error) {
-      console.error('텍스트 전송 실패');
-      throw error;
+      console.error('❌ 음성 처리 실패:', error);
+      this.isProcessing = false;
+      onError?.(error);
     }
   }
 
   /**
-   * 응답 대기 및 오디오 데이터 반환 (최적화된 버전)
+   * 스트리밍 응답을 대기하고 오디오 청크를 수신
    */
-  async waitForResponse() {
-    return new Promise((resolve) => {
-      let combinedText = '';
-      let audioChunks = []; // 오디오 청크들을 배열로 수집
-      let userInput = ''; // 사용자의 음성 인식 결과 저장
-      let hasResponse = false;
-      let messageCount = 0;
-
-      // 스트리밍 응답 처리 (turnComplete까지 대기)
+  async waitForStreamingResponse(fileName, onAudioChunk, onComplete, onError) {
+    try {
       let isComplete = false;
-      
-      const processMessages = () => {
-        while (this.responseQueue.length > 0) {
-          const message = this.responseQueue.shift();
-          messageCount++;
-          
-          // 메시지 처리 로그 제거 (과도한 로그 방지)
-          
-          // 메시지 구조 정보 수집 (로그 출력 없이)
-          if (message.serverContent) {
-            // serverContent 정보 수집
-            if (message.serverContent.modelTurn) {
-              this.hasModelTurn = true;
-            }
-            if (message.serverContent.inputTranscription) {
-              this.hasInputTranscription = true;
-            }
-            if (message.serverContent.outputTranscription) {
-              this.hasOutputTranscription = true;
-            }
-            if (message.serverContent.turnComplete) {
-              this.turnComplete = true;
-            }
+      let audioChunks = [];
+      let responseText = '';
+
+      // 실시간 응답 모니터링 (Polling 방식)
+      const pollInterval = setInterval(async () => {
+        try {
+          // 응답 상태 확인
+          const { data: statusData, error: statusError } = await supabase
+            .from('voice_chat_responses')
+            .select('*')
+            .eq('audio_file_name', fileName)
+            .eq('request_id', this.currentRequestId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (statusError && statusError.code !== 'PGRST116') {
+            console.error('응답 상태 확인 실패:', statusError);
+            return;
           }
-          
-          // 직접적인 텍스트/오디오 응답
-          if (message.text) {
-            combinedText += message.text;
-          }
-          
-          // 오디오 데이터는 message.data를 통해서만 수집 (중복 방지)
-          if (message.data) {
-            // 오디오 데이터 수신 로그 제거 (과도한 로그 방지)
-            audioChunks.push(message.data);
-          }
-          
-          // serverContent 구조 처리
-          if (message.serverContent) {
-            // modelTurn에서 텍스트와 MIME 타입 추출
-            if (message.serverContent.modelTurn?.parts) {
-              message.serverContent.modelTurn.parts.forEach(part => {
-                if (part.text) {
-                  combinedText += part.text;
-                }
-                // 오디오 데이터는 중복되므로 추가하지 않지만, MIME 타입은 여기서 가져옴
-                if (part.inlineData?.mimeType) {
-                  this.lastMimeType = part.inlineData.mimeType;
-                  // MIME 타입 감지 로그 제거 (과도한 로그 방지)
-                }
+
+          if (statusData) {
+            // 새로운 오디오 청크가 있는지 확인
+            if (statusData.audio_chunk && statusData.audio_chunk !== '') {
+              audioChunks.push(statusData.audio_chunk);
+              
+              // 오디오 청크 콜백 호출
+              onAudioChunk?.({
+                chunk: statusData.audio_chunk,
+                chunkIndex: audioChunks.length - 1,
+                mimeType: statusData.mime_type || 'audio/mpeg',
+                isComplete: statusData.is_complete
               });
             }
-            
-            // 입력 전사 처리 (사용자 음성)
-            if (message.serverContent.inputTranscription?.text) {
-              userInput += message.serverContent.inputTranscription.text + ' ';
-              // 입력 전사 로그 제거 (과도한 로그 방지)
+
+            // 응답 텍스트 업데이트
+            if (statusData.response_text && statusData.response_text !== responseText) {
+              responseText = statusData.response_text;
             }
-            
-            // 출력 전사 처리 (AI 음성)
-            if (message.serverContent.outputTranscription?.text) {
-              combinedText += message.serverContent.outputTranscription.text;
-            }
-            
-            // turnComplete 확인 - 이때만 완료 처리
-            if (message.serverContent.turnComplete) {
-              // 턴 완료 신호 로그 제거 (과도한 로그 방지)
+
+            // 완료 여부 확인
+            if (statusData.is_complete) {
               isComplete = true;
-              break; 
-            }
-          }
-        }
-        
-        if (isComplete) {
-          const finalText = combinedText.trim() || '응답을 받았습니다.';
-          const finalUserInput = userInput.trim();
-          
-          let combinedAudioBase64 = '';
-          if (audioChunks.length > 0) {
-            try {
-              const binaryChunks = audioChunks.map(chunk => {
-                const binaryString = atob(chunk);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                  bytes[i] = binaryString.charCodeAt(i);
-                }
-                return bytes;
+              clearInterval(pollInterval);
+              
+              if (DEBUG) console.log('✅ AI 응답 완료');
+              
+              // 완료 콜백 호출
+              onComplete?.({
+                audioChunks: audioChunks,
+                responseText: responseText,
+                totalChunks: audioChunks.length,
+                mimeType: statusData.mime_type || 'audio/mpeg'
               });
-              const totalLength = binaryChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-              const combinedBinary = new Uint8Array(totalLength);
-              let offset = 0;
-              for (const chunk of binaryChunks) {
-                combinedBinary.set(chunk, offset);
-                offset += chunk.length;
-              }
-              let binaryString = '';
-              for (let i = 0; i < combinedBinary.length; i++) binaryString += String.fromCharCode(combinedBinary[i]);
-              combinedAudioBase64 = btoa(binaryString);
-            } catch (e) {
-              combinedAudioBase64 = audioChunks[0] || '';
+              
+              this.isProcessing = false;
             }
           }
-          
-          if (LIVE_DEBUG) console.log('✅ 응답 처리 완료:', {
-            userInput: finalUserInput,
-            textLength: finalText.length,
-            hasAudio: !!combinedAudioBase64,
-            audioChunks: audioChunks.length,
-            totalAudioSize: audioChunks.reduce((sum, chunk) => sum + chunk.length, 0),
-            messageCount: messageCount,
-            mimeType: this.lastMimeType || "audio/pcm;rate=24000",
-            serverContent: {
-              hasModelTurn: this.hasModelTurn,
-              hasInputTranscription: this.hasInputTranscription,
-              hasOutputTranscription: this.hasOutputTranscription,
-              turnComplete: this.turnComplete
-            }
-          });
-
-          resolve({
-            audioData: combinedAudioBase64,
-            text: finalText,
-            userInput: finalUserInput,
-            mimeType: combinedAudioBase64 ? (this.lastMimeType || "audio/pcm;rate=24000") : "",
-            source: 'Gemini Live API'
-          });
-          return true; // 처리 완료
+        } catch (error) {
+          console.error('응답 모니터링 중 오류:', error);
         }
-        return false; // 계속 대기
-      };
+      }, 200); // 200ms 간격으로 폴링
 
-      const checkInterval = setInterval(() => {
-        if (processMessages()) {
-          clearInterval(checkInterval);
+      // 타임아웃 설정 (60초)
+      setTimeout(() => {
+        if (!isComplete) {
+          clearInterval(pollInterval);
+          this.isProcessing = false;
+          onError?.(new Error('응답 대기 시간이 초과되었습니다.'));
         }
-      }, 100);
+      }, 60000);
 
-      const timeoutId = setTimeout(() => {
-        clearInterval(checkInterval);
-        console.warn('⏰ Live API 응답 타임아웃 (30초)');
-        resolve({
-          audioData: '',
-          text: '응답 시간이 초과되었어요. 다시 시도해 주세요.',
-          userInput: userInput.trim(),
-          mimeType: "",
-          source: 'Timeout'
-        });
-      }, 30000); // 15초 → 30초로 증가
-      
-      const originalResolve = resolve;
-      resolve = (result) => {
-        clearTimeout(timeoutId);
-        originalResolve(result);
-      };
-    });
+    } catch (error) {
+      console.error('스트리밍 응답 대기 실패:', error);
+      this.isProcessing = false;
+      onError?.(error);
+    }
   }
 
   /**
-   * 세션 재연결
+   * 텍스트를 AI로 전송하여 음성 응답 생성
+   * @param {string} text - 전송할 텍스트
+   * @param {string} systemInstruction - AI 시스템 프롬프트
+   * @param {Function} onAudioChunk - 오디오 청크 수신 시 콜백
+   * @param {Function} onComplete - 완료 시 콜백
+   * @param {Function} onError - 오류 시 콜백
    */
-  async reconnect() {
-    if (LIVE_DEBUG) console.log('🔄 Live API 세션 재연결 중...');
+  async processTextToAI(
+    text,
+    systemInstruction,
+    onAudioChunk,
+    onComplete,
+    onError
+  ) {
+    if (this.isProcessing) {
+      throw new Error('이미 처리 중인 요청이 있습니다.');
+    }
+
+    this.isProcessing = true;
     
     try {
-      // 기존 세션 정리
-      if (this.session) {
-        this.session.close();
-        this.session = null;
-      }
+      if (DEBUG) console.log('💬 텍스트 AI 처리 시작...');
       
-      this.isConnected = false;
-      this.responseQueue = [];
-      this.audioBuffer = [];
-      
-      // 새 세션 생성
-      this.session = await genAI.live.connect({
-        model: CURRENT_MODEL,
-        callbacks: {
-          onopen: () => {
-            if (LIVE_DEBUG) console.log('✅ Live API 재연결 성공!');
-            this.isConnected = true;
-          },
-          onmessage: (message) => {
-            // 재연결 후 메시지 수신 로그 제거 (과도한 로그 방지)
-            this.responseQueue.push(message);
-          },
-          onerror: (error) => {
-            console.error('❌ Live API 재연결 오류');
-            this.isConnected = false;
-          },
-          onclose: (event) => {
-            if (LIVE_DEBUG) console.log('🔌 Live API 재연결 후 연결 종료');
-            this.isConnected = false;
-          }
-        },
-        config: {
-          systemInstruction: {
-            parts: [{ text: this.lastSystemInstruction || '당신은 루티입니다.' }]
-          },
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: { 
-              prebuiltVoiceConfig: { 
-                voiceName: "Aoede"
-              }
-            }
-          },
-          outputAudioTranscription: {}
+      // Edge Function 호출하여 텍스트 기반 AI 처리
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('ai-text-chat', {
+        body: {
+          text: text,
+          systemInstruction: systemInstruction,
+          requestId: this.currentRequestId = Date.now().toString()
         }
       });
-      
-      if (LIVE_DEBUG) console.log('🚀 Live API 재연결 세션 설정 완료');
+
+      if (aiError) {
+        throw new Error(`AI 처리 시작 실패: ${aiError.message}`);
+      }
+
+      if (DEBUG) console.log('🚀 AI 텍스트 처리 시작됨:', aiResponse);
+
+      // 스트리밍 응답 대기
+      await this.waitForStreamingResponse(
+        `text_${this.currentRequestId}`,
+        onAudioChunk,
+        onComplete,
+        onError
+      );
+
     } catch (error) {
-      console.error('❌ Live API 재연결 실패:', error);
-      throw new Error('세션 재연결에 실패했습니다.');
+      console.error('❌ 텍스트 처리 실패:', error);
+      this.isProcessing = false;
+      onError?.(error);
     }
   }
 
   /**
-   * 세션 종료
+   * 현재 처리 상태 확인
    */
-  async disconnect() {
-    if (this.session) {
-      this.session.close();
-      this.session = null;
-      this.isConnected = false;
-      if (LIVE_DEBUG) console.log('🔌 Live API 세션 종료');
-    }
+  getProcessingStatus() {
+    return {
+      isProcessing: this.isProcessing,
+      requestId: this.currentRequestId
+    };
   }
 
   /**
-   * 시스템 프롬프트를 업데이트합니다.
+   * 처리 중단
    */
-  async updateSystemInstruction(newSystemInstruction) {
-    if (!this.session) {
-      throw new Error('세션이 연결되지 않았습니다.');
+  cancelProcessing() {
+    if (this.isProcessing) {
+      this.isProcessing = false;
+      if (DEBUG) console.log('🛑 AI 처리 중단됨');
     }
-    this.lastSystemInstruction = newSystemInstruction;
-    if (LIVE_DEBUG) console.log('시스템 프롬프트가 업데이트되었습니다.');
   }
+}
+
+/**
+ * 편의 함수: 음성 파일을 AI로 처리
+ */
+async function processVoiceToAI(
+  audioFile,
+  systemInstruction,
+  onAudioChunk,
+  onComplete,
+  onError
+) {
+  const voiceChat = new SupabaseAIVoiceChat();
+  return await voiceChat.processVoiceToAI(
+    audioFile,
+    systemInstruction,
+    onAudioChunk,
+    onComplete,
+    onError
+  );
+}
+
+/**
+ * 편의 함수: 텍스트를 AI로 처리
+ */
+async function processTextToAI(
+  text,
+  systemInstruction,
+  onAudioChunk,
+  onComplete,
+  onError
+) {
+  const voiceChat = new SupabaseAIVoiceChat();
+  return await voiceChat.processTextToAI(
+    text,
+    systemInstruction,
+    onAudioChunk,
+    onComplete,
+    onError
+  );
 }
 
 // --- 대화형 세션 관리 ---
@@ -443,16 +308,13 @@ let conversationSession = null;
  * 대화형 세션을 시작하거나 기존 세션을 가져옵니다.
  */
 async function startOrGetConversationSession(systemInstruction) {
-  if (conversationSession && conversationSession.isConnected) {
-    if (LIVE_DEBUG) console.log('기존 Live API 세션을 새로운 맥락으로 업데이트합니다.');
-    // 기존 세션을 새로운 시스템 프롬프트로 업데이트
-    await conversationSession.updateSystemInstruction(systemInstruction);
+  if (conversationSession && conversationSession.isProcessing) {
+    if (DEBUG) console.log('기존 AI 음성 채팅 세션을 사용합니다.');
     return conversationSession;
   }
   
-  if (LIVE_DEBUG) console.log('새로운 Live API 세션을 시작합니다.');
-  conversationSession = new GeminiLiveSession();
-  await conversationSession.connect(systemInstruction);
+  if (DEBUG) console.log('새로운 AI 음성 채팅 세션을 시작합니다.');
+  conversationSession = new SupabaseAIVoiceChat();
   return conversationSession;
 }
 
@@ -461,105 +323,16 @@ async function startOrGetConversationSession(systemInstruction) {
  */
 async function endConversationSession() {
   if (conversationSession) {
-    await conversationSession.disconnect();
+    conversationSession.cancelProcessing();
     conversationSession = null;
-    if (LIVE_DEBUG) console.log('Live API 대화 세션이 종료되었습니다.');
-  }
-}
-
-
-/**
- * 편의 함수: 텍스트를 Live API로 처리하고 네이티브 오디오 생성
- */
-async function generateNativeAudio(text, systemInstruction) {
-  let session = null;
-  
-  try {
-    if (LIVE_DEBUG) console.log('🚀 Live API 텍스트 처리 시작');
-    
-    // 새 세션 생성 및 연결
-    session = new GeminiLiveSession();
-    await session.connect(systemInstruction);
-    
-    // 연결 확인
-    if (!session.isConnected) {
-      throw new Error('Live API 세션 연결에 실패했습니다.');
-    }
-    
-    // 텍스트 전송
-    await session.sendText(text);
-    
-    // 응답 대기
-    const response = await session.waitForResponse();
-    
-    if (response && (response.text || response.audioData)) {
-      if (LIVE_DEBUG) console.log('✅ Live API 응답 성공:', {
-        hasText: !!response.text,
-        hasAudio: !!response.audioData,
-        textLength: response.text?.length || 0,
-        audioSize: response.audioData?.length || 0
-      });
-      
-      return {
-        error: false,
-        audioData: response.audioData || '',
-        text: response.text || '응답을 받았습니다.',
-        mimeType: response.mimeType || "audio/pcm;rate=24000",
-        source: 'Gemini Live API'
-      };
-    } else {
-      throw new Error('Live API에서 유효한 응답을 받지 못했습니다.');
-    }
-  } catch (error) {
-    console.error('❌ Live API 처리 실패');
-    
-    return {
-      error: true,
-      text: '죄송해요, 처리 중에 문제가 발생했어요. 다시 말씀해 주시겠어요?',
-      audioData: '',
-      mimeType: '',
-      source: 'Error'
-    };
-  } finally {
-    // 항상 세션 종료 (안전하게)
-    if (session) {
-      try {
-        await session.disconnect();
-      } catch (disconnectError) {
-    console.warn('세션 종료 중 오류');
-      }
-    }
-  }
-}
-
-/**
- * 편의 함수: 오디오를 오디오로 변환 (음성 대화)
- */
-async function processAudioToAudio(audioData, systemInstruction, audioMimeType = "audio/pcm;rate=16000") {
-  const session = new GeminiLiveSession();
-  
-  try {
-    await session.connect(systemInstruction);
-    await session.sendAudio(audioData, audioMimeType);
-    const response = await session.waitForResponse();
-    await session.disconnect();
-    
-    return {
-      audioData: response.audioData,
-      text: response.text,
-      mimeType: response.mimeType,
-      source: 'Gemini 2.5 Flash 네이티브 오디오'
-    };
-  } catch (error) {
-    await session.disconnect();
-    throw error;
+    if (DEBUG) console.log('AI 음성 채팅 대화 세션이 종료되었습니다.');
   }
 }
 
 export { 
-  GeminiLiveSession,
-  generateNativeAudio,
-  processAudioToAudio,
+  SupabaseAIVoiceChat,
+  processVoiceToAI,
+  processTextToAI,
   startOrGetConversationSession,
   endConversationSession
 };
