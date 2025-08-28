@@ -440,7 +440,6 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       setCurrentState('error');
       
       // 에러 발생 시 상태 복구
->>>>>>> SJ_UI_0817_clean
       setTimeout(() => {
         initializeSession();
       }, 100);
