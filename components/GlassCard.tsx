@@ -46,39 +46,39 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   const getGlassBackground = () => {
     const isDark = colorScheme === 'dark';
     
-    // Ultra-transparent magnifying glass opacity levels
+    // Original dark glass with 10% brightness boost
     const opacityMap = {
-      light: isDark ? 0.05 : 0.08,
-      medium: isDark ? 0.08 : 0.12,
-      dark: isDark ? 0.12 : 0.15,
+      light: isDark ? 0.09 : 0.13,
+      medium: isDark ? 0.13 : 0.20,
+      dark: isDark ? 0.20 : 0.28,
     };
 
     const alpha = opacityMap[opacity];
 
     switch (variant) {
       case 'primary':
-        // Sage green magnifying glass tint
+        // Original sage with 10% brightness boost
         return isDark 
-          ? `rgba(116, 136, 115, ${alpha})` // Sage green for dark mode
-          : `rgba(116, 136, 115, ${alpha})`; // Subtle sage tint
+          ? `rgba(153, 170, 145, ${alpha * 0.8})` // Original light sage + brightness for dark mode
+          : `rgba(126, 146, 125, ${alpha})`; // Original sage (116,136,115) + 10% brightness
       case 'accent':
-        // Warm beige magnifying glass tint
+        // Original warm beige with 10% brightness boost
         return isDark 
-          ? `rgba(209, 169, 128, ${alpha})` // Warm beige for dark mode
-          : `rgba(209, 169, 128, ${alpha})`; // Warm beige glass
+          ? `rgba(219, 179, 138, ${alpha * 0.7})` // Original beige + brightness for dark mode
+          : `rgba(219, 179, 138, ${alpha})`; // Original beige (209,169,128) + 10% brightness
       case 'secondary':
       default:
-        // Ultra-clear magnifying glass with minimal tint
+        // Original light sage with 10% brightness boost
         return isDark 
-          ? `rgba(143, 160, 135, ${alpha * 0.8})` // Light sage for dark mode
-          : `rgba(248, 248, 248, ${alpha * 0.7})`; // Almost transparent with minimal warm tint
+          ? `rgba(153, 170, 145, ${alpha * 0.8})` // Light sage + brightness for dark mode
+          : `rgba(153, 170, 145, ${alpha * 0.7})`; // Original light sage (143,160,135) + 10% brightness
     }
   };
 
   // Generate strong glass block border colors with refraction
   const getBorderColor = () => {
     const isDark = colorScheme === 'dark';
-    const borderOpacity = isDark ? 0.35 : 0.3; // Much stronger for glass block effect
+    const borderOpacity = isDark ? 0.50 : 0.55; // Original dark borders + 10% boost
 
     switch (variant) {
       case 'primary':
@@ -109,22 +109,22 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     
     const blurConfig = {
       subtle: {
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: isDark ? 0.3 : 0.08,
-        shadowRadius: 4,
-        elevation: 2,
-      },
-      medium: {
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: isDark ? 0.4 : 0.12,
         shadowRadius: 6,
-        elevation: 4,
+        elevation: 3,
       },
-      strong: {
+      medium: {
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: isDark ? 0.5 : 0.15,
+        shadowOpacity: isDark ? 0.5 : 0.18,
         shadowRadius: 8,
         elevation: 6,
+      },
+      strong: {
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.6 : 0.22,
+        shadowRadius: 12,
+        elevation: 8,
       },
     };
 
@@ -213,32 +213,32 @@ const createStyles = (colors: typeof Colors.light) =>
       zIndex: 20, // Ensure content is above all glass effects
     },
     
-    // Correct Transparent Liquid Glass Background (matching Figma)
+    // Original Dark Sage Glass with 10% Brightness Boost
     liquidGlassBase: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(116, 136, 115, 0.08)', // Ultra-light sage glass - matches Figma's rgba(255,255,255,0.08)
+      backgroundColor: 'rgba(126, 146, 125, 0.16)', // Original sage (116,136,115) + 10% brightness + original 0.15 opacity + 0.01
       borderRadius: Spacing.layout.borderRadius.xl,
     },
     liquidGlassBaseDark: {
-      backgroundColor: 'rgba(143, 160, 135, 0.06)',
+      backgroundColor: 'rgba(153, 170, 145, 0.13)', // Original light sage + brightness for dark mode
     },
     
     liquidGlassLayer1: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(116, 136, 115, 0.04)', // Very subtle sage tint
+      backgroundColor: 'rgba(126, 146, 125, 0.09)', // Original sage + brightness with original 0.08 + 0.01
       borderRadius: Spacing.layout.borderRadius.xl,
     },
     liquidGlassLayer1Dark: {
-      backgroundColor: 'rgba(143, 160, 135, 0.03)',
+      backgroundColor: 'rgba(153, 170, 145, 0.07)', // Original light sage + brightness for dark mode
     },
     
     liquidGlassLayer2: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(255, 255, 255, 0.03)', // Barely visible white overlay for glass shine
+      backgroundColor: 'rgba(255, 255, 255, 0.09)', // Original 0.08 white + 10% boost = 0.09
       borderRadius: Spacing.layout.borderRadius.xl,
     },
     liquidGlassLayer2Dark: {
-      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+      backgroundColor: 'rgba(255, 255, 255, 0.06)', // Original 0.05 + 10% boost
     },
     
     // Complex Inset Shadow System (based on Figma CSS)
@@ -250,16 +250,16 @@ const createStyles = (colors: typeof Colors.light) =>
       borderLeftWidth: 2,
       borderRightWidth: 2,
       borderBottomWidth: 2,
-      borderTopColor: 'rgba(116, 136, 115, 0.6)', // Sage version of #333333
-      borderLeftColor: 'rgba(116, 136, 115, 0.6)',
-      borderRightColor: 'rgba(95, 111, 94, 0.5)', // Sage version of #262626
-      borderBottomColor: 'rgba(95, 111, 94, 0.5)',
+      borderTopColor: 'rgba(126, 146, 125, 0.65)', // Original sage (116,136,115) + brightness + original 0.6 + boost
+      borderLeftColor: 'rgba(126, 146, 125, 0.65)',
+      borderRightColor: 'rgba(105, 121, 104, 0.55)', // Original darker sage (95,111,94) + brightness + boost
+      borderBottomColor: 'rgba(105, 121, 104, 0.55)',
     },
     insetShadowDarkMode: {
-      borderTopColor: 'rgba(143, 160, 135, 0.5)',
-      borderLeftColor: 'rgba(143, 160, 135, 0.5)',
-      borderRightColor: 'rgba(74, 85, 73, 0.4)',
-      borderBottomColor: 'rgba(74, 85, 73, 0.4)',
+      borderTopColor: 'rgba(153, 170, 145, 0.55)', // Original light sage + brightness + boost
+      borderLeftColor: 'rgba(153, 170, 145, 0.55)',
+      borderRightColor: 'rgba(84, 95, 83, 0.45)', // Original dark sage (74,85,73) + brightness + boost
+      borderBottomColor: 'rgba(84, 95, 83, 0.45)',
     },
     
     insetShadowLight: {
@@ -274,19 +274,19 @@ const createStyles = (colors: typeof Colors.light) =>
       borderLeftWidth: 1,
       borderRightWidth: 1,
       borderBottomWidth: 1,
-      borderTopColor: 'rgba(255, 255, 255, 0.4)',
-      borderLeftColor: 'rgba(255, 255, 255, 0.4)',
-      borderRightColor: 'rgba(255, 255, 255, 0.2)',
-      borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+      borderTopColor: 'rgba(255, 255, 255, 0.44)', // Original 0.4 + 10% boost
+      borderLeftColor: 'rgba(255, 255, 255, 0.44)',
+      borderRightColor: 'rgba(255, 255, 255, 0.22)', // Original 0.2 + 10% boost
+      borderBottomColor: 'rgba(255, 255, 255, 0.22)',
     },
     insetShadowLightMode: {
-      borderTopColor: 'rgba(255, 255, 255, 0.3)',
-      borderLeftColor: 'rgba(255, 255, 255, 0.3)',
-      borderRightColor: 'rgba(255, 255, 255, 0.15)',
-      borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+      borderTopColor: 'rgba(255, 255, 255, 0.33)', // Original 0.3 + 10% boost
+      borderLeftColor: 'rgba(255, 255, 255, 0.33)',
+      borderRightColor: 'rgba(255, 255, 255, 0.165)', // Original 0.15 + 10% boost
+      borderBottomColor: 'rgba(255, 255, 255, 0.165)',
     },
     
-    // Inner Glow Effect - Transparent with glass-like luminosity
+    // Original Minimal Inner Glow with 10% Boost
     innerGlow: {
       position: 'absolute',
       top: 4,
@@ -294,20 +294,20 @@ const createStyles = (colors: typeof Colors.light) =>
       right: 4,
       bottom: 4,
       borderRadius: Spacing.layout.borderRadius.xl - 4,
-      backgroundColor: 'rgba(255, 255, 255, 0.02)', // Much more transparent
-      shadowColor: 'rgba(255, 255, 255, 0.5)',
+      backgroundColor: 'rgba(255, 255, 255, 0.022)', // Original 0.02 + 10% boost
+      shadowColor: 'rgba(255, 255, 255, 0.55)', // Original 0.5 + 10% boost
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.3, // Reduced for subtlety
-      shadowRadius: 8,
+      shadowOpacity: 0.33, // Original 0.3 + 10% boost
+      shadowRadius: 8, // Original radius
       elevation: 0,
     },
     innerGlowDark: {
-      backgroundColor: 'rgba(255, 255, 255, 0.01)',
-      shadowColor: 'rgba(255, 255, 255, 0.3)',
-      shadowOpacity: 0.2,
+      backgroundColor: 'rgba(255, 255, 255, 0.011)', // Original 0.01 + 10% boost
+      shadowColor: 'rgba(255, 255, 255, 0.33)', // Original 0.3 + 10% boost
+      shadowOpacity: 0.22, // Original 0.2 + 10% boost
     },
     
-    // Outer Glow Effect - Soft luminous glass effect
+    // Original Minimal Outer Glow with 10% Boost
     outerGlow: {
       position: 'absolute',
       top: 8,
@@ -315,28 +315,28 @@ const createStyles = (colors: typeof Colors.light) =>
       right: 8,
       bottom: 8,
       borderRadius: Spacing.layout.borderRadius.xl - 8,
-      backgroundColor: 'rgba(242, 242, 242, 0.03)', // Much more transparent
-      shadowColor: '#F2F2F2',
+      backgroundColor: 'rgba(242, 242, 242, 0.033)', // Original (242,242,242,0.03) + 10% boost
+      shadowColor: '#F2F2F2', // Original color
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.15, // Reduced for transparent effect
-      shadowRadius: 20,
+      shadowOpacity: 0.165, // Original 0.15 + 10% boost
+      shadowRadius: 20, // Original radius
       elevation: 0,
     },
     outerGlowDark: {
-      backgroundColor: 'rgba(200, 200, 200, 0.02)',
-      shadowColor: '#CCCCCC',
-      shadowOpacity: 0.1,
+      backgroundColor: 'rgba(200, 200, 200, 0.022)', // Original (200,200,200,0.02) + 10% boost
+      shadowColor: '#CCCCCC', // Original color
+      shadowOpacity: 0.11, // Original 0.1 + 10% boost
     },
     
-    // Enhanced Backdrop Blur Simulation (primary glass effect from Figma)
+    // Original Dark Glass Backdrop with 10% Brightness Boost
     backdropBlur: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(255, 255, 255, 0.04)', // Lighter than base layer for layered effect
+      backgroundColor: 'rgba(255, 255, 255, 0.11)', // Original 0.10 white + 10% boost = 0.11
       borderRadius: Spacing.layout.borderRadius.xl,
-      // This creates the primary glass transparency effect
+      // This restores the original dark glass effect with subtle brightness
     },
     backdropBlurDark: {
-      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+      backgroundColor: 'rgba(255, 255, 255, 0.07)', // Original 0.06 + 10% boost
     },
     
     // Enhanced magnification for liquid glass

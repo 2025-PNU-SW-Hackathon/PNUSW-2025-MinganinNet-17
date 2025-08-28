@@ -45,6 +45,7 @@ export interface VoiceChatScreenProps {
   onError?: (error: string) => void;
   onSwitchToText?: () => void; // 텍스트 모드로 전환하는 콜백 추가
   enableStepProgression?: boolean; // 단계별 진행 활성화 여부
+  customEntry?: boolean; // Custom entry animation for seamless transition
 }
 
 // 6단계 목표 설정 데이터 구조
@@ -280,6 +281,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   onError,
   onSwitchToText,
   enableStepProgression = true,
+  customEntry = false,
 }) => {
   const [currentState, setCurrentState] = useState<VoiceChatState>('idle');
   const [isPaused, setIsPaused] = useState(false);
@@ -738,6 +740,10 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   const fadeAnim = useSharedValue(0);
   const scaleAnim = useSharedValue(0.8);
   const textFadeAnim = useSharedValue(0);
+  
+  // Custom entry animation values for seamless transition
+  const visualizerFadeAnim = useSharedValue(customEntry ? 0 : 1);
+  const buttonsFadeAnim = useSharedValue(customEntry ? 0 : 1);
 
   // Typewriter animation function
   const startTypewriterAnimation = useCallback((text: string, typingSpeed: number = 40) => {
@@ -1118,15 +1124,35 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       fadeAnim.value = withTiming(1, { duration: 300 });
       scaleAnim.value = withSpring(1, { damping: 15, stiffness: 300 });
       textFadeAnim.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.quad) });
+      
+      // Custom entry animation sequence (0.7s fade in with stagger)
+      if (customEntry) {
+        // Start circular components fade in after 300ms (after background appears)
+        setTimeout(() => {
+          visualizerFadeAnim.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.quad) });
+          // Stagger buttons by 200ms
+          setTimeout(() => {
+            buttonsFadeAnim.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.quad) });
+          }, 200);
+        }, 300);
+      }
+      
       startSession();
     } else {
       fadeAnim.value = withTiming(0, { duration: 200 });
       scaleAnim.value = withTiming(0.8, { duration: 200 });
       textFadeAnim.value = withTiming(0, { duration: 200 });
+      
+      // Reset custom entry animation values
+      if (customEntry) {
+        visualizerFadeAnim.value = 0;
+        buttonsFadeAnim.value = 0;
+      }
+      
       // 세션을 즉시 종료하지 않고 유지 (대화가 끝날 때까지)
       // endSession();
     }
-  }, [visible]);
+  }, [visible, customEntry]);
 
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -1475,6 +1501,10 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
 
   const modalStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value, transform: [{ scale: scaleAnim.value }] }));
   const textStyle = useAnimatedStyle(() => ({ opacity: textFadeAnim.value }));
+  
+  // Custom entry animation styles
+  const visualizerStyle = useAnimatedStyle(() => ({ opacity: visualizerFadeAnim.value }));
+  const buttonsStyle = useAnimatedStyle(() => ({ opacity: buttonsFadeAnim.value }));
 
   // Create dynamic styles with theme colors
   const styles = createStyles(colors);
@@ -1523,35 +1553,37 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
                 ))}
               </View>
             </Animated.View>
-            <View style={styles.visualizerContainer}>
+            <Animated.View style={[styles.visualizerContainer, visualizerStyle]}>
               <VoiceVisualizer state={isPaused ? 'idle' : currentState} amplitude={0.7} />
-            </View>
+            </Animated.View>
           </TouchableOpacity>
           <VoiceChatControls onPause={() => setIsPaused(true)} onResume={() => setIsPaused(false)} isPaused={isPaused} disabled={currentState === 'idle' || currentState === 'connecting'} />
           
           {/* Report/Document button - positioned in right corner */}
-          <TouchableOpacity 
-            style={styles.reportButton} 
-            onPress={() => {
-              // Enhanced functionality: try text mode switch first, fallback to close
-              if (onSwitchToText) {
-                onSwitchToText();
-              } else {
-                handleClose();
-              }
-            }}
-            disabled={currentState === 'connecting'}
-            accessibilityRole="button"
-            accessibilityLabel="텍스트 모드로 전환"
-            accessibilityHint="두 번 탭하면 텍스트 모드로 전환합니다"
-          >
-            <MaterialIcons 
-              name="description" 
-              size={35} 
-              color={colors.text} 
-              accessible={false}
-            />
-          </TouchableOpacity>
+          <Animated.View style={buttonsStyle}>
+            <TouchableOpacity 
+              style={styles.reportButton} 
+              onPress={() => {
+                // Enhanced functionality: try text mode switch first, fallback to close
+                if (onSwitchToText) {
+                  onSwitchToText();
+                } else {
+                  handleClose();
+                }
+              }}
+              disabled={currentState === 'connecting'}
+              accessibilityRole="button"
+              accessibilityLabel="텍스트 모드로 전환"
+              accessibilityHint="두 번 탭하면 텍스트 모드로 전환합니다"
+            >
+              <MaterialIcons 
+                name="description" 
+                size={35} 
+                color={colors.text} 
+                accessible={false}
+              />
+            </TouchableOpacity>
+          </Animated.View>
         </SafeAreaView>
       </Animated.View>
     </Modal>

@@ -10,7 +10,9 @@ function AddGoalTabButton(props: any) {
   const router = useRouter();
 
   const handlePress = () => {
-    router.push('/goal-setting');
+    // Navigate to homescreen first with transition parameter to trigger fade out animation
+    // This ensures consistent transition experience from any tab (plan, report, home)
+    router.push('/(tabs)?transition=plus-button');
   };
   
   return (

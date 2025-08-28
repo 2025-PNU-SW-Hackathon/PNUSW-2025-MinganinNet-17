@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -27,7 +27,6 @@ import { DailyTodo, DailyTodosByDate } from '../../types/habit';
 import { AccentGlassCard, SecondaryGlassCard } from '../GlassCard';
 import ProfileScreen from '../ProfileScreen';
 import { SkeletonCard } from '../SkeletonLoaders';
-import VintagePaperBackground from '../VintagePaperBackground';
 import VoiceChatScreen from '../VoiceChatScreen';
 import TodoCard from './TodoCard';
 
@@ -178,6 +177,7 @@ const StreakBadge: React.FC<StreakBadgeProps> = ({ streak, status, onPress, puls
 
 export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const styles = createStyles(colors);
@@ -204,9 +204,13 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     return () => clearTimeout(timeout);
   }, [loading]);
 
+
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
   const [reportVoiceChatVisible, setReportVoiceChatVisible] = useState(false);
+  
+  // Custom transition animation state
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Use selectedDate from props if provided, otherwise use internal state
   const targetDate = selectedDate || internalSelectedDate;
@@ -232,6 +236,11 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const streakPulseAnimation = useRef(new Animated.Value(1)).current;
   const plantGrowAnimation = useRef(new Animated.Value(1)).current;
   const streakCelebrationAnimation = useRef(new Animated.Value(1)).current;
+  
+  // Custom transition animations (reuse existing ones where possible)
+  const profileHeaderFadeAnimation = useRef(new Animated.Value(1)).current;
+  const calendarFadeAnimation = useRef(new Animated.Value(1)).current;
+  const micButtonFadeAnimation = useRef(new Animated.Value(1)).current;
 
   // 1. db에서 인자로 입력받은 날짜의 할 일 목록 가져와서 로컬 상태에 추가
   const fetchTodosForDate = async (date: string) => {
@@ -257,6 +266,18 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       fetchTodosForDate(targetDate);
     }
   }, [targetDate]);
+
+  // 5. + Button transition detection - trigger fade out when coming from plus button
+  useEffect(() => {
+    if (params.transition === 'plus-button') {
+      // Small delay to ensure HomeScreen is fully mounted before triggering animation
+      const timer = setTimeout(() => {
+        startCustomTransition('goal-setting-from-plus');
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [params.transition, startCustomTransition]);
 
   // 2. 저장된 로컬 상태 중에서, targetDate에 해당하는 할 일 목록 가져오기
   const todosForSelectedDate = useMemo(() => {
@@ -362,13 +383,138 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   }, []);
 
   const handleVoiceChatOpen = useCallback((): void => {
-    setVoiceChatVisible(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, []);
+    startCustomTransition('voice-chat');
+  }, [startCustomTransition]);
 
   const handleVoiceChatClose = useCallback((): void => {
     setVoiceChatVisible(false);
-  }, []);
+    // Restore components with animation when returning from voice chat
+    if (isTransitioning) {
+      setTimeout(restoreComponentsAnimation, 100);
+    }
+  }, [isTransitioning, restoreComponentsAnimation]);
+
+  // Delayed restoration helper - restores HomeScreen after screen transition completes
+  const restoreHomeScreenDelayed = useCallback((): void => {
+    // Set all animation values to 1 after delay (user can't see HomeScreen during transition)
+    profileHeaderFadeAnimation.setValue(1);
+    calendarFadeAnimation.setValue(1);
+    coachFadeAnimation.setValue(1);
+    todoFadeAnimation.setValue(1);
+    micButtonFadeAnimation.setValue(1);
+    goalFadeAnimation.setValue(1);
+    setIsTransitioning(false);
+  }, [profileHeaderFadeAnimation, calendarFadeAnimation, coachFadeAnimation, todoFadeAnimation, micButtonFadeAnimation, goalFadeAnimation]);
+
+  // Custom transition animation controller
+  const startCustomTransition = useCallback((destination: 'goal-setting' | 'voice-chat' | 'goal-setting-from-plus'): void => {
+    if (isTransitioning) return; // Prevent multiple transitions
+    
+    setIsTransitioning(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    
+    // Sequential fade out animation with custom timing for todo card (reliable version)
+    // Also sync content animations to prevent glass/content mismatch
+    Animated.sequence([
+      // Immediate fadeout group (0ms) - Profile header and todo card together
+      Animated.parallel([
+        Animated.timing(profileHeaderFadeAnimation, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(todoFadeAnimation, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        // Sync goal content animation too (if it exists)
+        Animated.timing(goalFadeAnimation, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]),
+      // Small delay, then calendar
+      Animated.delay(30),
+      Animated.timing(calendarFadeAnimation, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      // Small delay, then coach
+      Animated.delay(30),
+      Animated.timing(coachFadeAnimation, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      // Small delay, then mic button
+      Animated.delay(30),
+      Animated.timing(micButtonFadeAnimation, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Navigate after animation completes
+      if (destination === 'goal-setting') {
+        router.push('/goal-setting');
+        // Wait 1.5s for screen transition to complete before restoring HomeScreen
+        setTimeout(restoreHomeScreenDelayed, 1500);
+      } else if (destination === 'goal-setting-from-plus') {
+        router.push('/goal-setting');
+        // Wait 1.5s for screen transition to complete before restoring HomeScreen
+        setTimeout(restoreHomeScreenDelayed, 1500);
+      } else if (destination === 'voice-chat') {
+        setVoiceChatVisible(true);
+        // Don't restore - user still on HomeScreen with modal
+      }
+    });
+  }, [isTransitioning, router, profileHeaderFadeAnimation, calendarFadeAnimation, coachFadeAnimation, todoFadeAnimation, micButtonFadeAnimation, goalFadeAnimation, restoreHomeScreenDelayed]);
+
+  // Restore components when returning from transitions
+  const restoreComponentsAnimation = useCallback((): void => {
+    if (!isTransitioning) return;
+    
+    setIsTransitioning(false);
+    
+    // Smooth fade back in (faster to match fade out speed)
+    // Sync all content animations to restore properly
+    Animated.parallel([
+      Animated.timing(profileHeaderFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(calendarFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(coachFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(todoFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(micButtonFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      // Restore goal content animation too
+      Animated.timing(goalFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [isTransitioning, profileHeaderFadeAnimation, calendarFadeAnimation, coachFadeAnimation, todoFadeAnimation, micButtonFadeAnimation, goalFadeAnimation]);
 
   const handleStreakPress = useCallback((): void => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -814,10 +960,10 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   }
 
   return (
-    <VintagePaperBackground style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerArea}>
+        <Animated.View style={[styles.headerArea, { opacity: profileHeaderFadeAnimation }]}>
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
               {/* Plant and Streak Row */}
@@ -902,6 +1048,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
 
           <Text style={styles.greetingText}>{getGreeting()}</Text>
 
+          <Animated.View style={{ opacity: calendarFadeAnimation }}>
           <SecondaryGlassCard
             blur="subtle"
             opacity="light"
@@ -955,7 +1102,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
               })}
             </ScrollView>
           </SecondaryGlassCard>
-        </View>
+          </Animated.View>
+        </Animated.View>
 
         <View style={styles.mainContent}>
           {/* Enhanced Coach Card with GlassCard */}
@@ -1023,7 +1171,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
           {/* Enhanced Todo Card with GlassCard */}
           <Animated.View 
             style={[
-              { transform: [{ scale: celebrationScale }] }
+              { transform: [{ scale: celebrationScale }] },
+              { opacity: todoFadeAnimation }
             ]}
           >
             <SecondaryGlassCard
@@ -1053,21 +1202,29 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       </ScrollView>
 
       {/* Floating Voice Chat Button */}
-      <TouchableOpacity
-        style={styles.floatingVoiceButton}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-          handleVoiceChatOpen();
-        }}
-        activeOpacity={0.85}
-        onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-      >
-        <Text style={styles.voiceButtonIcon}>🎤</Text>
-      </TouchableOpacity>
+      <Animated.View style={{ opacity: micButtonFadeAnimation }}>
+        <TouchableOpacity
+          style={styles.floatingVoiceButton}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            handleVoiceChatOpen();
+          }}
+          activeOpacity={0.85}
+          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+        >
+          <Text style={styles.voiceButtonIcon}>🎤</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Voice Chat Modals */}
       {voiceChatVisible && (
-          <VoiceChatScreen visible={voiceChatVisible} mode="plan" onClose={handleVoiceChatClose} onComplete={handleVoiceCommand} />
+          <VoiceChatScreen 
+            visible={voiceChatVisible} 
+            mode="plan" 
+            onClose={handleVoiceChatClose} 
+            onComplete={handleVoiceCommand}
+            customEntry={isTransitioning}
+          />
       )}
       {reportVoiceChatVisible && (
           <VoiceChatScreen visible={reportVoiceChatVisible} mode="report" onClose={() => setReportVoiceChatVisible(false)} onComplete={handleReportCreationComplete} />
@@ -1097,13 +1254,19 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         </View>
       </Modal>
       </SafeAreaView>
-    </VintagePaperBackground>
+    </View>
   );
 }
 
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  container: { flex: 1 },
-  safeArea: { flex: 1 },
+  container: { 
+    flex: 1,
+    backgroundColor: colors.background, // Solid background matching voice chat
+  },
+  safeArea: { 
+    flex: 1,
+    backgroundColor: colors.background, // Consistent background
+  },
   scrollView: { flex: 1 },
   headerArea: { 
     paddingHorizontal: Spacing.screen.paddingHorizontal, 
