@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { Colors } from '../../constants/Colors';
-import { useColorScheme } from '../../hooks/useColorScheme';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 export default function ConsultationScreen() {
   const colorScheme = useColorScheme();

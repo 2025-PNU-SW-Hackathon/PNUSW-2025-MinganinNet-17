@@ -1,10 +1,11 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, SafeAreaView, Dimensions } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { WeeklyReportFromSupabase } from '../../../../backend/supabase/reports';
 import { Colors } from '../../../../constants/Colors';
 import { useColorScheme } from '../../../../hooks/useColorScheme';
 import { WeeklyLineChart } from '../../components/WeeklyLineChart';
-import { getScoreStatus, formatScore, generateChartData } from '../../utils/scoreUtils';
+import { WeekNavigator } from '../../components/weekly_Navigator';
+import { formatScore, generateChartData, getScoreStatus } from '../../utils/scoreUtils';
 
 // Get screen dimensions
 const { width: screenWidth } = Dimensions.get('window');
@@ -33,16 +34,28 @@ const mapWeeklyReportFromSupabase = (report: WeeklyReportFromSupabase): WeeklyRe
   };
 };
 
+type ReportView = 'daily' | 'weekly';
+
 interface WeeklyReportResultProps {
   weeklyReport: WeeklyReportFromSupabase;
   onBack: () => void;
   onStartChat?: () => void;
+  currentWeekIndex: number;
+  weeklyReportsLength: number;
+  onNavigate: (index: number) => void;
+  selectedView?: ReportView;
+  onViewChange?: (view: ReportView) => void;
 }
 
 export default function WeeklyReportResult({ 
   weeklyReport, 
   onBack,
-  onStartChat 
+  onStartChat,
+  currentWeekIndex,
+  weeklyReportsLength,
+  onNavigate,
+  selectedView = 'weekly',
+  onViewChange
 }: WeeklyReportResultProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -57,26 +70,72 @@ export default function WeeklyReportResult({
   // Calculate overall average (mock data for now)
   const overallAverage = 8.63;
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.figma.white }]}>
-      {/* Header Section with coral background */}
-      <View style={[styles.headerSection, { backgroundColor: colors.figma.critical }]}>
-        {/* Back button */}
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>‹</Text>
-        </TouchableOpacity>
-        
-        {/* Filter buttons */}
-        <View style={styles.filterButtons}>
-          <TouchableOpacity style={[styles.filterButton, styles.activeFilter]}>
-            <Text style={styles.filterButtonText}>월간 리포트 분석</Text>
-            <Text style={styles.filterButtonIcon}>▼</Text>
+  // View Selector Component
+  const ViewSelector = () => {
+    if (!onViewChange) return null;
+    
+    return (
+      <View style={styles.selectorContainer}>
+        <View style={styles.segmentedControl}>
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              selectedView === 'daily' 
+                ? [styles.segmentButtonActive, { backgroundColor: colors.tint }]
+                : styles.segmentButtonInactive
+            ]}
+            onPress={() => onViewChange('daily')}
+            activeOpacity={0.7}
+          >
+            <Text style={[
+              styles.segmentText,
+              selectedView === 'daily' 
+                ? [styles.segmentTextActive, { color: colors.surface }]
+                : [styles.segmentTextInactive, { color: colors.text }]
+            ]}>
+              일간 리포트
+            </Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.filterButton}>
-            <Text style={styles.filterButtonText}>지난 3개월간 트래킹</Text>
-            <Text style={styles.filterButtonIcon}>📅</Text>
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              selectedView === 'weekly' 
+                ? [styles.segmentButtonActive, { backgroundColor: colors.tint }]
+                : styles.segmentButtonInactive
+            ]}
+            onPress={() => onViewChange('weekly')}
+            activeOpacity={0.7}
+          >
+            <Text style={[
+              styles.segmentText,
+              selectedView === 'weekly' 
+                ? [styles.segmentTextActive, { color: colors.surface }]
+                : [styles.segmentTextInactive, { color: colors.text }]
+            ]}>
+              주간 리포트
+            </Text>
           </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      {/* View Selector */}
+      <ViewSelector />
+      
+      {/* Header Section with coral background */}
+      <View style={[styles.headerSection, { backgroundColor: colors.figma.critical }]}>
+        {/* Navigation buttons */}
+        <View style={styles.navigationContainer}>
+          <WeekNavigator 
+            currentWeekIndex={currentWeekIndex}
+            currentWeekReportGenerated={true}
+            weeklyReportsLength={weeklyReportsLength}
+            onNavigate={onNavigate}
+          />
         </View>
       </View>
 
@@ -90,11 +149,6 @@ export default function WeeklyReportResult({
           {/* Title */}
           <Text style={[styles.cardTitle, { color: colors.figma.darkGray }]}>
             일간 달성률 분석 결과
-          </Text>
-          
-          {/* Overall Average */}
-          <Text style={[styles.overallAverageText, { color: colors.figma.darkGray }]}>
-            전체 평균 달성률 : {overallAverage} 점
           </Text>
           
           {/* Score Section */}
@@ -114,6 +168,11 @@ export default function WeeklyReportResult({
             </View>
           </View>
           
+          {/* Overall Average */}
+          <Text style={[styles.overallAverageText, { color: colors.figma.darkGray }]}>
+            전체 평균 달성률 : {overallAverage} 점
+          </Text>
+          
           {/* Chart */}
           <View style={styles.chartContainer}>
             <WeeklyLineChart 
@@ -123,20 +182,16 @@ export default function WeeklyReportResult({
             />
           </View>
           
-          {/* Analysis Text */}
-          <View style={styles.analysisContainer}>
+          {/* Analysis Text - Scrollable */}
+          <ScrollView 
+            style={styles.analysisScrollContainer}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+          >
             <Text style={[styles.analysisText, { color: colors.figma.darkGray }]}>
-              마지막 주가 조금 아쉽지만, 이번 달도 높은 달성률을 유지하고 있어. 잘 하고 있는데?
+              {currentWeekData.insights}
             </Text>
-            
-            <Text style={[styles.analysisText, { color: colors.figma.darkGray }]}>
-              특히나 눈에 띄는건 지난 7월이야. 내가 내줬던 수동태-비 수동태 문법 과제들과 단어 연습을 훌륭하게 해냈어.
-            </Text>
-            
-            <Text style={[styles.analysisText, { color: colors.figma.darkGray }]}>
-              자세한 내용은 서로 대화하면서 분석해보자고.
-            </Text>
-          </View>
+          </ScrollView>
         </View>
         
         {/* CTA Button */}
@@ -159,69 +214,93 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     paddingTop: 32,
     paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
-    height: 259,
+    height: 320,
+    zIndex: 0,
   },
-  backButton: {
-    position: 'absolute',
-    top: 32,
-    left: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#10152C',
-    fontWeight: 'bold',
-  },
-  filterButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 93 - 32,
+  navigationContainer: {
+    marginTop: 30,
     paddingHorizontal: 7,
   },
-  filterButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderRadius: 50,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    flexDirection: 'row',
+  selectorContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 20,
     alignItems: 'center',
-    maxWidth: screenWidth * 0.45,
+    zIndex: 10,
+    position: 'relative',
   },
-  activeFilter: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  segmentedControl: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 4,
+    width: '100%',
+    maxWidth: 300,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  filterButtonText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#10152C',
-    marginRight: 6,
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  filterButtonIcon: {
-    fontSize: 12,
-    color: '#10152C',
+  segmentButtonActive: {
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentButtonInactive: {
+    backgroundColor: 'transparent',
+    opacity: 0.5,
+  },
+  segmentText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  segmentTextActive: {
+    fontWeight: '700',
+  },
+  segmentTextInactive: {
+    opacity: 0.7,
   },
   scrollContent: {
     flex: 1,
+    paddingTop: 100,
   },
   scrollContainer: {
     paddingHorizontal: 27,
-    paddingTop: 17,
+    paddingTop: 5,
     paddingBottom: 100,
   },
   mainCard: {
     borderRadius: 40,
-    padding: 24,
+    padding: 20,
     marginBottom: 24,
-    marginTop: -90,
+    marginTop: -70,
+    zIndex: 2,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -235,17 +314,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 20,
-    marginTop: 8,
+    marginTop: 23,
   },
   overallAverageText: {
-    fontSize: 11,
-    marginBottom: 16,
+    fontSize: 13,
+    marginBottom: 13,
   },
   scoreSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 24,
+    marginBottom: 9,
   },
   scoreContainer: {
     flex: 1,
@@ -254,7 +333,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   currentScoreLabel: {
-    fontSize: 11,
+    fontSize: 13,
     marginBottom: 4,
   },
   currentScoreValue: {
@@ -278,8 +357,10 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     alignItems: 'center',
   },
-  analysisContainer: {
-    marginTop: 16,
+  analysisScrollContainer: {
+    marginTop: 12,
+    height: 160,
+    maxHeight: 160,
   },
   analysisText: {
     fontSize: 14,

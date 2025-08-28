@@ -1380,6 +1380,16 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   debugToggleText: {
     fontSize: 14,
   },
+  debugToggle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.neutral[300],
+  },
 }); 
 
 

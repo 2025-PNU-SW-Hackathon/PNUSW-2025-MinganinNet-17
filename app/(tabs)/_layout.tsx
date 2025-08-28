@@ -1,28 +1,25 @@
-import { Tabs } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { Tabs, useRouter } from 'expo-router';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import { IconSymbol } from '../../components/ui/IconSymbol';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../hooks/useColorScheme';
 
-// Simple Figma-style tab button component
-function FigmaTabButton(props: any) {
-  const isActive = props.accessibilityState?.selected;
+// Custom Add Goal button component with navigation
+function AddGoalTabButton(props: any) {
+  const router = useRouter();
+
+  const handlePress = () => {
+    router.push('/goal-setting');
+  };
   
   return (
     <TouchableOpacity
-      {...props}
-      style={styles.figmaTab}
-      activeOpacity={0.7}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        props.onPress?.();
-      }}
+      style={styles.addGoalButton}
+      activeOpacity={0.8}
+      onPress={handlePress}
     >
-      <View style={styles.figmaTabContent}>
-        {props.children}
-      </View>
+      <Text style={styles.plusEmoji}>➕</Text>
     </TouchableOpacity>
   );
 }
@@ -34,109 +31,82 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.figma.darkGray,
-        tabBarInactiveTintColor: colors.figma.darkGray,
+        tabBarActiveTintColor: colors.tint,
+        tabBarInactiveTintColor: colors.tabIconDefault,
         headerShown: false,
         tabBarStyle: {
-          height: 84,
-          backgroundColor: colors.figma.menuBg,
-          borderTopLeftRadius: 40,
-          borderTopRightRadius: 40,
-          borderTopWidth: 0,
-          paddingTop: 12,
-          paddingBottom: 8,
-          paddingHorizontal: 20,
-          shadowColor: '#000',
-          shadowOffset: {
-            width: 0,
-            height: -2,
-          },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          elevation: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
-          fontFamily: 'Karla',
-          marginTop: 4,
-        },
-        tabBarIconStyle: {
-          marginBottom: 0,
-        },
-        tabBarItemStyle: {
-          paddingVertical: 4,
+          backgroundColor: colors.background,
+          borderTopColor: colors.tabIconDefault,
+          borderTopWidth: 1,
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: '홈',
+          title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
-              size={24} 
+              size={focused ? 28 : 24} 
               name="house.fill" 
               color={color} 
             />
           ),
-          tabBarButton: FigmaTabButton,
-        }}
-      />
-      <Tabs.Screen
-        name="report"
-        options={{
-          title: '리포트',
-          tabBarIcon: ({ color, focused }) => (
-            <IconSymbol 
-              size={24} 
-              name="chart.bar.fill" 
-              color={color} 
-            />
-          ),
-          tabBarButton: FigmaTabButton,
         }}
       />
       <Tabs.Screen
         name="plan"
         options={{
-          title: '일정',
+          title: 'Plan',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
-              size={24} 
+              size={focused ? 28 : 24} 
               name="calendar" 
               color={color} 
             />
           ),
-          tabBarButton: FigmaTabButton,
         }}
       />
       <Tabs.Screen
-        name="consultation"
+        name="report"
         options={{
-          title: 'Routy와 상담',
+          title: 'Report',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
-              size={24} 
-              name="message.fill" 
+              size={focused ? 28 : 24} 
+              name="chart.bar" 
               color={color} 
             />
           ),
-          tabBarButton: FigmaTabButton,
         }}
       />
+      <Tabs.Screen
+        name="add-goal"
+        options={{
+          title: 'Add Goal',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol 
+              size={focused ? 28 : 24} 
+              name="plus" 
+              color={color} 
+            />
+          ),
+          tabBarButton: () => <AddGoalTabButton />,
+        }}
+      />
+
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  figmaTab: {
+  addGoalButton: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    alignItems: 'center',
   },
-  figmaTabContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  plusEmoji: {
+    fontSize: 18,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
