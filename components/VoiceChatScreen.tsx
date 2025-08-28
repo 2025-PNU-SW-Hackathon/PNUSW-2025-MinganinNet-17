@@ -157,41 +157,44 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
     console.log('[음성채팅] 세션 정리 완료');
   }, []);
 
-  // 컴포넌트가 마운트되거나 mode가 변경될 때 세션 초기화
+  // 통합된 세션 및 애니메이션 관리
   useEffect(() => {
     if (visible && mode) {
-      // 이전 세션 정리 후 새로운 세션 시작
-      cleanupSession();
-      
-      const subscription = AppState.addEventListener('change', (nextAppState) => {
-        if (nextAppState.match(/inactive|background/) && visible) {
-          // AppState 변경 시에도 세션 유지 (대화가 끝날 때까지)
-          // endSession().then(() => onClose());
-          onClose();
-        }
-      });
-      return () => subscription.remove();
-    }
-  }, [visible, mode, onClose]);
-
-  useEffect(() => {
-    if (visible) {
+      // 애니메이션 시작
       fadeAnim.value = withTiming(1, { duration: 300 });
       scaleAnim.value = withSpring(1, { damping: 15, stiffness: 300 });
       textFadeAnim.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.quad) });
       
-      
+      // 세션 초기화 (중복 cleanup 제거)
       initializeSession();
+      
+      // AppState 리스너 설정
+      const subscription = AppState.addEventListener('change', (nextAppState) => {
+        if (nextAppState.match(/inactive|background/) && visible) {
+          // AppState 변경 시에도 세션 유지 (대화가 끝날 때까지)
+          onClose();
+        }
+      });
+      
+      return () => subscription.remove();
     } else {
+      // 애니메이션 정리
       fadeAnim.value = withTiming(0, { duration: 200 });
       scaleAnim.value = withTiming(0.8, { duration: 200 });
       textFadeAnim.value = withTiming(0, { duration: 200 });
       
-      
-      // 세션을 즉시 종료하지 않고 유지 (대화가 끝날 때까지)
-      // endSession();
+      // 세션은 컴포넌트 언마운트 시에만 정리
     }
-  }, [visible, initializeSession]);
+  }, [visible, mode, onClose]);
+
+  // 컴포넌트 언마운트 시에만 세션 정리
+  useEffect(() => {
+    return () => {
+      if (sessionId) {
+        cleanupSession();
+      }
+    };
+  }, [sessionId, cleanupSession]);
 
   const audioChunksRef = useRef<Blob[]>([]);
 
