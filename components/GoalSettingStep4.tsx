@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useHabitStore } from '../lib/habitStore';
 import DebugNextButton from './DebugNextButton';
@@ -10,12 +10,14 @@ interface GoalSettingStep4Props {
   onNext?: (intensity: string) => void;
   onBack?: () => void;
   initialValue?: string;
+  collectedGoalInfo?: any; // 음성으로 수집된 목표 정보
 }
 
 export default function GoalSettingStep4({
   onNext,
   onBack,
-  initialValue = ''
+  initialValue = '',
+  collectedGoalInfo
 }: GoalSettingStep4Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
@@ -23,6 +25,24 @@ export default function GoalSettingStep4({
   const [selectedIntensity, setSelectedIntensity] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setIntensity } = useHabitStore();
+
+  // collectedGoalInfo에서 강도 정보 추출하여 미리 채우기
+  useEffect(() => {
+    if (collectedGoalInfo?.intensity) {
+      // AI가 말한 강도를 버튼 옵션에 맞게 매핑
+      let intensityToSet = '보통'; // 기본값
+      
+      if (collectedGoalInfo.intensity.includes('높') || collectedGoalInfo.intensity.includes('강하게')) {
+        intensityToSet = '높음';
+      } else if (collectedGoalInfo.intensity.includes('낮') || collectedGoalInfo.intensity.includes('가볍게')) {
+        intensityToSet = '낮음';
+      } else {
+        intensityToSet = '보통';
+      }
+      
+      setSelectedIntensity(intensityToSet);
+    }
+  }, [collectedGoalInfo]);
 
   const intensityOptions = [
     { id: '높음', label: '높음 - 강하게 동기부여하고 꾸준히 체크해주세요' },
@@ -122,6 +142,8 @@ export default function GoalSettingStep4({
         <Text style={styles.subtitle}>
           Routy가 당신을 어떻게 도와드릴지 알려주세요.
         </Text>
+        
+
       </View>
 
       <View style={styles.optionsContainer}>
@@ -266,6 +288,28 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textSecondary,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  aiCollectedInfo: {
+    backgroundColor: 'rgba(108, 99, 255, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(108, 99, 255, 0.3)',
+  },
+  aiCollectedTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  aiCollectedSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

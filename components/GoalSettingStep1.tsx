@@ -24,19 +24,23 @@ interface GoalSettingStep1Props {
   onNext?: (habitGoal: string) => void;
   onBack?: () => void;
   initialValue?: string;
+  collectedGoalInfo?: any; // 음성으로 수집된 목표 정보
+  onUpdateCollectedGoalInfo?: (goalInfo: any) => void; // 수집된 목표 정보 업데이트
 }
 
 export default function GoalSettingStep1({
   onNext,
   onBack,
-  initialValue = ''
+  initialValue = '',
+  collectedGoalInfo,
+  onUpdateCollectedGoalInfo
 }: GoalSettingStep1Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const styles = createStyles(colors);
-  const [habitText, setHabitText] = useState(initialValue);
+  const [habitText, setHabitText] = useState(initialValue || collectedGoalInfo?.goal || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(!collectedGoalInfo || Object.keys(collectedGoalInfo).length === 0); // AI 수집 정보가 없으면 음성모드
   const [isLoadingRouty, setIsLoadingRouty] = useState(true);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
   const {
@@ -47,9 +51,18 @@ export default function GoalSettingStep1({
     setIntensity,
   } = useHabitStore();
 
+  // collectedGoalInfo가 변경될 때 habitText 업데이트
+  useEffect(() => {
+    if (collectedGoalInfo?.goal && !habitText) {
+      setHabitText(collectedGoalInfo.goal);
+    }
+  }, [collectedGoalInfo, habitText]);
+
   // Auto-transition from welcome screen to voice chat
   useEffect(() => {
     if (showWelcome) {
+      console.log('🎉 Welcome screen activated, starting voice chat auto-transition...');
+      
       // Clear any existing conversation history
       useHabitStore.getState().clearConversationHistory();
       
@@ -192,36 +205,87 @@ export default function GoalSettingStep1({
       console.log('🎯 Voice goal setting completed, processing data...', data);
       setIsSubmitting(true);
 
-      // 음성으로 설정된 목표 정보를 추출하여 상태에 저장
-      const extractedData = data;
-      
-      if (extractedData.habitName) setHabitName(extractedData.habitName);
-      if (extractedData.goalPeriod) setGoalPeriod(extractedData.goalPeriod);
-      if (extractedData.availableTime) setAvailableTime(extractedData.availableTime);
-      if (extractedData.difficultyReason) setDifficultyReason(extractedData.difficultyReason);
-      if (extractedData.intensity) setIntensity(extractedData.intensity);
-
-      // action 필드 확인하여 처리
-      if (extractedData.action === 'GOAL_SETTING_COMPLETE') {
-        // 음성 채팅 완료 시 GoalSettingStep5로 직접 이동
-        console.log('✅ Voice goal setting data processed, proceeding to GoalSettingStep5');
+      // VoiceChatScreen에서 받은 데이터 처리
+      if (data.collectedGoalInfo) {
+        console.log('🎯 Received collectedGoalInfo:', data.collectedGoalInfo);
+        
+        // 수집된 목표 정보를 MainApp으로 전달 (이것이 핵심!)
+        if (onUpdateCollectedGoalInfo) {
+          console.log('🎯 MainApp으로 collectedGoalInfo 전달:', data.collectedGoalInfo);
+          onUpdateCollectedGoalInfo(data.collectedGoalInfo);
+        }
+        
+        // AI 수집 정보를 habitStore에도 저장 (Step5에서 표시하기 위해)
+        console.log('🏪 AI 수집 정보를 habitStore에 저장:', data.collectedGoalInfo);
+        
+        if (data.collectedGoalInfo.goal) {
+          setHabitName(data.collectedGoalInfo.goal);
+        }
+        if (data.collectedGoalInfo.period) {
+          setGoalPeriod(data.collectedGoalInfo.period);
+        }
+        if (data.collectedGoalInfo.time) {
+          setAvailableTime(data.collectedGoalInfo.time);
+        }
+        if (data.collectedGoalInfo.difficulty) {
+          setDifficultyReason(data.collectedGoalInfo.difficulty);
+        }
+        if (data.collectedGoalInfo.intensity) {
+          setIntensity(data.collectedGoalInfo.intensity);
+        }
+        
+        // 목표 설정이 완료되었으면 GoalSettingStep5로 이동
+        if (data.goalSettingComplete) {
+          console.log('✅ Voice goal setting completed, moving to GoalSettingStep5');
+          
+          Alert.alert('목표 설정 완료', '음성으로 설정된 목표 정보가 저장되었습니다. 최종 확인 단계로 이동합니다.');
+          
+          if (onNext) {
+            onNext('VOICE_COMPLETE_JUMP_TO_STEP5');
+          }
+        } else if (data.nextScreen) {
+          // 다음 단계로 이동
+          console.log('✅ Moving to next step:', data.nextScreen);
+          
+          // 여기서는 단계별 이동이므로 collectedGoalInfo만 업데이트
+          // 실제 화면 이동은 MainApp에서 처리
+        }
+      } else if (data.goalSettingComplete) {
+        // collectedGoalInfo가 없어도 goalSettingComplete가 true면 완료로 처리
+        console.log('✅ Voice goal setting completed (no collectedGoalInfo), moving to GoalSettingStep5');
         
         Alert.alert('목표 설정 완료', '음성으로 설정된 목표 정보가 저장되었습니다. 최종 확인 단계로 이동합니다.');
         
-        // GoalSettingStep5로 직접 이동 (onNext 대신)
-        // 여기서는 단계별 이동이 아니라 최종 단계로 점프
         if (onNext) {
-          // GoalSettingStep5로 이동하기 위해 특별한 신호 전달
           onNext('VOICE_COMPLETE_JUMP_TO_STEP5');
         }
       } else {
-        // 일반적인 다음 단계 진행
-        console.log('✅ Voice goal setting data processed, proceeding to next step');
+        // 기존 로직 (하위 호환성)
+        const extractedData = data;
         
-        Alert.alert('목표 설정 완료', '음성으로 설정된 목표 정보가 저장되었습니다. 다음 단계를 진행해주세요.');
-        
-        if (onNext) {
-          onNext(extractedData.habitName || '음성 설정 목표');
+        if (extractedData.habitName) setHabitName(extractedData.habitName);
+        if (extractedData.goalPeriod) setGoalPeriod(extractedData.goalPeriod);
+        if (extractedData.availableTime) setAvailableTime(extractedData.availableTime);
+        if (extractedData.difficultyReason) setDifficultyReason(extractedData.difficultyReason);
+        if (extractedData.intensity) setIntensity(extractedData.intensity);
+
+        // action 필드 확인하여 처리
+        if (extractedData.action === 'GOAL_SETTING_COMPLETE') {
+          console.log('✅ Voice goal setting data processed, proceeding to GoalSettingStep5');
+          
+          Alert.alert('목표 설정 완료', '음성으로 설정된 목표 정보가 저장되었습니다. 최종 확인 단계로 이동합니다.');
+          
+          if (onNext) {
+            onNext('VOICE_COMPLETE_JUMP_TO_STEP5');
+          }
+        } else {
+          console.log('✅ Voice goal setting data processed, proceeding to next step');
+          
+          Alert.alert('목표 설정 완료', '음성으로 설정된 목표 정보가 저장되었습니다. 다음 단계를 진행해주세요.');
+          
+          if (onNext) {
+            onNext(extractedData.habitName || '음성 설정 목표');
+          }
         }
       }
 
@@ -329,6 +393,7 @@ export default function GoalSettingStep1({
           enableStepProgression={true}
           onClose={() => setVoiceChatVisible(false)}
           onComplete={handleVoiceGoalSettingComplete}
+          isNewGoal={true} // 새로운 목표 추가 모드
           onSwitchToText={() => {
             setVoiceChatVisible(false);
             setShowWelcome(false);
@@ -398,6 +463,7 @@ export default function GoalSettingStep1({
         enableStepProgression={true}
         onClose={() => setVoiceChatVisible(false)}
         onComplete={handleVoiceGoalSettingComplete}
+        isNewGoal={true} // 새로운 목표 추가 모드
         onSwitchToText={() => {
           setVoiceChatVisible(false);
           // 음성 모드에서 수집된 정보가 있다면 다음 단계로 진행
@@ -554,5 +620,27 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   dot3: {
     opacity: 1,
+  },
+  aiCollectedInfo: {
+    backgroundColor: 'rgba(108, 99, 255, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(108, 99, 255, 0.3)',
+  },
+  aiCollectedTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  aiCollectedSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

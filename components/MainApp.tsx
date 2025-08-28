@@ -31,6 +31,7 @@ interface AppData {
   timeData: any; // Changed to any to avoid type errors
   coachingIntensity: string;
   habitData: HabitData | null;
+  collectedGoalInfo?: any; // 음성으로 수집된 목표 정보
 }
 
 export default function MainApp() {
@@ -46,14 +47,23 @@ export default function MainApp() {
     timeData: null,
     coachingIntensity: '',
     habitData: null,
+    collectedGoalInfo: null,
   });
 
   // (tabs) 경로일 때 목표 확인 및 goalStep1으로 이동
   useEffect(() => {
     const checkGoalAndNavigate = async () => {
-      if (pathname === '/(tabs)' && currentScreen === 'home') {
+      if (pathname === '/(tabs)') {
         try {
           console.log('🔍 (tabs) 경로에서 목표 확인 시작');
+          console.log('📱 현재 화면:', currentScreen);
+          
+          // 이미 goalStep1 화면이면 목표 확인 건너뛰기
+          if (currentScreen === 'goalStep1') {
+            console.log('🎯 이미 목표 설정 화면에 있음 - 건너뛰기');
+            return;
+          }
+          
           const activePlan = await getActivePlan();
           
           if (!activePlan) {
@@ -61,6 +71,9 @@ export default function MainApp() {
             setCurrentScreen('goalStep1');
           } else {
             console.log('✅ 목표가 있음 - 홈 화면 유지');
+            if (currentScreen !== 'home') {
+              setCurrentScreen('home');
+            }
           }
         } catch (error) {
           console.error('❌ 목표 확인 중 오류:', error);
@@ -70,7 +83,12 @@ export default function MainApp() {
       }
     };
 
-    checkGoalAndNavigate();
+    // 초기 로딩 시에도 목표 확인
+    if (pathname === '/(tabs)' && currentScreen === 'splash') {
+      checkGoalAndNavigate();
+    } else {
+      checkGoalAndNavigate();
+    }
   }, [pathname, currentScreen]);
 
   // Splash Screen handlers
@@ -91,14 +109,19 @@ export default function MainApp() {
       
       if (activePlan) {
         // 이미 목표가 있으면 바로 메인 화면으로
+        console.log('✅ 목표가 있음 - 홈 화면으로 이동');
+        setCurrentScreen('home');
         router.replace('/(tabs)');
       } else {
         // 목표가 없으면 목표 설정으로
+        console.log('🎯 목표가 없음 - 목표 설정 화면으로 이동');
         setCurrentScreen('goalStep1');
+        // 목표가 없을 때는 router.replace를 호출하지 않음
       }
     } catch (error) {
       console.error('Error checking user plan:', error);
       // 에러가 발생하면 기본적으로 목표 설정으로 이동
+      console.log('🚨 에러 발생 - 목표 설정 화면으로 이동');
       setCurrentScreen('goalStep1');
     }
   };
@@ -136,9 +159,23 @@ export default function MainApp() {
     console.log('📱 Screen should now be: goalStep2');
   };
 
+  // 음성 채팅에서 수집된 목표 정보 업데이트
+  const updateCollectedGoalInfo = (goalInfo: any) => {
+    console.log('🎯 MainApp - Updating collected goal info:', goalInfo);
+    setAppData(prev => ({ ...prev, collectedGoalInfo: goalInfo }));
+  };
+
   const handleGoalStep1Back = () => {
     console.log('🔙 handleGoalStep1Back called');
-    setCurrentScreen('login');
+    if (pathname === '/(tabs)') {
+      // (tabs) 경로에서는 홈 화면으로 이동
+      console.log('🏠 (tabs) 경로에서 홈 화면으로 이동');
+      setCurrentScreen('home');
+    } else {
+      // 다른 경로에서는 로그인 화면으로 이동
+      console.log('🔐 다른 경로에서 로그인 화면으로 이동');
+      setCurrentScreen('login');
+    }
   };
 
   // Goal Setting Step 2 handlers (Duration & Time Window)
@@ -224,6 +261,26 @@ export default function MainApp() {
   // Daily Schedule Popup handlers - Removed since HomeScreen now manages its own interactions
 
   const renderScreen = () => {
+    // (tabs) 경로에서 화면 결정
+    if (pathname === '/(tabs)') {
+      if (currentScreen === 'goalStep1') {
+        return (
+          <GoalSettingStep1
+            onNext={handleGoalStep1Next}
+            onBack={handleGoalStep1Back}
+            initialValue={appData.habitGoal}
+          />
+        );
+      } else if (currentScreen === 'home') {
+        return (
+          <ErrorBoundary>
+            <HomeScreen />
+          </ErrorBoundary>
+        );
+      }
+    }
+
+    // 다른 경로들에 대한 처리
     switch (currentScreen) {
       case 'splash':
         return <SplashScreen onLoadingComplete={handleSplashComplete} />;
@@ -247,14 +304,16 @@ export default function MainApp() {
           />
         );
       
-      case 'goalStep1':
-        return (
-          <GoalSettingStep1
-            onNext={handleGoalStep1Next}
-            onBack={handleGoalStep1Back}
-            initialValue={appData.habitGoal}
-          />
-        );
+             case 'goalStep1':
+         return (
+           <GoalSettingStep1
+             onNext={handleGoalStep1Next}
+             onBack={handleGoalStep1Back}
+             initialValue={appData.habitGoal}
+             collectedGoalInfo={appData.collectedGoalInfo}
+             onUpdateCollectedGoalInfo={updateCollectedGoalInfo}
+           />
+         );
       
       case 'goalStep2':
         return (
@@ -262,6 +321,7 @@ export default function MainApp() {
             onNext={handleGoalStep2Next}
             onBack={handleGoalStep2Back}
             initialValue={{ duration: appData.duration, timeWindow: appData.timeWindow }}
+            collectedGoalInfo={appData.collectedGoalInfo}
           />
         );
       
@@ -271,6 +331,7 @@ export default function MainApp() {
             onNext={handleGoalStep3Next}
             onBack={handleGoalStep3Back}
             initialValue={appData.timeData}
+            collectedGoalInfo={appData.collectedGoalInfo}
           />
         );
       
@@ -280,6 +341,7 @@ export default function MainApp() {
             onNext={handleGoalStep4Next}
             onBack={handleGoalStep4Back}
             initialValue={appData.coachingIntensity}
+            collectedGoalInfo={appData.collectedGoalInfo}
           />
         );
       
@@ -288,6 +350,7 @@ export default function MainApp() {
           <GoalSettingStep5
             onComplete={handleGoalStep5Complete}
             onBack={handleGoalStep5Back}
+            collectedGoalInfo={appData.collectedGoalInfo}
           />
         );
       
