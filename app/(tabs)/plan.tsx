@@ -1,5 +1,5 @@
 import TimelineView from '../../components/TimelineView';
 
-export default function HomeTab() {
+export default function PlanTab() {
   return <TimelineView />;
 }
