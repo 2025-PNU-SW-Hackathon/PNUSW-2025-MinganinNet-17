@@ -121,8 +121,8 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   const visualizerFadeAnim = useSharedValue(1);
   const buttonsFadeAnim = useSharedValue(1);
 
-  // 세션 초기화 함수
-  const initializeSession = useCallback(() => {
+  // 세션 초기화 함수 (useCallback 제거)
+  const initializeSession = () => {
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setSessionId(newSessionId);
     setSessionStartTime(new Date());
@@ -146,16 +146,16 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
     }
     
     console.log('[음성채팅] 새로운 세션 시작:', newSessionId, '새로운 목표:', isNewGoal);
-  }, [isNewGoal]);
+  };
 
-  // 세션 정리 함수
-  const cleanupSession = useCallback(() => {
+  // 세션 정리 함수 (useCallback 제거)
+  const cleanupSession = () => {
     setSessionId(null);
     setSessionStartTime(null);
     // 대화 기록도 정리 (새로운 세션을 위해)
     useHabitStore.getState().clearConversationHistory();
     console.log('[음성채팅] 세션 정리 완료');
-  }, []);
+  };
 
   // 통합된 세션 및 애니메이션 관리
   useEffect(() => {
@@ -185,16 +185,19 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       
       // 세션은 컴포넌트 언마운트 시에만 정리
     }
-  }, [visible, mode, onClose]);
+  }, [visible, mode]);
 
   // 컴포넌트 언마운트 시에만 세션 정리
   useEffect(() => {
     return () => {
       if (sessionId) {
-        cleanupSession();
+        setSessionId(null);
+        setSessionStartTime(null);
+        useHabitStore.getState().clearConversationHistory();
+        console.log('[음성채팅] 세션 정리 완료');
       }
     };
-  }, [sessionId, cleanupSession]);
+  }, [sessionId]);
 
   const audioChunksRef = useRef<Blob[]>([]);
 
