@@ -1,0 +1,72 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+# 환경 변수
+.env
+.env.*
+.npmrc*
+.env*.local
+
+ROUTY_APP_FLOW_GUIDED.md
+ROUTY_APP_FLOW_GUIDE.md
+.claude/
+Git_Collaboration_Guide.md
+
+# IDE 설정
+.idea/
+.vscode/
+backend/.vscode/
+
+# Android 빌드 파일
+android/
+
+# Supabase 로컬 설정만 제외 (중요한 데이터베이스 파일들은 유지)
+backend/supabase/.gitignore
+backend/supabase/config.toml
+backend/supabase/cli-latest
+
+# SQL 마이그레이션 파일 (이미 적용됨)
+*.sql
+
+# Supabase CLI 실행 파일
+backend/supabase.exe
+
+# Supabase 프로젝트 설정 (minganinet/supabase/ 폴더는 유지하되 .gitignore만 제거)
+supabase/.gitignore

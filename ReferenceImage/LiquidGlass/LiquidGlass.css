@@ -1,0 +1,197 @@
+/* Music */
+
+position: absolute;
+width: 408px;
+height: 408px;
+left: 104px;
+top: 463px;
+
+background: linear-gradient(0deg, #0F0F0F, #0F0F0F), linear-gradient(0deg, rgba(51, 51, 51, 0.45), rgba(51, 51, 51, 0.45)), rgba(153, 153, 153, 0.3);
+background-blend-mode: plus-lighter, luminosity, darken;
+box-shadow: inset 2.70199px 2.70199px 0px -1.35099px #333333, inset -2.70199px -2.70199px 0px -1.35099px #262626, inset 2.70199px 2.70199px 1.35099px -2.70199px #FFFFFF, inset -2.70199px -2.70199px 1.35099px -2.70199px #FFFFFF, inset 0px 0px 8.10596px rgba(255, 255, 255, 0.5), inset 0px 0px 43.2318px #F2F2F2;
+border-radius: 91.8676px;
+
+
+/* Rectangle 4 */
+
+position: absolute;
+left: -17px;
+right: -20px;
+top: -17px;
+bottom: -17px;
+
+background: rgba(255, 255, 255, 0.08);
+background-blend-mode: plus-lighter;
+backdrop-filter: blur(8.5px);
+/* Note: backdrop-filter has minimal browser support */
+
+
+/* Group 1 */
+
+position: absolute;
+width: 335.05px;
+height: 345.79px;
+left: 37.83px;
+top: 35.13px;
+
+
+
+/* 􀊌 */
+
+position: absolute;
+width: 54.04px;
+height: 37.83px;
+right: 64.85px;
+bottom: 45.93px;
+
+font-family: 'SF Pro';
+font-style: normal;
+font-weight: 700;
+font-size: 32.4238px;
+line-height: 39px;
+display: flex;
+align-items: center;
+text-align: center;
+letter-spacing: -0.540397px;
+font-feature-settings: 'ss16' on;
+
+color: #FFFFFF;
+
+
+
+/* 􀊄 */
+
+position: absolute;
+width: 64px;
+height: 81px;
+left: calc(50% - 64px/2 - 1.77px);
+bottom: 27.08px;
+
+font-family: 'SF Pro';
+font-style: normal;
+font-weight: 700;
+font-size: 67.5497px;
+line-height: 81px;
+/* identical to box height */
+display: flex;
+align-items: center;
+text-align: center;
+letter-spacing: -0.540397px;
+
+color: #FFFFFF;
+
+
+
+/* 􀊊 */
+
+position: absolute;
+width: 54.04px;
+height: 37.83px;
+left: 64.85px;
+bottom: 45.93px;
+
+font-family: 'SF Pro';
+font-style: normal;
+font-weight: 700;
+font-size: 32.4238px;
+line-height: 39px;
+display: flex;
+align-items: center;
+text-align: center;
+letter-spacing: -0.540397px;
+font-feature-settings: 'ss16' on;
+
+color: #FFFFFF;
+
+
+
+/* Artist */
+
+position: absolute;
+width: 335.05px;
+height: 48.64px;
+left: 37.83px;
+top: 243.18px;
+
+font-family: 'SF Pro';
+font-style: normal;
+font-weight: 510;
+font-size: 40.5298px;
+line-height: 49px;
+/* identical to box height, or 120% */
+display: flex;
+align-items: center;
+letter-spacing: -0.216159px;
+
+color: rgba(255, 255, 255, 0.33);
+
+
+
+/* Track */
+
+position: absolute;
+width: 335.05px;
+height: 48px;
+left: 37.83px;
+top: 194.54px;
+
+font-family: 'SF Pro';
+font-style: normal;
+font-weight: 510;
+font-size: 40.5298px;
+line-height: 48px;
+display: flex;
+align-items: center;
+letter-spacing: -0.540397px;
+
+color: #FFFFFF;
+
+
+
+/* AirDrop */
+
+position: absolute;
+width: 108.08px;
+height: 108.08px;
+right: 35.13px;
+top: 35.13px;
+
+background: linear-gradient(0deg, #222222, #222222), linear-gradient(0deg, #777777, #777777), rgba(17, 17, 17, 0.6);
+background-blend-mode: plus-lighter, color-dodge, luminosity;
+border-radius: 270.199px;
+
+
+/* 􀑢 */
+
+position: absolute;
+width: 64.85px;
+height: 64.85px;
+left: calc(50% - 64.85px/2 - 0px);
+top: calc(50% - 64.85px/2 - 0px);
+
+font-family: 'SF Pro';
+font-style: normal;
+font-weight: 510;
+font-size: 40.5298px;
+line-height: 48px;
+display: flex;
+align-items: center;
+text-align: center;
+letter-spacing: -0.540397px;
+font-feature-settings: 'ss16' on;
+
+color: #FFFFFF;
+
+
+
+/* Album Cover */
+
+position: absolute;
+width: 140.5px;
+height: 140.5px;
+left: 37.83px;
+top: 37.83px;
+
+background: linear-gradient(0deg, #222222, #222222), linear-gradient(0deg, #777777, #777777), rgba(17, 17, 17, 0.6);
+background-blend-mode: plus-lighter, color-dodge, luminosity;
+border-radius: 37.8278px;

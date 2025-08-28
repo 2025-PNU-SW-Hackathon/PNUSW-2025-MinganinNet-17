@@ -1,0 +1,457 @@
+/**
+ * Enhanced color system for Routy app with semantic design tokens.
+ * Includes neutral shades, semantic colors, and opacity variants for modern UI design.
+ */
+
+const tintColorLight = '#748873';
+const tintColorDark = '#748873';
+
+export const Colors = {
+  light: {
+    // Backgrounds
+    background: '#f8f8f8',
+    surface: '#e5e0d8',
+    card: '#f8f8f8',
+    cardSecondary: '#e5e0d8',
+    
+    // Figma Design Colors
+    figma: {
+      menuBg: '#F1EEFB',      // Bottom menu background
+      darkGray: '#10152C',    // Dark text and CTA buttons
+      critical: '#F9A7A7',   // Header background and critical status
+      yellow: '#F5F5DA',     // Main content card background
+      normal: '#21DCBA',     // Success/normal status color
+      white: '#FFFFFF',      // Pure white
+    },
+    
+    // Neutral color scale (50-900) - Earth tones
+    neutral: {
+      50: '#f8f8f8',
+      100: '#f0f0f0',
+      200: '#e5e0d8',
+      300: '#d1a980',
+      400: '#b8a082',
+      500: '#748873',
+      600: '#5f6f5e',
+      700: '#4a5549',
+      800: '#353b34',
+      900: '#2c2c2c',
+    },
+    
+    // Text colors
+    text: '#2c2c2c',
+    textSecondary: '#5a6b5a',
+    textMuted: '#8fa087',
+    
+    // Primary colors with variants
+    primary: '#748873',
+    primaryLight: '#8fa087',
+    primaryDark: '#5f6f5e',
+    tint: tintColorLight,
+    
+    // Semantic colors
+    success: '#10b981',
+    successLight: '#34d399',
+    successDark: '#047857',
+    
+    // GitHub-style heat map colors (transparent brighter green gradient)
+    heatMap: {
+      none: 'rgba(235, 237, 240, 0.3)',        // 0% - Very light transparent
+      low: 'rgba(34, 197, 94, 0.15)',          // 1-25% - 15% bright green
+      medium: 'rgba(34, 197, 94, 0.35)',       // 26-50% - 35% bright green
+      high: 'rgba(34, 197, 94, 0.55)',         // 51-75% - 55% bright green
+      highest: 'rgba(34, 197, 94, 0.75)',      // 76-100% - 75% bright green
+    },
+    
+    warning: '#f59e0b',
+    warningLight: '#fbbf24',
+    warningDark: '#d97706',
+    
+    error: '#ef4444',
+    errorLight: '#f87171',
+    errorDark: '#dc2626',
+    
+    info: '#3b82f6',
+    infoLight: '#60a5fa',
+    infoDark: '#2563eb',
+    
+    // UI elements
+    border: '#e5e7eb',
+    borderLight: '#f3f4f6',
+    borderDark: '#d1d5db',
+    
+    icon: '#6b7280',
+    tabIconDefault: '#9ca3af',
+    tabIconSelected: tintColorLight,
+    
+    // Interactive elements
+    buttonPrimary: '#748873',
+    buttonSecondary: '#f3f4f6',
+    buttonDisabled: '#e5e7eb',
+    buttonGhost: 'transparent',
+    buttonOutline: 'transparent',
+    
+    inputBackground: '#f9fafb',
+    inputBorder: '#d1d5db',
+    inputFocus: '#6c63ff',
+    inputError: '#ef4444',
+    inputSuccess: '#10b981',
+    
+    modalBackground: '#f8fafc',
+    modalOverlay: 'rgba(0, 0, 0, 0.5)',
+    
+    // Gradients
+    gradientStart: '#6c63ff',
+    gradientEnd: '#8b7cf6',
+    gradientSuccess: '#10b981',
+    gradientWarning: '#f59e0b',
+    gradientError: '#ef4444',
+    
+    // Opacity variants
+    opacity: {
+      10: 'rgba(0, 0, 0, 0.1)',
+      20: 'rgba(0, 0, 0, 0.2)',
+      30: 'rgba(0, 0, 0, 0.3)',
+      50: 'rgba(0, 0, 0, 0.5)',
+      80: 'rgba(0, 0, 0, 0.8)',
+    },
+    
+    // Primary color with opacity
+    primaryOpacity: {
+      10: 'rgba(116, 136, 115, 0.1)',
+      20: 'rgba(116, 136, 115, 0.2)',
+      30: 'rgba(116, 136, 115, 0.3)',
+      50: 'rgba(116, 136, 115, 0.5)',
+      80: 'rgba(116, 136, 115, 0.8)',
+    },
+    
+    // Typography system
+    typography: {
+      // Font sizes
+      fontSize: {
+        xs: 12,
+        sm: 14,
+        base: 16,
+        lg: 18,
+        xl: 20,
+        '2xl': 24,
+        '3xl': 28,
+        '4xl': 32,
+        '5xl': 48,
+      },
+      
+      // Font weights
+      fontWeight: {
+        light: '300',
+        regular: '400',
+        medium: '500',
+        semibold: '600',
+        bold: '700',
+        extrabold: '800',
+      },
+      
+      // Line heights
+      lineHeight: {
+        tight: 1.2,
+        snug: 1.3,
+        normal: 1.5,
+        relaxed: 1.75,
+        loose: 2,
+      },
+      
+      // Letter spacing
+      letterSpacing: {
+        tight: -0.5,
+        normal: 0,
+        wide: 0.5,
+        wider: 1,
+        widest: 2,
+      },
+      
+      // Font family helpers
+      fontFamily: {
+        korean: 'NanumHandwriting',
+        default: 'sans-serif',
+        getKoreanFont: (hasKorean: boolean = false) => hasKorean ? 'NanumHandwriting' : 'sans-serif',
+      },
+      
+      // Text variants for common use cases
+      variants: {
+        h1: {
+          fontSize: 32,
+          fontWeight: '700',
+          lineHeight: 1.2,
+          letterSpacing: -0.5,
+        },
+        h2: {
+          fontSize: 28,
+          fontWeight: '600',
+          lineHeight: 1.3,
+          letterSpacing: -0.5,
+        },
+        h3: {
+          fontSize: 24,
+          fontWeight: '600',
+          lineHeight: 1.3,
+          letterSpacing: 0,
+        },
+        h4: {
+          fontSize: 20,
+          fontWeight: '600',
+          lineHeight: 1.4,
+          letterSpacing: 0,
+        },
+        body: {
+          fontSize: 16,
+          fontWeight: '400',
+          lineHeight: 1.5,
+          letterSpacing: 0,
+        },
+        bodySmall: {
+          fontSize: 14,
+          fontWeight: '400',
+          lineHeight: 1.5,
+          letterSpacing: 0,
+        },
+        caption: {
+          fontSize: 12,
+          fontWeight: '400',
+          lineHeight: 1.4,
+          letterSpacing: 0.5,
+        },
+        button: {
+          fontSize: 16,
+          fontWeight: '600',
+          lineHeight: 1.2,
+          letterSpacing: 0.5,
+        },
+        label: {
+          fontSize: 14,
+          fontWeight: '500',
+          lineHeight: 1.2,
+          letterSpacing: 0.5,
+        },
+      },
+    },
+  },
+  dark: {
+    // Backgrounds
+    background: '#1c1c2e',
+    surface: '#2a2a42',
+    card: '#3a3a50',
+    cardSecondary: '#2f2f45',
+    
+    // Figma Design Colors (same as light theme)
+    figma: {
+      menuBg: '#F1EEFB',      // Bottom menu background
+      darkGray: '#10152C',    // Dark text and CTA buttons
+      critical: '#F9A7A7',   // Header background and critical status
+      yellow: '#F5F5DA',     // Main content card background
+      normal: '#21DCBA',     // Success/normal status color
+      white: '#FFFFFF',      // Pure white
+    },
+    
+    // Neutral color scale (50-900) - Inverted for dark mode
+    neutral: {
+      50: '#111827',
+      100: '#1f2937',
+      200: '#374151',
+      300: '#4b5563',
+      400: '#6b7280',
+      500: '#9ca3af',
+      600: '#d1d5db',
+      700: '#e5e7eb',
+      800: '#f3f4f6',
+      900: '#f9fafb',
+    },
+    
+    // Text colors
+    text: '#ffffff',
+    textSecondary: '#a9a9c2',
+    textMuted: '#7a7a95',
+    
+    // Primary colors with variants
+    primary: '#748873',
+    primaryLight: '#8fa087',
+    primaryDark: '#5f6f5e',
+    tint: tintColorDark,
+    
+    // Semantic colors
+    success: '#4CAF50',
+    successLight: '#66bb6a',
+    successDark: '#2e7d32',
+    
+    // GitHub-style heat map colors (transparent brighter green gradient for dark mode)
+    heatMap: {
+      none: 'rgba(33, 38, 45, 0.3)',           // 0% - Dark transparent
+      low: 'rgba(74, 222, 128, 0.15)',         // 1-25% - 15% bright green
+      medium: 'rgba(74, 222, 128, 0.35)',      // 26-50% - 35% bright green
+      high: 'rgba(74, 222, 128, 0.55)',        // 51-75% - 55% bright green
+      highest: 'rgba(74, 222, 128, 0.75)',     // 76-100% - 75% bright green
+    },
+    
+    warning: '#FFC107',
+    warningLight: '#ffca28',
+    warningDark: '#f57c00',
+    
+    error: '#ff4757',
+    errorLight: '#ff6b7a',
+    errorDark: '#d32f2f',
+    
+    info: '#42a5f5',
+    infoLight: '#64b5f6',
+    infoDark: '#1976d2',
+    
+    // UI elements
+    border: '#4a4a60',
+    borderLight: '#5a5a70',
+    borderDark: '#3a3a50',
+    
+    icon: '#9BA1A6',
+    tabIconDefault: '#9BA1A6',
+    tabIconSelected: tintColorDark,
+    
+    // Interactive elements
+    buttonPrimary: '#748873',
+    buttonSecondary: '#4a4a60',
+    buttonDisabled: '#4a47cc',
+    buttonGhost: 'transparent',
+    buttonOutline: 'transparent',
+    
+    inputBackground: '#3a3a50',
+    inputBorder: '#4a4a60',
+    inputFocus: '#6c63ff',
+    inputError: '#ff4757',
+    inputSuccess: '#4CAF50',
+    
+    modalBackground: '#5a5a70',
+    modalOverlay: 'rgba(0, 0, 0, 0.7)',
+    
+    // Gradients
+    gradientStart: '#1c1c2e',
+    gradientEnd: '#2a2a4a',
+    gradientSuccess: '#4CAF50',
+    gradientWarning: '#FFC107',
+    gradientError: '#ff4757',
+    
+    // Opacity variants
+    opacity: {
+      10: 'rgba(255, 255, 255, 0.1)',
+      20: 'rgba(255, 255, 255, 0.2)',
+      30: 'rgba(255, 255, 255, 0.3)',
+      50: 'rgba(255, 255, 255, 0.5)',
+      80: 'rgba(255, 255, 255, 0.8)',
+    },
+    
+    // Primary color with opacity
+    primaryOpacity: {
+      10: 'rgba(116, 136, 115, 0.1)',
+      20: 'rgba(116, 136, 115, 0.2)',
+      30: 'rgba(116, 136, 115, 0.3)',
+      50: 'rgba(116, 136, 115, 0.5)',
+      80: 'rgba(116, 136, 115, 0.8)',
+    },
+    
+    // Typography system (same for both light and dark modes)
+    typography: {
+      // Font sizes
+      fontSize: {
+        xs: 12,
+        sm: 14,
+        base: 16,
+        lg: 18,
+        xl: 20,
+        '2xl': 24,
+        '3xl': 28,
+        '4xl': 32,
+        '5xl': 48,
+      },
+      
+      // Font weights
+      fontWeight: {
+        light: '300',
+        regular: '400',
+        medium: '500',
+        semibold: '600',
+        bold: '700',
+        extrabold: '800',
+      },
+      
+      // Line heights
+      lineHeight: {
+        tight: 1.2,
+        snug: 1.3,
+        normal: 1.5,
+        relaxed: 1.75,
+        loose: 2,
+      },
+      
+      // Letter spacing
+      letterSpacing: {
+        tight: -0.5,
+        normal: 0,
+        wide: 0.5,
+        wider: 1,
+        widest: 2,
+      },
+      
+      // Text variants for common use cases
+      variants: {
+        h1: {
+          fontSize: 32,
+          fontWeight: '700',
+          lineHeight: 1.2,
+          letterSpacing: -0.5,
+        },
+        h2: {
+          fontSize: 28,
+          fontWeight: '600',
+          lineHeight: 1.3,
+          letterSpacing: -0.5,
+        },
+        h3: {
+          fontSize: 24,
+          fontWeight: '600',
+          lineHeight: 1.3,
+          letterSpacing: 0,
+        },
+        h4: {
+          fontSize: 20,
+          fontWeight: '600',
+          lineHeight: 1.4,
+          letterSpacing: 0,
+        },
+        body: {
+          fontSize: 16,
+          fontWeight: '400',
+          lineHeight: 1.5,
+          letterSpacing: 0,
+        },
+        bodySmall: {
+          fontSize: 14,
+          fontWeight: '400',
+          lineHeight: 1.5,
+          letterSpacing: 0,
+        },
+        caption: {
+          fontSize: 12,
+          fontWeight: '400',
+          lineHeight: 1.4,
+          letterSpacing: 0.5,
+        },
+        button: {
+          fontSize: 16,
+          fontWeight: '600',
+          lineHeight: 1.2,
+          letterSpacing: 0.5,
+        },
+        label: {
+          fontSize: 14,
+          fontWeight: '500',
+          lineHeight: 1.2,
+          letterSpacing: 0.5,
+        },
+      },
+    },
+  },
+};
