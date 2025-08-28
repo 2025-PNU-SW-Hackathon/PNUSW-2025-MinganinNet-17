@@ -117,9 +117,9 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   const scaleAnim = useSharedValue(0.8);
   const textFadeAnim = useSharedValue(0);
   
-  // Custom entry animation values for seamless transition
-  const visualizerFadeAnim = useSharedValue(customEntry ? 0 : 1);
-  const buttonsFadeAnim = useSharedValue(customEntry ? 0 : 1);
+  // Animation values for UI components
+  const visualizerFadeAnim = useSharedValue(1);
+  const buttonsFadeAnim = useSharedValue(1);
 
   // 세션 초기화 함수
   const initializeSession = useCallback(() => {
@@ -180,17 +180,6 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       scaleAnim.value = withSpring(1, { damping: 15, stiffness: 300 });
       textFadeAnim.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.quad) });
       
-      // Custom entry animation sequence (0.7s fade in with stagger)
-      if (customEntry) {
-        // Start circular components fade in after 300ms (after background appears)
-        setTimeout(() => {
-          visualizerFadeAnim.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.quad) });
-          // Stagger buttons by 200ms
-          setTimeout(() => {
-            buttonsFadeAnim.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.quad) });
-          }, 200);
-        }, 300);
-      }
       
       startSession();
     } else {
@@ -198,16 +187,11 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       scaleAnim.value = withTiming(0.8, { duration: 200 });
       textFadeAnim.value = withTiming(0, { duration: 200 });
       
-      // Reset custom entry animation values
-      if (customEntry) {
-        visualizerFadeAnim.value = 0;
-        buttonsFadeAnim.value = 0;
-      }
       
       // 세션을 즉시 종료하지 않고 유지 (대화가 끝날 때까지)
       // endSession();
     }
-  }, [visible, customEntry]);
+  }, [visible]);
 
   const audioChunksRef = useRef<Blob[]>([]);
 
