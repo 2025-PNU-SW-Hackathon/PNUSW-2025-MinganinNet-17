@@ -95,6 +95,50 @@ ALTER TABLE voice_chat_responses ENABLE ROW LEVEL SECURITY;
 -- 모든 사용자가 읽고 쓸 수 있도록 정책 설정 (개발 단계)
 CREATE POLICY "Allow all operations for voice chat responses" ON voice_chat_responses
   FOR ALL USING (true) WITH CHECK (true);
+
+-- 대화 맥락을 저장하는 테이블 (새로 추가)
+CREATE TABLE IF NOT EXISTS conversation_history (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  session_id TEXT, -- 세션 ID (음성 세션 구분용)
+  user_text TEXT NOT NULL, -- 사용자 음성 텍스트
+  ai_response TEXT NOT NULL, -- AI 응답 텍스트
+  audio_file TEXT, -- 음성 파일명
+  context_screen TEXT, -- 어떤 화면에서 대화했는지
+  context_step INTEGER, -- 목표 설정 단계
+  goal_info JSONB, -- 수집된 목표 정보 (JSON 형태로 저장)
+  extracted_info JSONB, -- 기존 필드 (하위 호환성)
+  emotion TEXT, -- 감정 분석 결과 (선택사항)
+  conversation_context JSONB, -- 대화 맥락 정보 (화면, 단계, 세션 등)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_conversation_history_user_id ON conversation_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_history_created_at ON conversation_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_conversation_history_context_screen ON conversation_history(context_screen);
+
+-- RLS (Row Level Security) 활성화
+ALTER TABLE conversation_history ENABLE ROW LEVEL SECURITY;
+
+-- 사용자별로 자신의 대화 내용만 읽고 쓸 수 있도록 정책 설정
+CREATE POLICY "Users can view own conversation history" ON conversation_history
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own conversation history" ON conversation_history
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 기존 테이블 업데이트 (필요한 경우)
+-- ALTER TABLE conversation_history ADD COLUMN IF NOT EXISTS session_id TEXT;
+-- ALTER TABLE conversation_history ADD COLUMN IF NOT EXISTS goal_info JSONB;
+-- ALTER TABLE conversation_history ADD COLUMN IF NOT EXISTS conversation_context JSONB;
+
+-- 인덱스 추가 (세션 기반 조회 성능 향상)
+CREATE INDEX IF NOT EXISTS idx_conversation_history_session_id ON conversation_history(session_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_history_user_session ON conversation_history(user_id, session_id);
+
+-- 기존 voice_processing_jobs 테이블은 더 이상 사용하지 않음 (선택사항)
+-- DROP TABLE IF EXISTS voice_processing_jobs;
 ```
 
 ### 2. Storage 버킷 생성

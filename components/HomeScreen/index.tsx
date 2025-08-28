@@ -648,7 +648,12 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
 
       {/* Voice Chat Modals */}
       {voiceChatVisible && (
-          <VoiceChatScreen visible={voiceChatVisible} mode="home" onClose={handleVoiceChatClose} onComplete={handleVoiceCommand} />
+          <VoiceChatScreen 
+            visible={voiceChatVisible} 
+            mode="goalSetting" 
+            onClose={handleVoiceChatClose} 
+            onComplete={handleVoiceCommand} 
+          />
       )}
       {reportVoiceChatVisible && (
           <VoiceChatScreen visible={reportVoiceChatVisible} mode="report" onClose={() => setReportVoiceChatVisible(false)} onComplete={handleReportCreationComplete} />

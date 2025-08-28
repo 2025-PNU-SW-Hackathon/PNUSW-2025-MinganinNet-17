@@ -58,7 +58,7 @@ serve(async (req) => {
       throw new Error('SUPABASE_ANON_KEY가 설정되지 않았습니다.');
     }
     
-    // 3. STT 시작
+    // 3. STT 시작 (Gemini 2.5 Flash로 오디오를 텍스트로 변환)
     console.log('[ai-voice-chat] STT 시작...');
     const audioData = base64Audio.split(',').pop() || base64Audio;
     console.log('[ai-voice-chat] 오디오 데이터 처리됨, 길이:', audioData.length);
@@ -70,7 +70,7 @@ serve(async (req) => {
         contents: [{ 
           parts: [ 
             { text: "다음 오디오를 들리는 그대로 한글 텍스트로만 변환하고 [웃음]같은 괄호 설명은 제거해줘." }, 
-            { inlineData: { mimeType: "audio/mp4", data: audioData } } 
+            { inlineData: { mimeType: "audio/m4a", data: audioData } } 
           ] 
         }] 
       })
@@ -87,7 +87,16 @@ serve(async (req) => {
     const sttResult = await sttResponse.json();
     console.log('[ai-voice-chat] STT 결과 구조:', Object.keys(sttResult));
     
+    // Gemini STT 응답 구조에 맞게 파싱
     const transcribedText = sttResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    
+    // STT 결과 검증
+    if (!transcribedText) {
+      console.error('[ai-voice-chat] STT 실패 - 텍스트가 비어있음');
+      console.error('[ai-voice-chat] STT 응답 상세:', sttResult);
+      throw new Error('음성을 텍스트로 변환하지 못했습니다. 다시 시도해주세요.');
+    }
+    
     console.log('[ai-voice-chat] STT 완료:', transcribedText);
 
     // 4. 사용자 인증 및 목표 조회 (LLM 시작 전에)
@@ -126,19 +135,26 @@ serve(async (req) => {
       user = authUser;
       console.log('[ai-voice-chat] 사용자 인증 완료:', user.id);
       
-                 // 사용자 목표 정보 조회
-           const { data: goals, error: goalsError } = await supabase
-             .from('habits')
-             .select('*')
-             .eq('user_id', user.id);
-           
-           if (goalsError) {
-             console.error('[ai-voice-chat] 목표 조회 오류:', goalsError);
-             // 목표 조회 실패는 치명적이지 않으므로 계속 진행
-           } else {
-             userGoals = goals;
-             console.log('[ai-voice-chat] 사용자 목표 조회 완료:', userGoals?.length || 0, '개');
-           }
+          // 사용자 목표 정보 조회 (목표 설정 중에는 기존 정보 유지)
+          if (context.isNewGoal && context.screen === 'home') {
+            // 홈화면에서 새로운 목표 추가 모드일 때만 기존 목표 정보를 무시
+            userGoals = [];
+            console.log('[ai-voice-chat] 홈화면 새로운 목표 모드 - 기존 목표 정보 무시');
+          } else {
+            // 목표 설정 중이거나 기존 목표 정보 조회
+            const { data: goals, error: goalsError } = await supabase
+              .from('habits')
+              .select('*')
+              .eq('user_id', user.id);
+            
+            if (goalsError) {
+              console.error('[ai-voice-chat] 목표 조회 오류:', goalsError);
+              // 목표 조회 실패는 치명적이지 않으므로 계속 진행
+            } else {
+              userGoals = goals;
+              console.log('[ai-voice-chat] 사용자 목표 조회 완료:', userGoals?.length || 0, '개');
+            }
+          }
            
            // 사용자 이전 대화 맥락 조회 (최근 7일간)
            let conversationContext = null;
@@ -166,36 +182,122 @@ serve(async (req) => {
     // 5. LLM 시작 (목표 정보를 포함한 프롬프트 생성)
     console.log('[ai-voice-chat] LLM 시작...');
     
-    // 사용자 입력에서 목표 설정 정보 파싱
-    const parseGoalSettingInfo = (text) => {
-      const info = {};
+    // 사용자 입력에서 목표 설정 정보 파싱 (개선된 버전)
+    const parseGoalSettingInfo = (text, previousInfo = {}) => {
+      const info = { ...previousInfo }; // 이전 정보 유지
+      console.log('[ai-voice-chat] 파싱 시작 - 입력 텍스트:', text);
+      console.log('[ai-voice-chat] 이전 정보:', previousInfo);
       
-      // 목표 추출 (예: "100만원 모으기", "운동하기")
-      const goalMatch = text.match(/(\d+만원\s*모으기?|운동하기?|공부하기?|독서하기?|절약하기?|저축하기?)/);
-      if (goalMatch) info.goal = goalMatch[1];
+      // 목표 추출 (예: "100만원 모으기", "운동하기", "코딩 연습하기", "코딩 연습을 하고 싶어")
+      const goalPatterns = [
+        // 1순위: 구체적인 목표 패턴들 (가장 정확함)
+        /(코딩\s*연습(을?\s*하고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(프로그래밍(을?\s*하고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(개발(을?\s*하고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(영어(를?\s*배우고?\s*싶어?|를?\s*할래?|를?\s*해보고?\s*싶어?|해볼래?))/,
+        /(일본어(를?\s*배우고?\s*싶어?|를?\s*할래?|를?\s*해보고?\s*싶어?|해볼래?))/,
+        /(중국어(를?\s*배우고?\s*싶어?|를?\s*할래?|를?\s*해보고?\s*싶어?|해볼래?))/,
+        /(운동(을?\s*하고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(헬스(를?\s*하고?\s*싶어?|를?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(독서(를?\s*하고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(책(을?\s*읽고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|읽을래?))/,
+        /(요리(를?\s*하고?\s*싶어?|를?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(정리(를?\s*하고?\s*싶어?|를?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(청소(를?\s*하고?\s*싶어?|를?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(명상(을?\s*하고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(요가(를?\s*하고?\s*싶어?|를?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        /(스트레칭(을?\s*하고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/,
+        
+        // 2순위: 숫자 + 단위 패턴들
+        /(\d+만원\s*모으기?|저축하기?)/,
+        
+        // 3순위: 일반적인 한국어 표현 (가장 마지막)
+        /([가-힣\s]+(을?\s*하고?\s*싶어?|을?\s*할래?|을?\s*해보고?\s*싶어?|해볼래?))/
+      ];
       
-      // 기간 추출 (예: "3개월", "6개월", "1년")
-      const periodMatch = text.match(/(\d+개월|\d+년|일주일|한달)/);
-      if (periodMatch) info.period = periodMatch[1];
-      
-      // 시간 추출 (예: "아침 7시", "저녁 8시")
-      const timeMatch = text.match(/(아침|저녁|오전|오후)\s*(\d+시)/);
-      if (timeMatch) info.time = `${timeMatch[1]} ${timeMatch[2]}시`;
-      
-      // 어려운 점 추출
-      if (text.includes('의지') || text.includes('시간') || text.includes('귀찮')) {
-        info.difficulty = '사용자가 어려운 점을 언급했습니다.';
+      for (const pattern of goalPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          info.goal = match[1].trim();
+          console.log('[ai-voice-chat] 목표 추출됨 (일반 패턴):', info.goal);
+          break;
+        }
       }
       
-      // 강도 추출 (높음/보통/낮음)
-      if (text.includes('높음') || text.includes('어려워') || text.includes('힘들어')) {
-        info.intensity = '높음';
-      } else if (text.includes('보통') || text.includes('적당해')) {
-        info.intensity = '보통';
-      } else if (text.includes('낮음') || text.includes('쉬워') || text.includes('가벼워')) {
-        info.intensity = '낮음';
+      // 1. 기간 추출 (가장 먼저 처리)
+      const periodPatterns = [
+        /(\d+개월)\s*동안/,
+        /(\d+년)\s*동안/,
+        /(\d+주)\s*동안/,
+        /(\d+일)\s*동안/,
+        /일주일\s*동안/,
+        /한달\s*동안/
+      ];
+      
+      for (const pattern of periodPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          info.period = match[1] || match[0];
+          console.log('[ai-voice-chat] 기간 추출됨:', info.period);
+          break;
+        }
       }
       
+      // 3. 시간 추출 (더 정확한 패턴)
+      const timePatterns = [
+        /(아침|저녁|오전|오후)\s*(\d+시)/,
+        /(\d+)시\s*부터\s*(\d+)시\s*까지/,
+        /(\d+)시\s*~?\s*(\d+)시/
+      ];
+      
+      for (const pattern of timePatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          if (match[1] && match[2]) {
+            info.time = `${match[1]} ${match[2]}시`;
+          } else if (match[0]) {
+            info.time = match[0];
+          }
+          console.log('[ai-voice-chat] 시간 추출됨:', info.time);
+          break;
+        }
+      }
+      
+      // 4. 어려운 점 추출 (더 정확한 패턴)
+      const difficultyPatterns = [
+        /(의지|동기|동기부여|의욕)(가?\s*부족해?|가?\s*없어?|가?\s*안\s*생겨?)/,
+        /(시간)(이?\s*부족해?|이?\s*없어?|이?\s*안\s*돼?)/,
+        /(귀찮|싫어|하기\s*싫어|하기\s*귀찮)/,
+        /(까먹어|잊어버려|기억\s*안\s*나)/,
+        /(어려워|힘들어|복잡해)/
+      ];
+      
+      for (const pattern of difficultyPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          info.difficulty = match[0];
+          console.log('[ai-voice-chat] 어려운 점 추출됨:', info.difficulty);
+          break;
+        }
+      }
+      
+      // 5. 강도 추출 (더 정확한 패턴)
+      const intensityPatterns = [
+        /(높음|높은|어려워|힘들어|복잡해|도전적)/,
+        /(보통|적당해|보통이야|보통이에요)/,
+        /(낮음|낮은|쉬워|가벼워|간단해|쉬워요)/
+      ];
+      
+      for (const pattern of intensityPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          info.intensity = match[1];
+          console.log('[ai-voice-chat] 강도 추출됨:', info.intensity);
+          break;
+        }
+      }
+      
+      console.log('[ai-voice-chat] 최종 파싱 결과:', info);
       return info;
     };
 
@@ -203,47 +305,131 @@ serve(async (req) => {
     const extractPreviousGoalInfo = (conversationContext) => {
       const info = {};
       
-      // 목표 내용 추출
-      const goalMatch = conversationContext.match(/목표[:\s]*([^,\n]+)/);
-      if (goalMatch) {
-        info.goal = goalMatch[1].trim();
+      console.log('[ai-voice-chat] extractPreviousGoalInfo 시작 - 입력:', conversationContext);
+      
+      // 대화 맥락에서 사용자 발화만 추출 (사용자: ... 형태)
+      const userUtterances = [];
+      const userPattern = /사용자:\s*([^|]+)/g;
+      let match;
+      while ((match = userPattern.exec(conversationContext)) !== null) {
+        userUtterances.push(match[1].trim());
       }
       
-      // 기간 추출
-      const periodMatch = conversationContext.match(/(\d+)개월|(\d+)주|(\d+)일/);
-      if (periodMatch) {
-        info.period = periodMatch[0];
+      console.log('[ai-voice-chat] 추출된 사용자 발화:', userUtterances);
+      
+      // 모든 사용자 발화를 하나의 텍스트로 합치기
+      const allUserText = userUtterances.join(' ');
+      console.log('[ai-voice-chat] 모든 사용자 발화 합친 텍스트:', allUserText);
+      
+      // 목표 내용 추출 (더 유연한 패턴)
+      const goalPatterns = [
+        /(코딩\s*연습|프로그래밍|개발|운동|공부|독서|저축|다이어트|금연|금주|습관|목표|계획)/,
+        /([^,\n]+)\s*(하고?\s*싶어|하려고|할래|할\s*거야|할\s*예정이야|해볼래)/,
+        /(매일|매주|매월|정기적으로)\s*(하는|할|하려는)\s*([^,\n]+)/,
+        /(코딩\s*연습을?\s*하고?\s*싶어)/,
+        /(코딩\s*연습을?\s*할래)/
+      ];
+      
+      for (const pattern of goalPatterns) {
+        const goalMatch = allUserText.match(pattern);
+        if (goalMatch) {
+          info.goal = goalMatch[0].trim();
+          console.log('[ai-voice-chat] 목표 추출됨:', info.goal);
+          break;
+        }
       }
       
-      // 시간 추출
-      const timeMatch = conversationContext.match(/(오전|오후|새벽|밤|아침|점심|저녁)\s*(\d+)시\s*~?\s*(\d+)?시?/);
-      if (timeMatch) {
-        info.time = timeMatch[0];
+      // 기간 추출 (더 정확한 패턴)
+      const periodPatterns = [
+        /(\d+개월)\s*동안/,
+        /(\d+년)\s*동안/,
+        /(\d+주)\s*동안/,
+        /(\d+일)\s*동안/,
+        /일주일\s*동안/,
+        /한달\s*동안/,
+        /(\d+개월)/,
+        /(\d+주)/,
+        /(\d+일)/,
+        /삼개월/,
+        /(\d+)개월\s*할래/,
+        /(\d+)개월\s*하고?\s*싶어/
+      ];
+      
+      for (const pattern of periodPatterns) {
+        const periodMatch = allUserText.match(pattern);
+        if (periodMatch) {
+          info.period = periodMatch[1] || periodMatch[0];
+          console.log('[ai-voice-chat] 기간 추출됨:', info.period);
+          break;
+        }
       }
       
-      // 어려운 점 추출
-      const difficultyMatch = conversationContext.match(/어려운\s*점[:\s]*([^,\n]+)/);
-      if (difficultyMatch) {
-        info.difficulty = difficultyMatch[1].trim();
+      // 시간 추출 (더 정확한 패턴)
+      const timePatterns = [
+        /(아침|저녁|오전|오후)\s*(\d+시)/,
+        /(\d+)시\s*부터\s*(\d+)시\s*까지/,
+        /(\d+)시\s*~?\s*(\d+)시/,
+        /(새벽|밤|아침|점심|저녁)\s*(\d+)시/,
+        /다섯\s*시\s*에서\s*(\d+)시\s*까지/,
+        /오후\s*(\d+)시\s*부터\s*(\d+)시\s*까지/
+      ];
+      
+      for (const pattern of timePatterns) {
+        const timeMatch = allUserText.match(pattern);
+        if (timeMatch) {
+          if (timeMatch[1] && timeMatch[2]) {
+            info.time = `${timeMatch[1]} ${timeMatch[2]}시`;
+          } else if (timeMatch[0]) {
+            info.time = timeMatch[0];
+          }
+          console.log('[ai-voice-chat] 시간 추출됨:', info.time);
+          break;
+        }
       }
       
-      // 강도 추출
-      const intensityMatch = conversationContext.match(/강도[:\s]*([^,\n]+)/);
-      if (intensityMatch) {
-        info.intensity = intensityMatch[1].trim();
+      // 어려운 점 추출 (더 정확한 패턴)
+      const difficultyPatterns = [
+        /(의지|동기|동기부여|의욕)(가?\s*부족해?|가?\s*없어?|가?\s*안\s*생겨?)/,
+        /(시간)(이?\s*부족해?|이?\s*없어?|이?\s*안\s*돼?)/,
+        /(귀찮|싫어|하기\s*싫어|하기\s*귀찮)/,
+        /(까먹어|잊어버려|기억\s*안\s*나|맨날\s*까먹어)/,
+        /(어려워|힘들어|복잡해)/
+      ];
+      
+      for (const pattern of difficultyPatterns) {
+        const difficultyMatch = allUserText.match(pattern);
+        if (difficultyMatch) {
+          info.difficulty = difficultyMatch[0];
+          console.log('[ai-voice-chat] 어려운 점 추출됨:', info.difficulty);
+          break;
+        }
       }
       
-      // 앱 제한 추출
-      const appsMatch = conversationContext.match(/앱[:\s]*([^,\n]+)/);
-      if (appsMatch) {
-        info.apps = appsMatch[1].trim();
+      // 강도 추출 (더 정확한 패턴)
+      const intensityPatterns = [
+        /(높음|높은|어려워|힘들어|복잡해|도전적)/,
+        /(보통|적당해|보통이야|보통이에요)/,
+        /(낮음|낮은|쉬워|가벼워|간단해|쉬워요)/
+      ];
+      
+      for (const pattern of intensityPatterns) {
+        const intensityMatch = allUserText.match(pattern);
+        if (intensityMatch) {
+          info.intensity = intensityMatch[1];
+          console.log('[ai-voice-chat] 강도 추출됨:', info.intensity);
+          break;
+        }
       }
       
-      // 코칭 스타일 추출
-      const styleMatch = conversationContext.match(/스타일[:\s]*([^,\n]+)/);
-      if (styleMatch) {
-        info.style = styleMatch[1].trim();
-      }
+      console.log('[ai-voice-chat] extractPreviousGoalInfo 최종 결과:', info);
+      
+      // 디버깅: 각 필드별 상태 확인
+      console.log('[ai-voice-chat] 필드별 상태:');
+      console.log('- goal:', info.goal || '없음');
+      console.log('- period:', info.period || '없음');
+      console.log('- time:', info.time || '없음');
+      console.log('- difficulty:', info.difficulty || '없음');
+      console.log('- intensity:', info.intensity || '없음');
       
       return info;
     };
@@ -299,19 +485,39 @@ serve(async (req) => {
     // allGoalInfo를 함수 시작 부분에서 설정 (이전 대화 + 현재 입력)
     let allGoalInfo = {};
     
-    // 이전 대화에서 이미 설정된 정보들 확인
-    if (conversationContext?.conversation_context) {
-      const previousGoalInfo = extractPreviousGoalInfo(conversationContext.conversation_context);
-      console.log('[ai-voice-chat] 이전 대화에서 파싱된 정보:', previousGoalInfo);
-      allGoalInfo = { ...previousGoalInfo };
+    // 목표 설정 중에는 이전 정보 유지, 홈화면에서만 초기화
+    if (context.screen === 'goalSetting') {
+      console.log('[ai-voice-chat] 목표 설정 모드 - conversationContext 확인:', conversationContext);
+      
+      // 이전 대화에서 이미 설정된 정보들 확인
+      if (conversationContext?.conversation_context) {
+        console.log('[ai-voice-chat] conversation_context 존재, 길이:', conversationContext.conversation_context.length);
+        console.log('[ai-voice-chat] extractPreviousGoalInfo 함수 호출 시작');
+        try {
+          const previousGoalInfo = extractPreviousGoalInfo(conversationContext.conversation_context);
+          console.log('[ai-voice-chat] extractPreviousGoalInfo 함수 실행 완료');
+          console.log('[ai-voice-chat] 이전 대화에서 파싱된 정보:', previousGoalInfo);
+          allGoalInfo = { ...previousGoalInfo };
+          console.log('[ai-voice-chat] previousGoalInfo 적용 후 allGoalInfo:', allGoalInfo);
+        } catch (error) {
+          console.error('[ai-voice-chat] extractPreviousGoalInfo 함수 실행 중 오류:', error);
+          allGoalInfo = {};
+        }
+      } else {
+        console.log('[ai-voice-chat] conversation_context가 없음');
+      }
+      
+      // 현재 입력에서 정보 파싱 및 추가 (이전 정보와 합쳐서 파싱)
+      const extractedInfo = parseGoalSettingInfo(transcribedText, allGoalInfo);
+      console.log('[ai-voice-chat] 현재 파싱된 정보:', extractedInfo);
+      allGoalInfo = { ...allGoalInfo, ...extractedInfo };
+      
+      console.log('[ai-voice-chat] 목표 설정 중 - 최종 allGoalInfo:', allGoalInfo);
+    } else {
+      // 홈화면 등에서는 새로운 목표 모드
+      console.log('[ai-voice-chat] 홈화면 모드 - 새로운 목표 시작');
+      allGoalInfo = {};
     }
-    
-    // 현재 입력에서 정보 파싱 및 추가
-    const extractedInfo = parseGoalSettingInfo(transcribedText);
-    console.log('[ai-voice-chat] 현재 파싱된 정보:', extractedInfo);
-    allGoalInfo = { ...allGoalInfo, ...extractedInfo };
-    
-    console.log('[ai-voice-chat] 최종 allGoalInfo:', allGoalInfo);
     
     // 화면별 맥락에 따른 프롬프트 생성 (목표 정보 포함)
     const getContextualPrompt = (context, userGoals) => {
@@ -326,17 +532,18 @@ serve(async (req) => {
           const stepInfo = getGoalSettingStepInfo(currentStep, allGoalInfo);
           basePrompt = `사용자가 목표 설정 ${currentStep}단계에 있어요. ${stepInfo}
           
-          IMPORTANT: 당신은 목표 설정 코치입니다. 사용자가 단순히 인사만 해도 다음 단계로 진행시켜야 합니다.
+          CRITICAL: 당신은 목표 설정 코치입니다. 사용자가 "안녕하세요", "반갑습니다" 등 인사만 해도 무조건 다음 단계로 진행하세요!
           
           현재 단계: ${currentStep}단계
-          - 1단계: 목표 내용 파악 (예: "어떤 목표를 이루고 싶으신가요?")
-          - 2단계: 목표 기간 설정 (예: "언제까지 달성하고 싶으신가요?")
-          - 3단계: 실천 시간 설정 (예: "언제 시간을 내서 실천하고 싶으신가요?")
-          - 4단계: 어려운 점 파악 (예: "이 습관을 형성하는 데 어려운 점이 있나요?")
-          - 5단계: 강도 설정 (예: "목표 달성 난이도는 어느 정도로 설정하고 싶으신가요? 높음/보통/낮음")
+          - 1단계: 목표 내용 파악 → "어떤 목표를 이루고 싶으신가요?"
+          - 2단계: 목표 기간 설정 → "언제까지 달성하고 싶으신가요?"
+          - 3단계: 실천 시간 설정 → "언제 시간을 내서 실천하고 싶으신가요?"
+          - 4단계: 어려운 점 파악 → "이 습관을 형성하는 데 어려운 점이 있나요?"
+          - 5단계: 강도 설정 → "목표 달성 난이도는 어느 정도로 설정하고 싶으신가요? 높음/보통/낮음"
           
           IMPORTANT: 5단계가 완료되면 사용자에게 "목표 설정이 완료되었습니다! 이제 루틴을 만들어드릴게요."라고 말하고 
           골세팅 5번 화면으로 이동하도록 안내해주세요.
+          CRITICAL: 사용자가 인사만 해도 무조건 위의 해당 단계 질문을 던져주세요!
           
           사용자가 이미 제공한 정보 (이전 대화 포함):
           ${JSON.stringify(allGoalInfo, null, 2)}
@@ -357,86 +564,82 @@ serve(async (req) => {
           응답 데이터에 goalSettingComplete: true와 nextScreen: 'goalSettingStep5'를 포함시켜주세요.
           더 이상 질문하지 마세요.
           
-          사용자가 인사만 해도 다음 단계 질문을 던져주세요!`;
+          CRITICAL: 사용자가 인사만 해도 무조건 다음 단계 질문을 던져주세요!`;
           break;
         case 'home':
-          basePrompt = `사용자가 홈화면에서 열었어요. 
-          
-          IMPORTANT: 당신은 홈 화면 코치입니다. 사용자가 단순히 인사만 해도 목표 진행 상황을 체크하고 동기부여를 해야 합니다.
-          
-          사용 가능한 데이터를 최대한 활용하세요:
-          
-          사용자 목표 정보 (userGoals):
-          - 목표명: ${userGoals?.map(g => g.habit_name).join(', ') || '없음'}
-          - 목표 기간: ${userGoals?.map(g => g.goal_period).join(', ') || '없음'}
-          - 실천 시간: ${userGoals?.map(g => g.available_time).join(', ') || '없음'}
-          - 어려운 점: ${userGoals?.map(g => g.difficulty_reason).join(', ') || '없음'}
-          - 제한 앱: ${userGoals?.map(g => g.restricted_apps).join(', ') || '없음'}
-          - 코칭 스타일: ${userGoals?.map(g => g.persona).join(', ') || '없음'}
-          
-          이전 대화 맥락 (conversationContext):
-          - 최근 대화 내용: ${conversationContext?.conversation_context || '없음'}
-          - 사용자 감정 상태: ${conversationContext?.recent_emotions?.join(', ') || '없음'}
-          
-          홈 화면에서의 역할:
-          - 목표 진행 상황 점검 및 격려
-          - 일상적인 동기부여 및 응원
-          - 목표 달성에 도움이 되는 조언
-          - 사용자의 감정 상태 파악 및 케어
-          
-          상황별 맞춤형 대응:
-          
-          1. 목표가 있는 경우 (구체적인 목표 정보 활용):
-          - "오늘 ${userGoals?.[0]?.habit_name || '목표'} 진행은 어땠나요? ${userGoals?.[0]?.available_time || '설정된 시간'}에 잘 하고 계시나요?"
-          - "${userGoals?.[0]?.difficulty_reason || '어려운 점'}은 여전히 힘드신가요? 함께 해결해볼까요?"
-          - "정말 대단해요! ${userGoals?.[0]?.goal_period || '목표 기간'} 동안 꾸준히 하고 계시는군요!"
-          
-          2. 목표가 없는 경우:
-          - "새로운 목표를 설정해보는 건 어떨까요?"
-          - "어떤 습관을 만들고 싶으신가요?"
-          - "루티가 함께 도와드릴게요!"
-          
-          3. 일반적인 인사 (이전 대화 맥락 활용):
-          - "안녕하세요! 오늘 하루는 어땠나요?"
-          - "목표 달성을 위해 오늘도 힘내세요!"
-          - "무엇을 도와드릴까요?"
-          
-          사용자가 인사만 해도 구체적인 목표 정보와 이전 대화 맥락을 활용해서 맞춤형 동기부여를 해주세요!`;
+          // 홈화면에서 새로운 목표 추가인 경우
+          if (context.isNewGoal) {
+            basePrompt = `사용자가 홈화면에서 + 버튼을 눌러 새로운 목표를 추가하려고 합니다.
+            
+            CRITICAL: 완전히 새로운 목표 설정을 시작해야 합니다. 기존 목표나 이전 대화와는 무관하게 진행하세요.
+            
+            새로운 목표 설정을 위한 안내:
+            - 사용자에게 새로운 목표 설정을 시작한다고 안내
+            - 목표 설정 1단계로 자연스럽게 진행
+            - 기존 목표나 이전 대화는 언급하지 않기
+            
+            사용자가 인사만 해도 "새로운 목표를 설정해보시겠어요?"라고 말하고 목표 설정을 시작하세요.`;
+          } else {
+            basePrompt = `사용자가 홈화면에서 열었어요. 
+            
+            IMPORTANT: 당신은 홈 화면 코치입니다. 사용자가 단순히 인사만 해도 목표 진행 상황을 체크하고 동기부여를 해야 합니다.
+            
+            사용 가능한 데이터를 최대한 활용하세요:
+            
+            사용자 목표 정보 (userGoals):
+            - 목표명: ${userGoals?.map(g => g.habit_name).join(', ') || '없음'}
+            - 목표 기간: ${userGoals?.map(g => g.goal_period).join(', ') || '없음'}
+            - 실천 시간: ${userGoals?.map(g => g.available_time).join(', ') || '없음'}
+            - 어려운 점: ${userGoals?.map(g => g.difficulty_reason).join(', ') || '없음'}
+            - 제한 앱: ${userGoals?.map(g => g.restricted_apps).join(', ') || '없음'}
+            - 코칭 스타일: ${userGoals?.map(g => g.persona).join(', ') || '없음'}
+            
+            이전 대화 맥락 (conversationContext):
+            - 최근 대화 내용: ${conversationContext?.conversation_context || '없음'}
+            - 사용자 감정 상태: ${conversationContext?.recent_emotions?.join(', ') || '없음'}
+            
+            홈 화면에서의 역할:
+            - 목표 진행 상황 점검 및 격려
+            - 일상적인 동기부여 및 응원
+            - 목표 달성에 도움이 되는 조언
+            - 사용자의 감정 상태 파악 및 케어
+            
+            상황별 맞춤형 대응:
+            
+            1. 목표가 있는 경우 (구체적인 목표 정보 활용):
+            - "오늘 ${userGoals?.[0]?.habit_name || '목표'} 진행은 어땠나요? ${userGoals?.[0]?.available_time || '설정된 시간'}에 잘 하고 계시나요?"
+            - "${userGoals?.[0]?.difficulty_reason || '어려운 점'}은 여전히 힘드신가요? 함께 해결해볼까요?"
+            - "정말 대단해요! ${userGoals?.[0]?.goal_period || '목표 기간'} 동안 꾸준히 하고 계시는군요!"
+            
+            2. 목표가 없는 경우:
+            - "새로운 목표를 설정해보는 건 어떨까요?"
+            - "어떤 습관을 만들고 싶으신가요?"
+            - "루티가 함께 도와드릴게요!"
+            
+            3. 일반적인 인사 (이전 대화 맥락 활용):
+            - "안녕하세요! 오늘 하루는 어땠나요?"
+            - "목표 달성을 위해 오늘도 힘내세요!"
+            - "무엇을 도와드릴까요?"
+            
+            사용자가 인사만 해도 구체적인 목표 정보와 이전 대화 맥락을 활용해서 맞춤형 동기부여를 해주세요!`;
+          }
           break;
         case 'report':
-          basePrompt = `사용자가 리포트 화면에서 열었어요. 
-          
-          IMPORTANT: 당신은 리포트 코치입니다. 사용자가 단순히 인사만 해도 리포트 작성을 유도해야 합니다.
-          
-          사용 가능한 데이터를 최대한 활용하세요:
-          
-          사용자 목표 정보 (userGoals):
-          - 목표명: ${userGoals?.map(g => g.habit_name).join(', ') || '없음'}
-          - 목표 기간: ${userGoals?.map(g => g.goal_period).join(', ') || '없음'}
-          - 실천 시간: ${userGoals?.map(g => g.available_time).join(', ') || '없음'}
-          - 어려운 점: ${userGoals?.map(g => g.difficulty_reason).join(', ') || '없음'}
-          
-          이전 대화 맥락 (conversationContext):
-          - 최근 대화 내용: ${conversationContext?.conversation_context || '없음'}
-          - 사용자 감정 상태: ${conversationContext?.recent_emotions?.join(', ') || '없음'}
-          
-          리포트 유형:
-          - 일간 리포트: 하루를 마치는 상황에서 오늘 하루를 돌아보고 평가
-          - 주간 리포트: 일일 리포트들을 종합해서 한 주를 정리하고 다음 주 계획 수립
-          
-          현재 상황에 맞는 맞춤형 질문을 던져주세요:
-          
-          일간 리포트 예시 질문 (목표 정보 활용):
-          - "오늘 ${userGoals?.[0]?.habit_name || '목표'} 진행은 어땠나요? ${userGoals?.[0]?.available_time || '설정된 시간'}에 잘 하고 계시나요?"
-          - "오늘 가장 만족스러웠던 순간은 언제였나요?"
-          - "내일은 ${userGoals?.[0]?.difficulty_reason || '어려운 점'}을 개선하고 싶으신가요?"
-          
-          주간 리포트 예시 질문 (이전 대화 맥락 활용):
-          - "이번 주는 전반적으로 어땠나요? ${userGoals?.[0]?.habit_name || '목표'} 달성률은 어느 정도인가요?"
-          - "이번 주 가장 어려웠던 순간은 언제였나요? ${conversationContext?.recent_emotions?.[0] || '감정 상태'}와 관련이 있나요?"
-          - "다음 주는 ${userGoals?.[0]?.goal_period || '목표 기간'}을 고려해서 어떤 계획을 세우고 싶으신가요?"
-          
-          사용자가 인사만 해도 구체적인 목표 정보와 이전 대화 맥락을 활용해서 맞춤형 리포트 작성을 유도해주세요!`;
+          basePrompt = `너는 리포트 작성 코치야.
+
+- 사용자가 하루나 한 주를 돌아보는 회고를 작성하도록 유도해야 해.
+- **\`userGoals\`** (사용자 목표 정보)와 **\`conversationContext\`** (이전 대화)를 활용해서 맞춤형 질문을 던져.
+- 예: "오늘 목표는 얼마나 달성하셨나요?", "이번 주에 가장 만족스러웠던 순간은 언제였나요?"
+
+사용자 목표 정보 (userGoals):
+- 목표명: ${userGoals?.map(g => g.habit_name).join(', ') || '없음'}
+- 목표 기간: ${userGoals?.map(g => g.goal_period).join(', ') || '없음'}
+- 실천 시간: ${userGoals?.map(g => g.available_time).join(', ') || '없음'}
+- 어려운 점: ${userGoals?.map(g => g.difficulty_reason).join(', ') || '없음'}
+
+이전 대화 맥락 (conversationContext):
+- 최근 대화 내용: ${conversationContext?.conversation_context || '없음'}
+- 사용자 감정 상태: ${conversationContext?.recent_emotions?.join(', ') || '없음'}`;
           break;
         default:
           basePrompt = "일반적인 대화를 이어가세요.";
@@ -482,20 +685,49 @@ IMPORTANT RULES:
 
              // 이전 대화 맥락을 포함한 프롬프트 생성
          let conversationMemory = "";
-         if (conversationContext && conversationContext.conversation_context) {
-           conversationMemory = `\n\n이전 대화 맥락 (최근 7일간):\n${conversationContext.conversation_context}`;
-           
-           if (conversationContext.recent_emotions && conversationContext.recent_emotions.length > 0) {
-             conversationMemory += `\n사용자 최근 감정 상태: ${conversationContext.recent_emotions.join(', ')}`;
-           }
-         }
-         
-                   const llmPrompt = `${systemPrompt}\n\n맥락: ${contextualPrompt}${conversationMemory}\n\n사용자: "${transcribedText}"\n\n규칙: 2문장 내로만 답해. 절대 길게 말하지 마.\n\nIMPORTANT: 위의 맥락 정보를 반드시 기억하고 따르세요. 사용자가 이미 제공한 정보를 무시하지 마세요.`;
     
-          // 디버깅을 위한 최종 프롬프트 로그
-      console.log('[ai-voice-chat] 최종 LLM 프롬프트:', llmPrompt);
-      console.log('[ai-voice-chat] allGoalInfo 상태:', allGoalInfo);
-      console.log('[ai-voice-chat] conversationContext 상태:', conversationContext);
+    // 목표 설정 중에는 이전 대화 맥락 포함 (메모리 유지)
+    if (context.screen === 'goalSetting' || !context.isNewGoal) {
+      if (conversationContext && conversationContext.conversation_context) {
+        conversationMemory = `\n\n이전 대화 맥락 (최근 7일간):\n${conversationContext.conversation_context}`;
+        
+        if (conversationContext.recent_emotions && conversationContext.recent_emotions.length > 0) {
+          conversationMemory += `\n사용자 최근 감정 상태: ${conversationContext.recent_emotions.join(', ')}`;
+        }
+      }
+      
+      // 클라이언트에서 전달받은 현재 세션 대화 기억도 추가
+      if (context.conversationMemory && context.conversationMemory.trim()) {
+        if (conversationMemory) {
+          conversationMemory += `\n\n현재 세션 대화 기억:\n${context.conversationMemory}`;
+        } else {
+          conversationMemory = `\n\n현재 세션 대화 기억:\n${context.conversationMemory}`;
+        }
+        console.log('[ai-voice-chat] 클라이언트 대화 기억 추가됨:', context.conversationMemory.length, '자');
+      }
+    } else {
+      console.log('[ai-voice-chat] 홈화면 새로운 목표 모드 - 이전 대화 맥락 무시');
+    }
+    
+    // 디버깅을 위한 맥락 정보 로그
+    console.log('[ai-voice-chat] 맥락 정보 요약:', {
+      isNewGoal: context.isNewGoal,
+      hasConversationContext: !!conversationContext?.conversation_context,
+      hasClientMemory: !!context.conversationMemory,
+      conversationMemoryLength: conversationMemory.length,
+      clientMemoryLength: context.conversationMemory?.length || 0
+    });
+    
+    const llmPrompt = `${systemPrompt}\n\n맥락: ${contextualPrompt}${conversationMemory}\n\n사용자: "${transcribedText}"\n\n규칙: 2문장 내로만 답해. 절대 길게 말하지 마.\n\nIMPORTANT: 위의 맥락 정보를 반드시 기억하고 따르세요. 사용자가 이미 제공한 정보를 무시하지 마세요.`;
+    
+    // 디버깅을 위한 최종 프롬프트 로그
+    console.log('[ai-voice-chat] 최종 LLM 프롬프트 길이:', llmPrompt.length);
+    console.log('[ai-voice-chat] 맥락 정보 포함 여부:', {
+      hasContextualPrompt: !!contextualPrompt,
+      hasConversationMemory: !!conversationMemory,
+      isNewGoal: context.isNewGoal,
+      totalPromptLength: llmPrompt.length
+    });
     
     const llmResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST', 

@@ -45,6 +45,7 @@ export interface VoiceChatScreenProps {
   onError?: (error: string) => void;
   onSwitchToText?: () => void;
   enableStepProgression?: boolean;
+  isNewGoal?: boolean; // 새로운 목표 추가 여부
 }
 
 interface GoalSettingStepData {
@@ -80,6 +81,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   onError,
   onSwitchToText,
   enableStepProgression = true,
+  isNewGoal = false, // 새로운 목표 추가 여부
 }) => {
   const [currentState, setCurrentState] = useState<VoiceChatState>('idle');
   const [isPaused, setIsPaused] = useState(false);
@@ -105,17 +107,75 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
   const [progressValue, setProgressValue] = useState(0);
   const shouldEnableStepProgression = mode === 'goalSetting' && enableStepProgression;
 
+  // --- Session Management for Context Persistence ---
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [conversationMemory, setConversationMemory] = useState<string>(''); // 대화 기억 추가
+
   // --- Animations ---
   const fadeAnim = useSharedValue(0);
   const scaleAnim = useSharedValue(0.8);
   const textFadeAnim = useSharedValue(0);
+
+  // 세션 초기화 함수
+  const initializeSession = useCallback(() => {
+    const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setSessionId(newSessionId);
+    setSessionStartTime(new Date());
+    
+    // 새로운 목표 추가인 경우 대화 기록 초기화
+    if (isNewGoal) {
+      useHabitStore.getState().clearConversationHistory();
+      setConversationMemory('');
+      console.log('[음성채팅] 새로운 목표 추가 모드 - 대화 기록 초기화');
+    } else {
+      // 기존 대화 기록 유지
+      const store = useHabitStore.getState();
+      const history = store.conversationHistory;
+      if (history.length > 0) {
+        const recentMessages = history.slice(-10).map(msg => `${msg.role}: ${msg.text}`).join('\n');
+        setConversationMemory(recentMessages);
+        console.log('[음성채팅] 기존 대화 기록 로드:', recentMessages.length, '자');
+      } else {
+        console.log('[음성채팅] 기존 대화 기록 없음');
+      }
+    }
+    
+    console.log('[음성채팅] 새로운 세션 시작:', newSessionId, '새로운 목표:', isNewGoal);
+  }, [isNewGoal]);
+
+  // 세션 정리 함수
+  const cleanupSession = useCallback(() => {
+    setSessionId(null);
+    setSessionStartTime(null);
+    // 대화 기록도 정리 (새로운 세션을 위해)
+    useHabitStore.getState().clearConversationHistory();
+    console.log('[음성채팅] 세션 정리 완료');
+  }, []);
+
+  // 컴포넌트가 마운트되거나 mode가 변경될 때 세션 초기화
+  useEffect(() => {
+    if (visible && mode) {
+      // 이전 세션 정리 후 새로운 세션 시작
+      cleanupSession();
+      setTimeout(() => {
+        initializeSession();
+      }, 100);
+    }
+    return () => {
+      if (!visible) {
+        cleanupSession();
+      }
+    };
+  }, [visible, mode, initializeSession, cleanupSession]);
 
   // --- 새로운 비동기 작업 처리 함수 ---
   const processVoiceWithNewAsyncMethod = useCallback(async (base64Audio: string) => {
     try {
       console.log('[음성채팅] 새로운 비동기 방식으로 음성 처리 시작...');
       console.log('[음성채팅] 오디오 데이터 길이:', base64Audio.length);
-      console.log('[음성채팅] Supabase 클라이언트 상태 확인 중...');
+      console.log('[음성채팅] 현재 대화 기억:', conversationMemory.length, '자');
+      console.log('[음성채팅] 새로운 목표 모드:', isNewGoal);
       
       // Supabase 클라이언트 상태 확인
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -133,7 +193,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
         const { data: goals, error: goalsError } = await supabase
           .from('habits')
           .select('*')
-          .eq('user_id', supabase.auth.getUser().then(u => u.data.user?.id));
+          .eq('user_id', user?.id);
         
         if (goalsError) {
           console.error('[음성채팅] 목표 조회 오류:', goalsError);
@@ -148,11 +208,23 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       // 화면별 맥락 정보 전달 (목표 정보 포함)
       const context = {
         screen: mode === 'home' ? 'home' : mode, // 'goalSetting', 'home', 'report'
-        currentStep: shouldEnableStepProgression ? currentStep : undefined,
+        currentStep: mode === 'goalSetting' ? currentStep : (shouldEnableStepProgression ? currentStep : undefined),
         hasGoal: mode === 'home', // home 화면에서는 목표가 있다고 가정
         isDebugMode: isDebugMode, // 디버그 모드 상태 추가
-        userGoals: userGoals // 사용자 목표 정보 추가
+        userGoals: (mode === 'goalSetting' || isNewGoal) ? [] : userGoals, // 새로운 목표 추가 모드일 때는 기존 목표 정보 완전 무시
+        sessionId: sessionId, // 세션 ID 추가
+        sessionStartTime: sessionStartTime, // 세션 시작 시간 추가
+        isNewGoal: isNewGoal, // 새로운 목표 추가 여부
+        conversationMemory: conversationMemory // 대화 기억 추가
       };
+
+      console.log('[음성채팅] 전송할 컨텍스트:', {
+        screen: context.screen,
+        currentStep: context.currentStep,
+        isNewGoal: context.isNewGoal,
+        userGoalsLength: context.userGoals?.length || 0,
+        conversationMemoryLength: context.conversationMemory?.length || 0
+      });
 
       const { data, error } = await supabase.functions.invoke('ai-voice-chat', {
         body: { 
@@ -180,6 +252,12 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       addMessageToHistory({ role: 'user', text: userText });
       setAiResponseText(responseText); // AI 응답 텍스트 저장 (화면에는 아직 표시 안함)
       fullResponseTextRef.current = responseText;
+      
+      // 대화 기억 업데이트 (새로운 정보 추가)
+      const newMemory = `${conversationMemory}\n사용자: ${userText}\nAI: ${responseText}`.trim();
+      setConversationMemory(newMemory);
+      console.log('[음성채팅] 대화 기억 업데이트:', newMemory.length, '자');
+      
       // 화면에는 "생각중이에요" 상태 유지
       
       // 4. 즉시 ai-voice-finish 함수 호출 (트리거 대신)
@@ -302,76 +380,128 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
         }
         
         // 프로덕션 모드: 폴링 방식으로 빠르게 상태 확인 (0.3초마다)
-        const checkStatus = setInterval(async () => {
-          try {
-            const { data: jobData, error: jobError } = await supabase
-              .from('voice_processing_jobs')
-              .select('status, audio_url, error_message')
-              .eq('job_id', jobId)
-              .single();
-            
-            if (jobError) {
-              console.error('[음성채팅] 작업 상태 확인 실패:', jobError);
-              return;
-            }
-            
-            console.log('[음성채팅] 작업 상태 확인 중:', jobData.status);
-            
-            if (jobData.status === 'completed' && jobData.audio_url) {
-              console.log('[음성채팅] 드디어 음성 생성 완료!', jobData.audio_url);
-              clearInterval(checkStatus); // 폴링 중지
+        let checkStatus: any = null;
+        let timeoutId: any = null;
+        
+        const startPolling = () => {
+          // 기존 폴링이 있다면 중지
+          if (checkStatus) {
+            clearInterval(checkStatus);
+            checkStatus = null;
+          }
+          
+          // 기존 타임아웃이 있다면 중지
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
+          checkStatus = setInterval(async () => {
+            try {
+              const { data: jobData, error: jobError } = await supabase
+                .from('voice_processing_jobs')
+                .select('status, audio_url, error_message')
+                .eq('job_id', jobId)
+                .single();
               
-              // 6. 오디오 URL을 사용하여 음성 재생
-              try {
-                if (sound) {
-                  await sound.unloadAsync();
-                }
-                
-                // 음성 재생 시작 시 상태 변경
-                setCurrentState('speaking'); // "말하고 있어요" 상태
-                setDisplayedText(aiResponseText); // AI 응답 텍스트를 subtitle에 표시
-                
-                const { sound: newSound } = await Audio.Sound.createAsync(
-                  { uri: jobData.audio_url },
-                  { shouldPlay: true }
-                );
-                
-                setSound(newSound);
-                newSound.setOnPlaybackStatusUpdate((status) => {
-                  if (status.isLoaded && status.didJustFinish) {
-                    console.log('[음성채팅] 음성 재생 완료');
-                    newSound.unloadAsync();
-                    setSound(null);
-                    setCurrentState('idle');
-                    setDisplayedText(''); // 텍스트 초기화
-                    setAiResponseText(''); // AI 응답 텍스트 초기화
-                  }
-                });
-                
-              } catch (audioError) {
-                console.error('[음성채팅] 음성 재생 실패:', audioError);
-                setCurrentState('idle');
-                setDisplayedText('');
-                setAiResponseText('');
+              if (jobError) {
+                console.error('[음성채팅] 작업 상태 확인 실패:', jobError);
+                return;
               }
               
-            } else if (jobData.status === 'failed') {
-              console.error('[음성채팅] 음성 생성 실패:', jobData.error_message);
-              clearInterval(checkStatus); // 폴링 중지
-              setDisplayedText('음성 생성에 실패했어요. 다시 시도해주세요.');
-              setCurrentState('error');
+              console.log('[음성채팅] 작업 상태 확인 중:', jobData.status);
+              
+              if (jobData.status === 'completed' && jobData.audio_url) {
+                console.log('[음성채팅] 드디어 음성 생성 완료!', jobData.audio_url);
+                
+                // 폴링과 타임아웃 모두 중지
+                if (checkStatus) {
+                  clearInterval(checkStatus);
+                  checkStatus = null;
+                }
+                if (timeoutId) {
+                  clearTimeout(timeoutId);
+                  timeoutId = null;
+                }
+                
+                // 6. 오디오 URL을 사용하여 음성 재생
+                try {
+                  if (sound) {
+                    await sound.unloadAsync();
+                  }
+                  
+                  // 음성 재생 시작 시 상태 변경
+                  setCurrentState('speaking'); // "말하고 있어요" 상태
+                  setDisplayedText(aiResponseText); // AI 응답 텍스트를 subtitle에 표시
+                  
+                  const { sound: newSound } = await Audio.Sound.createAsync(
+                    { uri: jobData.audio_url },
+                    { shouldPlay: true }
+                  );
+                  
+                  setSound(newSound);
+                  newSound.setOnPlaybackStatusUpdate((status) => {
+                    if (status.isLoaded && status.didJustFinish) {
+                      console.log('[음성채팅] 음성 재생 완료');
+                      newSound.unloadAsync();
+                      setSound(null);
+                      setCurrentState('idle');
+                      setDisplayedText(''); // 텍스트 초기화
+                      setAiResponseText(''); // AI 응답 텍스트 초기화
+                    }
+                  });
+                  
+                } catch (audioError) {
+                  console.error('[음성채팅] 음성 재생 실패:', audioError);
+                  setCurrentState('idle');
+                  setDisplayedText('');
+                  setAiResponseText('');
+                }
+                
+              } else if (jobData.status === 'failed') {
+                console.error('[음성채팅] 음성 생성 실패:', jobData.error_message);
+                
+                // 폴링과 타임아웃 모두 중지
+                if (checkStatus) {
+                  clearInterval(checkStatus);
+                  checkStatus = null;
+                }
+                if (timeoutId) {
+                  clearTimeout(timeoutId);
+                  timeoutId = null;
+                }
+                
+                setDisplayedText('음성 생성에 실패했어요. 다시 시도해주세요.');
+                setCurrentState('error');
+              }
+              
+            } catch (checkError) {
+              console.error('[음성채팅] 작업 상태 확인 중 오류:', checkError);
+              
+              // 오류 발생 시에도 폴링과 타임아웃 모두 중지
+              if (checkStatus) {
+                clearInterval(checkStatus);
+                checkStatus = null;
+              }
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+              }
             }
-            
-            // 10초 후에도 완료되지 않으면 타임아웃
-            setTimeout(() => {
+          }, 300);
+          
+          // 10초 후에도 완료되지 않으면 타임아웃
+          timeoutId = setTimeout(() => {
+            if (checkStatus) {
               clearInterval(checkStatus);
-              console.log('[음성채팅] 음성 생성 타임아웃');
-            }, 10000);
-            
-          } catch (checkError) {
-            console.error('[음성채팅] 작업 상태 확인 중 오류:', checkError);
-          }
-        }, 300); // 0.3초마다 확인 (더 빠른 응답)
+              checkStatus = null;
+            }
+            console.log('[음성채팅] 음성 생성 타임아웃');
+          }, 10000);
+        };
+        
+        // 폴링 시작
+        startPolling();
         
       } catch (finishError) {
         console.error('[음성채팅] ai-voice-finish 처리 실패:', finishError);
@@ -384,7 +514,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       setCurrentState('error');
       setDisplayedText('오류가 발생했어요. 다시 시도해주세요.');
     }
-  }, [addMessageToHistory, sound]);
+  }, [addMessageToHistory, sound, sessionId, sessionStartTime, mode, currentStep, shouldEnableStepProgression, isDebugMode, isNewGoal, conversationMemory]);
 
 
 

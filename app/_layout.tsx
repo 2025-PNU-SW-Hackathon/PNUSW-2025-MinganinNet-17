@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import { useFonts } from 'expo-font';
 import { supabase } from '../backend/supabase/client';
+import { getActivePlan } from '../backend/supabase/habits';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function RootLayout() {
@@ -100,7 +101,7 @@ export default function RootLayout() {
         if (!isAutoNavigationHandled) {
           console.log('🚀 === 세션 복원 완료 - 자동 네비게이션 시작 ===');
           
-          const navigate = () => {
+          const navigate = async () => {
             if (isNavigationReady) {
               if (pendingNotificationRoute === 'report') {
                 // 알림을 통한 접속 → 리포트 화면
@@ -114,8 +115,23 @@ export default function RootLayout() {
                 setPendingNotificationRoute(null);
               } else {
                 // 일반 접속 → 메인 화면 (홈 탭)
-                router.replace('/(tabs)');
-                console.log('✅ 일반 세션 복원 → 메인 화면으로 이동 (로그인 화면 우회)');
+                // 목표가 있는지 먼저 확인
+                try {
+                  const activePlan = await getActivePlan();
+                  if (activePlan) {
+                    router.replace('/(tabs)');
+                    console.log('✅ 일반 세션 복원 → 메인 화면으로 이동 (목표 있음)');
+                  } else {
+                    // 목표가 없어도 (tabs)로 이동 - MainApp에서 목표 설정 화면 처리
+                    router.replace('/(tabs)');
+                    console.log('🎯 일반 세션 복원 → (tabs)로 이동 (목표 없음, MainApp에서 처리)');
+                  }
+                } catch (error) {
+                  console.error('목표 확인 중 오류:', error);
+                  // 에러 발생 시에도 (tabs)로 이동
+                  router.replace('/(tabs)');
+                  console.log('🚨 에러 발생 - (tabs)로 이동');
+                }
               }
               
               // 자동 네비게이션 완료 플래그 설정 (중복 실행 방지)

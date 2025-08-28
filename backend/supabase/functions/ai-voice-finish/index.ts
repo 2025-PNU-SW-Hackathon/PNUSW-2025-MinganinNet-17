@@ -40,8 +40,8 @@ serve(async (req) => {
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // 1. 더 빠른 Gemini TTS 사용 (속도 최적화)
-    const ttsApiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-tts:generateContent?key=${geminiApiKey}`, {
+    // 1. Gemini 2.5 Flash Preview TTS 사용 (속도 최적화)
+    const ttsApiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${geminiApiKey}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           contents: [{ parts: [{ text: job.response_text }] }], 
@@ -55,8 +55,44 @@ serve(async (req) => {
           } 
         })
     });
-    if (!ttsApiResponse.ok) throw new Error(`TTS API 오류: ${await ttsApiResponse.text()}`);
-    const pcmBase64 = (await ttsApiResponse.json()).candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    
+    if (!ttsApiResponse.ok) {
+      const errorText = await ttsApiResponse.text();
+      let errorData;
+      
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: { code: 'unknown', message: errorText } };
+      }
+      
+      // 429 오류 (할당량 초과) 시 특별 처리
+      if (errorData.error?.code === 429) {
+        console.error(`[FINISH] TTS API 할당량 초과 (429). 작업을 건너뛰고 나중에 재시도하도록 설정.`);
+        
+        // 작업 상태를 'retry_later'로 설정
+        await supabaseAdmin
+          .from('voice_processing_jobs')
+          .update({ 
+            status: 'retry_later', 
+            error_message: 'TTS API 할당량 초과. 나중에 재시도 예정.' 
+          })
+          .eq('job_id', job.job_id);
+        
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'TTS API 할당량 초과',
+          status: 'retry_later',
+          message: '나중에 자동으로 재시도됩니다.'
+        }));
+      }
+      
+      // 다른 오류는 그대로 던지기
+      throw new Error(`TTS API 오류: ${errorText}`);
+    }
+    
+    const ttsResult = await ttsApiResponse.json();
+    const pcmBase64 = ttsResult.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!pcmBase64) throw new Error("TTS 응답에 오디오 데이터가 없습니다.");
     
     // 2. 디버그 모드에 따른 처리 분기

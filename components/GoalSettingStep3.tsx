@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Alert,
     Platform,
@@ -17,12 +17,14 @@ interface GoalSettingStep3Props {
   onNext?: (difficulty: string) => void;
   onBack?: () => void;
   initialValue?: string;
+  collectedGoalInfo?: any; // 음성으로 수집된 목표 정보
 }
 
 export default function GoalSettingStep3({
   onNext,
   onBack,
-  initialValue = ''
+  initialValue = '',
+  collectedGoalInfo
 }: GoalSettingStep3Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
@@ -31,6 +33,31 @@ export default function GoalSettingStep3({
   const [customDifficulty, setCustomDifficulty] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(initialValue === '기타' || false);
   const { setDifficultyReason } = useHabitStore();
+
+  // collectedGoalInfo에서 어려운 점 정보 추출하여 미리 채우기
+  useEffect(() => {
+    if (collectedGoalInfo?.difficulty) {
+      // AI가 말한 어려운 점을 버튼 옵션에 맞게 매핑
+      let difficultyToSet = '의지 부족'; // 기본값
+      
+      if (collectedGoalInfo.difficulty.includes('시간') || collectedGoalInfo.difficulty.includes('바쁘')) {
+        difficultyToSet = '시간 부족';
+      } else if (collectedGoalInfo.difficulty.includes('잊어') || collectedGoalInfo.difficulty.includes('기억')) {
+        difficultyToSet = '자꾸 잊어버림';
+      } else if (collectedGoalInfo.difficulty.includes('성과') || collectedGoalInfo.difficulty.includes('결과')) {
+        difficultyToSet = '성과가 보이지 않음';
+      } else if (collectedGoalInfo.difficulty.includes('의지') || collectedGoalInfo.difficulty.includes('동기')) {
+        difficultyToSet = '의지 부족';
+      } else {
+        // 매칭되는 옵션이 없으면 기타로 설정
+        difficultyToSet = '기타';
+        setCustomDifficulty(collectedGoalInfo.difficulty);
+        setShowCustomInput(true);
+      }
+      
+      setSelectedDifficulty(difficultyToSet);
+    }
+  }, [collectedGoalInfo]);
 
   const difficultyOptions = [
     { key: '의지 부족', label: '의지 부족' },

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Alert,
     Dimensions,
@@ -21,12 +21,14 @@ interface GoalSettingStep2Props {
   onNext?: (data: { duration: string; timeWindow: string }) => void;
   onBack?: () => void;
   initialValue?: { duration?: string; timeWindow?: string };
+  collectedGoalInfo?: any; // 음성으로 수집된 목표 정보
 }
 
 export default function GoalSettingStep2({
   onNext,
   onBack,
-  initialValue = {}
+  initialValue = {},
+  collectedGoalInfo
 }: GoalSettingStep2Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
@@ -44,6 +46,81 @@ export default function GoalSettingStep2({
   const [tempTime, setTempTime] = useState({ hours: 19, minutes: 0 });
 
   const { setAvailableTime, setGoalPeriod } = useHabitStore();
+
+  // collectedGoalInfo에서 기간과 시간 정보 추출하여 미리 채우기
+  useEffect(() => {
+    if (collectedGoalInfo) {
+      // 기간 정보 추출 - 버튼 선택 상태로 설정
+      if (collectedGoalInfo.period) {
+        // AI가 말한 기간을 버튼 옵션에 맞게 변환
+        let periodToSet = collectedGoalInfo.period;
+        
+        // AI가 "3개월"이라고 했으면 "3개월" 버튼 선택
+        if (collectedGoalInfo.period.includes('3개월')) {
+          periodToSet = '3개월';
+        } else if (collectedGoalInfo.period.includes('6개월')) {
+          periodToSet = '6개월';
+        } else if (collectedGoalInfo.period.includes('9개월')) {
+          periodToSet = '9개월';
+        } else {
+          // 다른 기간이면 커스텀으로 설정
+          const monthMatch = collectedGoalInfo.period.match(/(\d+)개월/);
+          if (monthMatch) {
+            const month = parseInt(monthMatch[1]);
+            periodToSet = `직접 입력: ${month}개월`;
+            setTempMonth(month);
+          }
+        }
+        setSelectedDuration(periodToSet);
+      }
+      
+      // 시간 정보 추출 - AI가 말한 시간을 시간 선택기에 반영
+      if (collectedGoalInfo.time) {
+        console.log('[GoalSettingStep2] AI가 말한 시간:', collectedGoalInfo.time);
+        
+        // 시간 범위 패턴 확인 (예: "오후 5시부터 7시까지")
+        const timeRangeMatch = collectedGoalInfo.time.match(/(\d+)시\s*부터\s*(\d+)시\s*까지/);
+        if (timeRangeMatch) {
+          const startHour = parseInt(timeRangeMatch[1]);
+          const endHour = parseInt(timeRangeMatch[2]);
+          
+          // 오후/저녁 시간대 처리
+          let adjustedStartHour = startHour;
+          let adjustedEndHour = endHour;
+          
+          if (collectedGoalInfo.time.includes('오후') || collectedGoalInfo.time.includes('저녁')) {
+            if (startHour < 12) {
+              adjustedStartHour = startHour + 12;
+            }
+            if (endHour < 12) {
+              adjustedEndHour = endHour + 12;
+            }
+          }
+          
+          setStartTime({ hours: adjustedStartHour, minutes: 0 });
+          setEndTime({ hours: adjustedEndHour, minutes: 0 });
+          console.log('[GoalSettingStep2] 시간 범위 설정:', { start: adjustedStartHour, end: adjustedEndHour });
+        } else {
+          // 단일 시간 패턴 (예: "아침 7시", "오후 5시")
+          const timeMatch = collectedGoalInfo.time.match(/(\d+)시/);
+          if (timeMatch) {
+            let hour = parseInt(timeMatch[1]);
+            
+            // 오전/오후 시간대 처리
+            if (collectedGoalInfo.time.includes('오후') || collectedGoalInfo.time.includes('저녁')) {
+              if (hour < 12) {
+                hour = hour + 12;
+              }
+            }
+            
+            setStartTime({ hours: hour, minutes: 0 });
+            setEndTime({ hours: hour + 1, minutes: 0 });
+            console.log('[GoalSettingStep2] 단일 시간 설정:', { hour, start: hour, end: hour + 1 });
+          }
+        }
+      }
+    }
+  }, [collectedGoalInfo]);
 
   // Generate hours (00-23) and minutes (00, 15, 30, 45)
   const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -327,6 +404,15 @@ export default function GoalSettingStep2({
             <Text style={styles.sectionTitle}>프로젝트 기간</Text>
             <Text style={styles.sectionSubtitle}>목표 달성까지 얼마나 걸릴까요?</Text>
           </View>
+          
+          {/* AI가 수집한 기간 정보 표시 */}
+          {collectedGoalInfo?.period && (
+            <View style={styles.timeWindowSummary}>
+              <Text style={styles.timeWindowSummaryText}>
+                🎯 AI가 수집한 기간: {collectedGoalInfo.period}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.durationContainer}>
             {durationButtons.map((duration) => (
@@ -359,6 +445,15 @@ export default function GoalSettingStep2({
             <Text style={styles.sectionTitle}>일일 가용시간</Text>
             <Text style={styles.sectionSubtitle}>매일 언제 시간을 내실 수 있나요?</Text>
           </View>
+          
+          {/* AI가 수집한 시간 정보 표시 */}
+          {collectedGoalInfo?.time && (
+            <View style={styles.timeWindowSummary}>
+              <Text style={styles.timeWindowSummaryText}>
+                🎯 AI가 수집한 정보: {collectedGoalInfo.time}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.timeWindowContainer}>
             {/* From Time */}
@@ -696,4 +791,6 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
+  
+
 }); 
