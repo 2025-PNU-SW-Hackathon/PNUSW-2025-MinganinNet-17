@@ -58,12 +58,12 @@ export default function WeeklyReportResult({
   const overallAverage = 8.63;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.figma.white }]}>
       {/* Header Section with coral background */}
-      <View style={[styles.headerSection, { backgroundColor: colors.error }]}>
+      <View style={[styles.headerSection, { backgroundColor: colors.figma.critical }]}>
         {/* Back button */}
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+          <Text style={styles.backButtonText}>‹</Text>
         </TouchableOpacity>
         
         {/* Filter buttons */}
@@ -86,32 +86,31 @@ export default function WeeklyReportResult({
         contentContainerStyle={styles.scrollContainer}
       >
         {/* Main Content Card */}
-        <View style={[styles.mainCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.mainCard, { backgroundColor: colors.figma.yellow }]}>
           {/* Title */}
-          <Text style={[styles.cardTitle, { color: colors.text }]}>
+          <Text style={[styles.cardTitle, { color: colors.figma.darkGray }]}>
             일간 달성률 분석 결과
+          </Text>
+          
+          {/* Overall Average */}
+          <Text style={[styles.overallAverageText, { color: colors.figma.darkGray }]}>
+            전체 평균 달성률 : {overallAverage} 점
           </Text>
           
           {/* Score Section */}
           <View style={styles.scoreSection}>
             <View style={styles.scoreContainer}>
-              <Text style={[styles.overallAverageText, { color: colors.textMuted }]}>
-                전체 평균 달성률 : {overallAverage} 점
+              <Text style={[styles.currentScoreLabel, { color: colors.figma.darkGray }]}>
+                가장 최근 주의 달성점수
               </Text>
-              
-              <View style={styles.currentScoreContainer}>
-                <Text style={[styles.currentScoreLabel, { color: colors.textMuted }]}>
-                  가장 최근 주의 달성점수
-                </Text>
-                <Text style={[styles.currentScoreValue, { color: colors.error }]}>
-                  {formatScore(currentWeekData.averageScore)}
-                </Text>
-              </View>
+              <Text style={[styles.currentScoreValue, { color: colors.figma.critical }]}>
+                {formatScore(currentWeekData.averageScore)}
+              </Text>
             </View>
             
             {/* Status Badge */}
-            <View style={[styles.statusBadge, { backgroundColor: scoreStatus.backgroundColor }]}>
-              <Text style={styles.statusBadgeText}>{scoreStatus.label}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: colors.figma.critical }]}>
+              <Text style={styles.statusBadgeText}>아쉬워요</Text>
             </View>
           </View>
           
@@ -126,15 +125,15 @@ export default function WeeklyReportResult({
           
           {/* Analysis Text */}
           <View style={styles.analysisContainer}>
-            <Text style={[styles.analysisText, { color: colors.text }]}>
+            <Text style={[styles.analysisText, { color: colors.figma.darkGray }]}>
               마지막 주가 조금 아쉽지만, 이번 달도 높은 달성률을 유지하고 있어. 잘 하고 있는데?
             </Text>
             
-            <Text style={[styles.analysisText, { color: colors.text }]}>
+            <Text style={[styles.analysisText, { color: colors.figma.darkGray }]}>
               특히나 눈에 띄는건 지난 7월이야. 내가 내줬던 수동태-비 수동태 문법 과제들과 단어 연습을 훌륭하게 해냈어.
             </Text>
             
-            <Text style={[styles.analysisText, { color: colors.text }]}>
+            <Text style={[styles.analysisText, { color: colors.figma.darkGray }]}>
               자세한 내용은 서로 대화하면서 분석해보자고.
             </Text>
           </View>
@@ -142,16 +141,16 @@ export default function WeeklyReportResult({
         
         {/* CTA Button */}
         <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: colors.text }]}
+          style={[styles.ctaButton, { backgroundColor: colors.figma.darkGray }]}
           onPress={onStartChat || onBack}
           activeOpacity={0.8}
         >
-          <Text style={[styles.ctaButtonText, { color: colors.background }]}>
+          <Text style={[styles.ctaButtonText, { color: colors.figma.white }]}>
             Routy와 상담 진행하기
           </Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -160,38 +159,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
-    paddingTop: 20,
+    paddingTop: 32,
     paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
+    height: 259,
   },
   backButton: {
     position: 'absolute',
-    top: 20,
+    top: 32,
     left: 20,
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
   },
   backButtonText: {
-    fontSize: 20,
-    color: '#ffffff',
+    fontSize: 24,
+    color: '#10152C',
     fontWeight: 'bold',
   },
   filterButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 60,
-    paddingHorizontal: 10,
+    marginTop: 93 - 32,
+    paddingHorizontal: 7,
   },
   filterButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderRadius: 25,
+    borderRadius: 50,
     paddingHorizontal: 15,
     paddingVertical: 8,
     flexDirection: 'row',
@@ -199,30 +197,31 @@ const styles = StyleSheet.create({
     maxWidth: screenWidth * 0.45,
   },
   activeFilter: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   filterButtonText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#10152c',
+    color: '#10152C',
     marginRight: 6,
   },
   filterButtonIcon: {
     fontSize: 12,
-    color: '#10152c',
+    color: '#10152C',
   },
   scrollContent: {
     flex: 1,
   },
   scrollContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingHorizontal: 27,
+    paddingTop: 17,
     paddingBottom: 100,
   },
   mainCard: {
     borderRadius: 40,
     padding: 24,
     marginBottom: 24,
+    marginTop: -90,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -235,8 +234,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  overallAverageText: {
+    fontSize: 11,
     marginBottom: 16,
-    textAlign: 'center',
   },
   scoreSection: {
     flexDirection: 'row',
@@ -246,10 +249,6 @@ const styles = StyleSheet.create({
   },
   scoreContainer: {
     flex: 1,
-  },
-  overallAverageText: {
-    fontSize: 11,
-    marginBottom: 8,
   },
   currentScoreContainer: {
     marginTop: 4,
@@ -267,7 +266,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginTop: 8,
+    marginTop: 12,
+    alignSelf: 'flex-start',
   },
   statusBadgeText: {
     color: '#ffffff',

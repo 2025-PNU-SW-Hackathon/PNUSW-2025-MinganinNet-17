@@ -14,6 +14,16 @@ export const Colors = {
     card: '#f8f8f8',
     cardSecondary: '#e5e0d8',
     
+    // Figma Design Colors
+    figma: {
+      menuBg: '#F1EEFB',      // Bottom menu background
+      darkGray: '#10152C',    // Dark text and CTA buttons
+      critical: '#F9A7A7',   // Header background and critical status
+      yellow: '#F5F5DA',     // Main content card background
+      normal: '#21DCBA',     // Success/normal status color
+      white: '#FFFFFF',      // Pure white
+    },
+    
     // Neutral color scale (50-900) - Earth tones
     neutral: {
       50: '#f8f8f8',
@@ -221,6 +231,16 @@ export const Colors = {
     surface: '#2a2a42',
     card: '#3a3a50',
     cardSecondary: '#2f2f45',
+    
+    // Figma Design Colors (same as light theme)
+    figma: {
+      menuBg: '#F1EEFB',      // Bottom menu background
+      darkGray: '#10152C',    // Dark text and CTA buttons
+      critical: '#F9A7A7',   // Header background and critical status
+      yellow: '#F5F5DA',     // Main content card background
+      normal: '#21DCBA',     // Success/normal status color
+      white: '#FFFFFF',      // Pure white
+    },
     
     // Neutral color scale (50-900) - Inverted for dark mode
     neutral: {

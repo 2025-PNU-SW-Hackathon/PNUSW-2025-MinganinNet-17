@@ -68,16 +68,16 @@ export const WeeklyLineChart: React.FC<WeeklyLineChartProps> = ({
     <View style={styles.container}>
       <Svg width={width} height={height}>
         <Defs>
-          {/* Success zone gradient */}
+          {/* Success zone gradient (top - green area) */}
           <LinearGradient id="successZone" x1="0%" y1="0%" x2="0%" y2="100%">
-            <Stop offset="0%" stopColor={colors.success} stopOpacity="0.2" />
-            <Stop offset="100%" stopColor={colors.success} stopOpacity="0.1" />
+            <Stop offset="0%" stopColor="#CDECDD" stopOpacity="1" />
+            <Stop offset="100%" stopColor="#CDECDD" stopOpacity="1" />
           </LinearGradient>
           
-          {/* Warning zone gradient */}
+          {/* Warning zone gradient (bottom - pink area) */}
           <LinearGradient id="warningZone" x1="0%" y1="0%" x2="0%" y2="100%">
-            <Stop offset="0%" stopColor={colors.warning} stopOpacity="0.1" />
-            <Stop offset="100%" stopColor={colors.warning} stopOpacity="0.2" />
+            <Stop offset="0%" stopColor="#F8CDD8" stopOpacity="1" />
+            <Stop offset="100%" stopColor="#F8CDD8" stopOpacity="1" />
           </LinearGradient>
         </Defs>
         
@@ -100,19 +100,7 @@ export const WeeklyLineChart: React.FC<WeeklyLineChartProps> = ({
           fill="url(#warningZone)"
         />
         
-        {/* Grid lines for Y-axis */}
-        {yAxisLabels.map((score, index) => (
-          <Line
-            key={index}
-            x1={padding.left}
-            y1={getYPosition(score)}
-            x2={padding.left + chartWidth}
-            y2={getYPosition(score)}
-            stroke={colors.border}
-            strokeWidth={0.5}
-            strokeDasharray="2,2"
-          />
-        ))}
+        {/* Grid lines for Y-axis - removed for cleaner Figma look */}
         
         {/* Y-axis */}
         <Line
@@ -120,7 +108,7 @@ export const WeeklyLineChart: React.FC<WeeklyLineChartProps> = ({
           y1={padding.top}
           x2={padding.left}
           y2={padding.top + chartHeight}
-          stroke={colors.border}
+          stroke={colors.figma.darkGray}
           strokeWidth={1}
         />
         
@@ -130,7 +118,7 @@ export const WeeklyLineChart: React.FC<WeeklyLineChartProps> = ({
           y1={padding.top + chartHeight}
           x2={padding.left + chartWidth}
           y2={padding.top + chartHeight}
-          stroke={colors.border}
+          stroke={colors.figma.darkGray}
           strokeWidth={1}
         />
         
@@ -138,7 +126,7 @@ export const WeeklyLineChart: React.FC<WeeklyLineChartProps> = ({
         {scores.length > 1 && (
           <Path
             d={generatePath()}
-            stroke={colors.primary}
+            stroke={colors.figma.normal}
             strokeWidth={2}
             fill="none"
             strokeLinecap="round"
@@ -153,8 +141,8 @@ export const WeeklyLineChart: React.FC<WeeklyLineChartProps> = ({
             cx={getXPosition(index)}
             cy={getYPosition(score)}
             r={4}
-            fill={score >= 8.25 ? colors.success : colors.warning}
-            stroke={colors.background}
+            fill={score >= 8.25 ? colors.figma.normal : colors.figma.critical}
+            stroke={colors.figma.white}
             strokeWidth={2}
           />
         ))}
@@ -166,7 +154,7 @@ export const WeeklyLineChart: React.FC<WeeklyLineChartProps> = ({
             x={padding.left - 10}
             y={getYPosition(score) + 4}
             fontSize="10"
-            fill={colors.textMuted}
+            fill={colors.figma.darkGray}
             textAnchor="end"
           >
             {score}
@@ -181,7 +169,7 @@ export const WeeklyLineChart: React.FC<WeeklyLineChartProps> = ({
             key={index}
             style={[
               styles.xAxisLabel,
-              { color: colors.textMuted }
+              { color: colors.figma.darkGray }
             ]}
           >
             {date}

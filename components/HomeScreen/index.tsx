@@ -504,6 +504,17 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
                   </Text>
                 </TouchableOpacity>
               )}
+              {isDebugMode && (
+                <TouchableOpacity
+                  style={styles.debugToggle}
+                  onPress={() => {
+                    console.log('Navigating to dev weekly report');
+                    router.push('/dev-weekly-report');
+                  }}
+                >
+                  <Text style={styles.debugToggleText}>📊</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity 
                 style={styles.profileButton}
                 onPress={() => setCurrentScreen('settings')}
