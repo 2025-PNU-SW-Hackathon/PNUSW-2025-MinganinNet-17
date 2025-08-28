@@ -46,6 +46,112 @@ interface CoachStatus {
   color: string;
 }
 
+// Streak system types
+type StreakStatus = 'active' | 'at-risk' | 'broken' | 'celebrating';
+type PlantStage = 'seedling' | 'plant' | 'thriving' | 'tree';
+
+interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  status: StreakStatus;
+  plantStage: PlantStage;
+  todayCompletion: number;
+}
+
+// Helper functions for streak calculation
+const getStreakStatus = (
+  streak: number, 
+  todayCompletion: number, 
+  lastSuccess: string | null, 
+  today: string
+): StreakStatus => {
+  if (streak >= 7 && [7, 30, 100].includes(streak)) return 'celebrating';
+  if (todayCompletion >= 0.7) return 'active';
+  if (streak > 0 && todayCompletion < 0.7) return 'at-risk';
+  return 'broken';
+};
+
+const getPlantStage = (streak: number): PlantStage => {
+  if (streak >= 100) return 'tree';
+  if (streak >= 30) return 'thriving';  
+  if (streak >= 7) return 'plant';
+  return 'seedling';
+};
+
+const getPlantEmoji = (stage: PlantStage): string => {
+  const plants = {
+    seedling: '🌱',
+    plant: '🪴', 
+    thriving: '🌿',
+    tree: '🌳'
+  };
+  return plants[stage];
+};
+
+const getStatusIcon = (status: StreakStatus): string => {
+  const icons = {
+    active: '🔥',
+    'at-risk': '⏰', 
+    broken: '💔',
+    celebrating: '✨'
+  };
+  return icons[status];
+};
+
+// StreakBadge component for showing streak information
+interface StreakBadgeProps {
+  streak: number;
+  status: StreakStatus;
+  onPress?: () => void;
+  pulseAnimation?: Animated.Value;
+}
+
+const StreakBadge: React.FC<StreakBadgeProps> = ({ streak, status, onPress, pulseAnimation }) => {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
+  
+  if (streak === 0) return null;
+  
+  const statusColors = {
+    active: colors.success,
+    'at-risk': colors.warning,
+    broken: colors.error,
+    celebrating: '#FFD700' // Gold
+  };
+  
+  return (
+    <Animated.View
+      style={[
+        styles.streakBadge,
+        { borderColor: statusColors[status] + '40' },
+        pulseAnimation && {
+          transform: [{ scale: pulseAnimation }]
+        }
+      ]}
+    >
+      <TouchableOpacity 
+        onPress={onPress}
+        activeOpacity={0.8}
+        style={styles.streakBadgeInner}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`${streak}일 연속 달성 기록`}
+        accessibilityHint={`현재 연속 달성 상태를 확인하려면 두 번 탭하세요. 상태: ${status === 'active' ? '활성' : status === 'at-risk' ? '위험' : status === 'celebrating' ? '축하' : '중단됨'}`}
+      >
+        <Text style={styles.streakIcon}>
+          {getStatusIcon(status)}
+        </Text>
+        <Text style={[
+          styles.streakCount,
+          { color: statusColors[status] }
+        ]}>
+          {streak}d
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const router = useRouter();
@@ -86,6 +192,9 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const coachScaleAnimation = useRef(new Animated.Value(1)).current;
   const [previousCoachStatus, setPreviousCoachStatus] = useState<CoachStatus | null>(null);
   
+  // Track plant stage changes for animation optimization
+  const [previousPlantStage, setPreviousPlantStage] = useState<PlantStage>('seedling');
+  
   // Animations for smooth content loading
   const goalFadeAnimation = useRef(new Animated.Value(0)).current;
   const todoFadeAnimation = useRef(new Animated.Value(0)).current;
@@ -95,6 +204,11 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const progressBarAnimation = useRef(new Animated.Value(0)).current;
   const celebrationScale = useRef(new Animated.Value(1)).current;
   const completionGlow = useRef(new Animated.Value(0)).current;
+  
+  // Streak system animations
+  const streakPulseAnimation = useRef(new Animated.Value(1)).current;
+  const plantGrowAnimation = useRef(new Animated.Value(1)).current;
+  const streakCelebrationAnimation = useRef(new Animated.Value(1)).current;
 
   // 1. db에서 인자로 입력받은 날짜의 할 일 목록 가져와서 로컬 상태에 추가
   const fetchTodosForDate = async (date: string) => {
@@ -233,6 +347,26 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     setVoiceChatVisible(false);
   }, []);
 
+  const handleStreakPress = useCallback((): void => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const messages = {
+      active: `🔥 ${streakData.currentStreak}일 연속 달성 중!\n\n최고 기록: ${streakData.longestStreak}일`,
+      'at-risk': `⏰ 오늘 ${Math.round(streakData.todayCompletion * 100)}% 완료\n\n조금만 더 힘내면 ${streakData.currentStreak + 1}일 연속 달성!`,
+      broken: `💔 연속 기록이 끊어졌어요\n\n이전 최고 기록: ${streakData.longestStreak}일\n다시 시작해보세요!`,
+      celebrating: `✨ ${streakData.currentStreak}일 연속 달성 축하합니다!\n\n이런 멋진 습관을 계속 유지해보세요!`
+    };
+    
+    const titles = {
+      active: '연속 달성 기록 🔥',
+      'at-risk': '오늘 하루 더! ⏰', 
+      broken: '새로운 시작 💪',
+      celebrating: '마일스톤 달성! 🎉'
+    };
+    
+    Alert.alert(titles[streakData.status], messages[streakData.status]);
+  }, [streakData]);
+
   const handleReportCreationComplete = async (data: any) => {
     setReportVoiceChatVisible(false);
     if (!data || !data.transcript) {
@@ -341,6 +475,107 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       isComplete
     };
   }, [todosForSelectedDate, todoCompletion]);
+
+  // Streak calculation using existing dailyTodosByDate
+  const streakData = useMemo((): StreakData => {
+    const calculateStreakFromTodos = (): StreakData => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Safety check: Handle empty or invalid data
+      if (!dailyTodosByDate || Object.keys(dailyTodosByDate).length === 0) {
+        return {
+          currentStreak: 0,
+          longestStreak: 0,
+          status: 'broken',
+          plantStage: 'seedling',
+          todayCompletion: 0
+        };
+      }
+      
+      const dates = Object.keys(dailyTodosByDate)
+        .filter(date => {
+          // Filter out future dates and invalid dates
+          const dateObj = new Date(date);
+          const todayObj = new Date(today);
+          return dateObj <= todayObj && !isNaN(dateObj.getTime());
+        })
+        .sort(); // Chronological order
+      
+      let currentStreak = 0;
+      let longestStreak = 0;
+      let tempStreak = 0;
+      let lastSuccessDate: string | null = null;
+      
+      // Calculate daily success rates and streaks
+      const dailySuccessData: { [date: string]: boolean } = {};
+      
+      for (const date of dates) {
+        const todos = dailyTodosByDate[date] || [];
+        if (todos.length === 0) {
+          dailySuccessData[date] = false;
+          continue;
+        }
+        
+        const completed = todos.filter(t => t.is_completed).length;
+        const completionRate = completed / todos.length;
+        
+        // Success threshold: 70% completion
+        const isSuccessfulDay = completionRate >= 0.7;
+        dailySuccessData[date] = isSuccessfulDay;
+        
+        if (isSuccessfulDay) {
+          tempStreak++;
+          longestStreak = Math.max(longestStreak, tempStreak);
+          lastSuccessDate = date;
+        } else {
+          tempStreak = 0;
+        }
+      }
+      
+      // Calculate current streak (consecutive days from most recent)
+      const reversedDates = dates.slice().reverse(); // Most recent first
+      for (const date of reversedDates) {
+        if (dailySuccessData[date]) {
+          currentStreak++;
+        } else {
+          break; // Stop at first unsuccessful day
+        }
+      }
+      
+      // Calculate today's completion rate
+      const todayTodos = dailyTodosByDate[today] || [];
+      const todayCompletion = todayTodos.length > 0 ? 
+        todayTodos.filter(t => t.is_completed).length / todayTodos.length : 0;
+      
+      // Determine current status
+      const status = getStreakStatus(currentStreak, todayCompletion, lastSuccessDate, today);
+      const plantStage = getPlantStage(currentStreak);
+      
+      return {
+        currentStreak,
+        longestStreak,
+        status,
+        plantStage,
+        todayCompletion
+      };
+    };
+    
+    const result = calculateStreakFromTodos();
+    
+    // Development debugging
+    if (__DEV__) {
+      console.log('🔥 Streak System Debug:', {
+        currentStreak: result.currentStreak,
+        longestStreak: result.longestStreak,
+        status: result.status,
+        plantStage: result.plantStage,
+        todayCompletion: Math.round(result.todayCompletion * 100) + '%',
+        dataPoints: Object.keys(dailyTodosByDate).length
+      });
+    }
+    
+    return result;
+  }, [dailyTodosByDate]);
 
   // Animate coach when status changes - optimized with cleanup
   useEffect(() => {
@@ -465,6 +700,91 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   }, [progressStats.percentage, progressStats.isComplete, progressStats.total, 
       progressBarAnimation, celebrationScale, completionGlow]);
 
+  // Streak plant growth animation - only on actual stage changes
+  useEffect(() => {
+    let growthAnimation: Animated.CompositeAnimation | null = null;
+    
+    // Only animate when stage actually changes (not on initial render)
+    if (previousPlantStage !== streakData.plantStage && streakData.plantStage !== 'seedling') {
+      growthAnimation = Animated.sequence([
+        Animated.spring(plantGrowAnimation, {
+          toValue: 1.15,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 8,
+        }),
+        Animated.spring(plantGrowAnimation, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 10,
+        })
+      ]);
+      growthAnimation.start();
+    }
+    
+    // Update previous stage for next comparison
+    setPreviousPlantStage(streakData.plantStage);
+    
+    return () => {
+      if (growthAnimation) growthAnimation.stop();
+    };
+  }, [streakData.plantStage, previousPlantStage, plantGrowAnimation]);
+
+  // Streak status pulse animation - for at-risk status
+  useEffect(() => {
+    let pulseAnimation: Animated.CompositeAnimation | null = null;
+    
+    if (streakData.status === 'at-risk') {
+      pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(streakPulseAnimation, {
+            toValue: 1.08,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(streakPulseAnimation, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          })
+        ])
+      );
+      pulseAnimation.start();
+    } else {
+      streakPulseAnimation.setValue(1);
+    }
+    
+    return () => {
+      if (pulseAnimation) pulseAnimation.stop();
+    };
+  }, [streakData.status, streakPulseAnimation]);
+
+  // Streak celebration animation - for milestones
+  useEffect(() => {
+    if (streakData.status === 'celebrating') {
+      const celebration = Animated.sequence([
+        Animated.spring(streakCelebrationAnimation, {
+          toValue: 1.2,
+          useNativeDriver: true,
+          tension: 200,
+          friction: 8,
+        }),
+        Animated.spring(streakCelebrationAnimation, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 200,
+          friction: 10,
+        })
+      ]);
+      
+      celebration.start();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      streakCelebrationAnimation.setValue(1);
+    }
+  }, [streakData.status, streakCelebrationAnimation]);
+
   // Show ProfileScreen if settings is selected
   if (currentScreen === 'settings') {
     return <ProfileScreen onBackToHome={() => setCurrentScreen('home')} />;
@@ -477,7 +797,30 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         <View style={styles.headerArea}>
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>🌱</Text>
+              <Animated.Text 
+                style={[
+                  styles.logoText, 
+                  { 
+                    transform: [
+                      { scale: plantGrowAnimation },
+                      { scale: streakCelebrationAnimation }
+                    ] 
+                  }
+                ]}
+              >
+                {getPlantEmoji(streakData.plantStage)}
+              </Animated.Text>
+              
+              {/* Streak Badge - Only show if streak > 0 */}
+              {streakData.currentStreak > 0 && (
+                <StreakBadge 
+                  streak={streakData.currentStreak}
+                  status={streakData.status}
+                  pulseAnimation={streakData.status === 'at-risk' ? streakPulseAnimation : undefined}
+                  onPress={handleStreakPress}
+                />
+              )}
+              
               {/* Debug Mode Status Indicator */}
               {__DEV__ && isDebugMode && (
                 <View style={styles.debugIndicator}>
@@ -833,20 +1176,20 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   calendarDate: { 
     width: Spacing['5xl'], // ~48px for more compact appearance
-    height: 88, 
+    height: 62, // Reduced to 70% of original height (88px → 62px)
     borderRadius: Spacing.layout.borderRadius.lg, 
     backgroundColor: colors.card, 
     justifyContent: 'center', 
     alignItems: 'center', 
     marginHorizontal: Spacing.sm, 
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm, // Reduced from Spacing.md for compact design
     // Enhanced modern styling
     borderWidth: 1.5,
     borderColor: colors.neutral[100],
     shadowColor: colors.text,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 }, // Scaled down proportionally
     shadowOpacity: 0.08,
-    shadowRadius: Spacing.md,
+    shadowRadius: Spacing.sm, // Reduced shadow radius for smaller height
     elevation: 2,
     // Add subtle transform for better visual impact
     transform: [{ scale: 1 }],
@@ -859,9 +1202,9 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderWidth: 2,
     // Enhanced today styling
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 }, // Scaled down proportionally
     shadowOpacity: 0.3,
-    shadowRadius: Spacing.lg,
+    shadowRadius: Spacing.md, // Reduced shadow radius for smaller height
     elevation: 6,
     // Add subtle pulse effect preparation
     transform: [{ scale: 1.05 }],
@@ -879,20 +1222,20 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     transform: [{ scale: 1.02 }],
   },
   calendarDayName: { 
-    fontSize: colors.typography.fontSize.xs, 
+    fontSize: colors.typography.fontSize.xs * 0.9, // Slightly smaller for compact height
     color: colors.textMuted, 
     fontFamily: 'Inter',
     fontWeight: colors.typography.fontWeight.medium,
     letterSpacing: colors.typography.letterSpacing.wide,
     textTransform: 'uppercase',
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.xs * 0.7, // Reduced margin for compact spacing
   },
   calendarDayNumber: { 
-    fontSize: colors.typography.fontSize.xl, 
+    fontSize: colors.typography.fontSize.lg, // Reduced from xl to lg for compact height
     fontWeight: colors.typography.fontWeight.bold, 
     color: colors.text, 
     fontFamily: 'Inter',
-    lineHeight: colors.typography.fontSize.xl * colors.typography.lineHeight.tight,
+    lineHeight: colors.typography.fontSize.lg * colors.typography.lineHeight.tight, // Adjusted line height
   },
   calendarTextActive: { 
     color: '#ffffff', // White text for active states
@@ -906,34 +1249,34 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   achievementIndicator: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    top: -1,
+    right: -1,
+    width: 10, // Scaled down from 12px for smaller calendar height
+    height: 10, // Scaled down from 12px
+    borderRadius: 5, // Scaled down from 6px
     backgroundColor: colors.success,
-    borderWidth: 2,
+    borderWidth: 1.5, // Slightly thinner border for smaller indicator
     borderColor: colors.card,
     // Achievement glow effect
     shadowColor: colors.success,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
-    shadowRadius: 4,
+    shadowRadius: 3, // Reduced shadow radius
   },
   streakIndicator: {
     position: 'absolute',
-    bottom: -2,
+    bottom: -1,
     left: '50%',
-    marginLeft: -8,
-    width: 16,
-    height: 3,
-    borderRadius: 2,
+    marginLeft: -6, // Adjusted for smaller width
+    width: 12, // Scaled down from 16px for compact height
+    height: 2.5, // Slightly reduced height
+    borderRadius: 1.5, // Adjusted border radius
     backgroundColor: colors.warning,
     // Streak glow effect
     shadowColor: colors.warning,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
-    shadowRadius: 3,
+    shadowRadius: 2.5, // Slightly reduced shadow radius
   },
   
   // Enhanced calendar hover states (for future interactivity)
@@ -1389,6 +1732,43 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: colors.neutral[300],
+  },
+  
+  // Streak system styles
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: Spacing.sm,
+    paddingHorizontal: Spacing.md, // Increased from xs + 2
+    paddingVertical: Spacing.sm, // Increased from xs
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: Spacing.layout.borderRadius.md, // Increased from sm
+    borderWidth: 2, // Increased from 1.5
+    minHeight: 32, // Increased from 24
+    // Enhanced glass effect
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 }, // Increased shadow
+    shadowOpacity: 0.15, // Increased opacity
+    shadowRadius: 4, // Increased radius
+    elevation: 4, // Increased elevation
+  },
+  
+  streakIcon: {
+    fontSize: 14, // Increased from 11
+    marginRight: Spacing.xs,
+    lineHeight: 14,
+  },
+  
+  streakCount: {
+    fontSize: colors.typography.fontSize.sm, // Increased from xs
+    fontWeight: colors.typography.fontWeight.bold,
+    fontFamily: 'Inter',
+    letterSpacing: 0.5,
+  },
+  
+  streakBadgeInner: {
+    flexDirection: 'row', 
+    alignItems: 'center',
   },
 }); 
 
