@@ -181,7 +181,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       textFadeAnim.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.quad) });
       
       
-      startSession();
+      initializeSession();
     } else {
       fadeAnim.value = withTiming(0, { duration: 200 });
       scaleAnim.value = withTiming(0.8, { duration: 200 });
@@ -191,7 +191,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       // 세션을 즉시 종료하지 않고 유지 (대화가 끝날 때까지)
       // endSession();
     }
-  }, [visible]);
+  }, [visible, initializeSession]);
 
   const audioChunksRef = useRef<Blob[]>([]);
 
