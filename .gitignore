@@ -45,7 +45,9 @@ app-example
 .env*.local
 
 ROUTY_APP_FLOW_GUIDED.md
+ROUTY_APP_FLOW_GUIDE.md
 .claude/
+Git_Collaboration_Guide.md
 
 # IDE 설정
 .idea/

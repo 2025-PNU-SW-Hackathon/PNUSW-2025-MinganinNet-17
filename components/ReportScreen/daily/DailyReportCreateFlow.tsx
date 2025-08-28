@@ -6,11 +6,12 @@ import DailyReportStep2 from './steps/DailyReportStep2';
 
 interface DailyReportCreateFlowProps {
   onBack: () => void;
+  onReportSaved: () => Promise<void>;
 }
 
 type Step = 'step1' | 'step2' | 'result';
 
-export default function DailyReportCreateFlow({ onBack }: DailyReportCreateFlowProps) {
+export default function DailyReportCreateFlow({ onBack, onReportSaved }: DailyReportCreateFlowProps) {
   const [currentStep, setCurrentStep] = useState<Step>('step1');
   const [step1Data, setStep1Data] = useState<{
     todos: DailyTodo[];
@@ -68,6 +69,7 @@ export default function DailyReportCreateFlow({ onBack }: DailyReportCreateFlowP
             achievementScore={step1Data.achievementScore}
             aiReportText={step2Data.aiFeedback}
             onBack={onBack}
+            onReportSaved={onReportSaved}
           />
         );
       

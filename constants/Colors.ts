@@ -14,6 +14,16 @@ export const Colors = {
     card: '#f8f8f8',
     cardSecondary: '#e5e0d8',
     
+    // Figma Design Colors
+    figma: {
+      menuBg: '#F1EEFB',      // Bottom menu background
+      darkGray: '#10152C',    // Dark text and CTA buttons
+      critical: '#F9A7A7',   // Header background and critical status
+      yellow: '#F5F5DA',     // Main content card background
+      normal: '#21DCBA',     // Success/normal status color
+      white: '#FFFFFF',      // Pure white
+    },
+    
     // Neutral color scale (50-900) - Earth tones
     neutral: {
       50: '#f8f8f8',
@@ -43,6 +53,15 @@ export const Colors = {
     success: '#10b981',
     successLight: '#34d399',
     successDark: '#047857',
+    
+    // GitHub-style heat map colors (transparent brighter green gradient)
+    heatMap: {
+      none: 'rgba(235, 237, 240, 0.3)',        // 0% - Very light transparent
+      low: 'rgba(34, 197, 94, 0.15)',          // 1-25% - 15% bright green
+      medium: 'rgba(34, 197, 94, 0.35)',       // 26-50% - 35% bright green
+      high: 'rgba(34, 197, 94, 0.55)',         // 51-75% - 55% bright green
+      highest: 'rgba(34, 197, 94, 0.75)',      // 76-100% - 75% bright green
+    },
     
     warning: '#f59e0b',
     warningLight: '#fbbf24',
@@ -222,6 +241,16 @@ export const Colors = {
     card: '#3a3a50',
     cardSecondary: '#2f2f45',
     
+    // Figma Design Colors (same as light theme)
+    figma: {
+      menuBg: '#F1EEFB',      // Bottom menu background
+      darkGray: '#10152C',    // Dark text and CTA buttons
+      critical: '#F9A7A7',   // Header background and critical status
+      yellow: '#F5F5DA',     // Main content card background
+      normal: '#21DCBA',     // Success/normal status color
+      white: '#FFFFFF',      // Pure white
+    },
+    
     // Neutral color scale (50-900) - Inverted for dark mode
     neutral: {
       50: '#111827',
@@ -251,6 +280,15 @@ export const Colors = {
     success: '#4CAF50',
     successLight: '#66bb6a',
     successDark: '#2e7d32',
+    
+    // GitHub-style heat map colors (transparent brighter green gradient for dark mode)
+    heatMap: {
+      none: 'rgba(33, 38, 45, 0.3)',           // 0% - Dark transparent
+      low: 'rgba(74, 222, 128, 0.15)',         // 1-25% - 15% bright green
+      medium: 'rgba(74, 222, 128, 0.35)',      // 26-50% - 35% bright green
+      high: 'rgba(74, 222, 128, 0.55)',        // 51-75% - 55% bright green
+      highest: 'rgba(74, 222, 128, 0.75)',     // 76-100% - 75% bright green
+    },
     
     warning: '#FFC107',
     warningLight: '#ffca28',

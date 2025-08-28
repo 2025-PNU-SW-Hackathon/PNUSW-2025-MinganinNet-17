@@ -13,7 +13,7 @@ import ChatInput from './ChatInput';
 import TypingIndicator from './TypingIndicator';
 import TypewriterMessage from './TypewriterMessage';
 
-export interface ChatMessage {
+export interface ChatMessageType {
   id: string;
   role: 'user' | 'coach';
   content: string;
@@ -21,15 +21,17 @@ export interface ChatMessage {
 }
 
 interface ChatContainerProps {
-  messages: ChatMessage[];
+  messages: ChatMessageType[];
   onSendMessage: (message: string) => void;
   onVoicePress?: () => void;
+  onSubmitConversation?: () => void;
   onBack: () => void;
   isTyping?: boolean;
   disabled?: boolean;
   coachName?: string;
   placeholder?: string;
   showVoiceButton?: boolean;
+  showSubmitButton?: boolean;
   enableTypewriter?: boolean;
 }
 
@@ -37,12 +39,14 @@ export default function ChatContainer({
   messages,
   onSendMessage,
   onVoicePress,
+  onSubmitConversation,
   onBack,
   isTyping = false,
   disabled = false,
   coachName = "AI 코치",
   placeholder = "오늘 하루에 대해 이야기해보세요...",
   showVoiceButton = true,
+  showSubmitButton = false,
   enableTypewriter = true
 }: ChatContainerProps) {
   const colorScheme = useColorScheme();
@@ -119,9 +123,11 @@ export default function ChatContainer({
       <ChatInput
         onSendMessage={onSendMessage}
         onVoicePress={onVoicePress}
+        onSubmitConversation={onSubmitConversation}
         disabled={disabled}
         placeholder={placeholder}
         showVoiceButton={showVoiceButton}
+        showSubmitButton={showSubmitButton}
       />
     </SafeAreaView>
   );

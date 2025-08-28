@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -21,12 +21,12 @@ import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { useHabitStore } from '../../lib/habitStore';
+import { useDebugStore, useIsDebugMode } from '../../src/config/debug';
 
 import { DailyTodo, DailyTodosByDate } from '../../types/habit';
 import { AccentGlassCard, SecondaryGlassCard } from '../GlassCard';
 import ProfileScreen from '../ProfileScreen';
 import { SkeletonCard } from '../SkeletonLoaders';
-import VintagePaperBackground from '../VintagePaperBackground';
 import VoiceChatScreen from '../VoiceChatScreen';
 import TodoCard from './TodoCard';
 
@@ -45,15 +45,147 @@ interface CoachStatus {
   color: string;
 }
 
+// Streak system types
+type StreakStatus = 'active' | 'at-risk' | 'broken' | 'celebrating';
+type PlantStage = 'seedling' | 'plant' | 'thriving' | 'tree';
+
+interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  status: StreakStatus;
+  plantStage: PlantStage;
+  todayCompletion: number;
+}
+
+// Helper functions for streak calculation
+const getStreakStatus = (
+  streak: number, 
+  todayCompletion: number, 
+  lastSuccess: string | null, 
+  today: string
+): StreakStatus => {
+  if (streak >= 7 && [7, 30, 100].includes(streak)) return 'celebrating';
+  if (todayCompletion >= 0.7) return 'active';
+  if (streak > 0 && todayCompletion < 0.7) return 'at-risk';
+  return 'broken';
+};
+
+const getPlantStage = (streak: number): PlantStage => {
+  if (streak >= 100) return 'tree';
+  if (streak >= 30) return 'thriving';  
+  if (streak >= 7) return 'plant';
+  return 'seedling';
+};
+
+const getPlantEmoji = (stage: PlantStage): string => {
+  const plants = {
+    seedling: '🌱',
+    plant: '🪴', 
+    thriving: '🌿',
+    tree: '🌳'
+  };
+  return plants[stage];
+};
+
+const getStatusIcon = (status: StreakStatus): string => {
+  const icons = {
+    active: '🔥',
+    'at-risk': '⏰', 
+    broken: '💔',
+    celebrating: '✨'
+  };
+  return icons[status];
+};
+
+const getHarvestCountdownText = (currentStreak: number): string => {
+  if (currentStreak >= 7) return ""; // No countdown if already harvested
+  const daysLeft = 7 - (currentStreak % 7);
+  return `열매 맺기까지 ${daysLeft} 일!`;
+};
+
+// GitHub-style heat map color mapping
+const getHeatMapColor = (completionRate: number, colors: typeof Colors.light): string => {
+  if (completionRate === 0) return colors.heatMap.none;
+  if (completionRate <= 25) return colors.heatMap.low;
+  if (completionRate <= 50) return colors.heatMap.medium;
+  if (completionRate <= 75) return colors.heatMap.high;
+  return colors.heatMap.highest;
+};
+
+// Calculate daily todo completion rate
+const getDailyCompletionRate = (dateString: string, dailyTodosByDate: DailyTodosByDate): number => {
+  const todos = dailyTodosByDate[dateString] || [];
+  if (todos.length === 0) return 0;
+  const completed = todos.filter(todo => todo.is_completed).length;
+  return Math.round((completed / todos.length) * 100);
+};
+
+// StreakBadge component for showing streak information
+interface StreakBadgeProps {
+  streak: number;
+  status: StreakStatus;
+  onPress?: () => void;
+  pulseAnimation?: Animated.Value;
+}
+
+const StreakBadge: React.FC<StreakBadgeProps> = ({ streak, status, onPress, pulseAnimation }) => {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const styles = createStyles(colors);
+  
+  if (streak === 0) return null;
+  
+  const statusColors = {
+    active: colors.success,
+    'at-risk': colors.warning,
+    broken: colors.error,
+    celebrating: '#FFD700' // Gold
+  };
+  
+  return (
+    <Animated.View
+      style={[
+        styles.streakBadge,
+        { borderColor: statusColors[status] + '40' },
+        pulseAnimation && {
+          transform: [{ scale: pulseAnimation }]
+        }
+      ]}
+    >
+      <TouchableOpacity 
+        onPress={onPress}
+        activeOpacity={0.8}
+        style={styles.streakBadgeInner}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`${streak}일 연속 달성 기록`}
+        accessibilityHint={`현재 연속 달성 상태를 확인하려면 두 번 탭하세요. 상태: ${status === 'active' ? '활성' : status === 'at-risk' ? '위험' : status === 'celebrating' ? '축하' : '중단됨'}`}
+      >
+        <Text style={styles.streakIcon}>
+          {getStatusIcon(status)}
+        </Text>
+        <Text style={[
+          styles.streakCount,
+          { color: statusColors[status] }
+        ]}>
+          {streak}d
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const styles = createStyles(colors);
   const [currentScreen, setCurrentScreen] = useState<'home' | 'settings'>('home');
   const [internalSelectedDate, setInternalSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const { plan, setPlan } = useHabitStore();
+  const { toggleDebug } = useDebugStore();
+  const isDebugMode = useIsDebugMode();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dailyTodosByDate, setDailyTodosByDate] = useState<DailyTodosByDate>({});
@@ -72,9 +204,13 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
     return () => clearTimeout(timeout);
   }, [loading]);
 
+
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
   const [reportVoiceChatVisible, setReportVoiceChatVisible] = useState(false);
+  
+  // Custom transition animation state
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Use selectedDate from props if provided, otherwise use internal state
   const targetDate = selectedDate || internalSelectedDate;
@@ -82,6 +218,9 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   // Animation for coach status
   const coachScaleAnimation = useRef(new Animated.Value(1)).current;
   const [previousCoachStatus, setPreviousCoachStatus] = useState<CoachStatus | null>(null);
+  
+  // Track plant stage changes for animation optimization
+  const [previousPlantStage, setPreviousPlantStage] = useState<PlantStage>('seedling');
   
   // Animations for smooth content loading
   const goalFadeAnimation = useRef(new Animated.Value(0)).current;
@@ -92,6 +231,16 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   const progressBarAnimation = useRef(new Animated.Value(0)).current;
   const celebrationScale = useRef(new Animated.Value(1)).current;
   const completionGlow = useRef(new Animated.Value(0)).current;
+  
+  // Streak system animations
+  const streakPulseAnimation = useRef(new Animated.Value(1)).current;
+  const plantGrowAnimation = useRef(new Animated.Value(1)).current;
+  const streakCelebrationAnimation = useRef(new Animated.Value(1)).current;
+  
+  // Custom transition animations (reuse existing ones where possible)
+  const profileHeaderFadeAnimation = useRef(new Animated.Value(1)).current;
+  const calendarFadeAnimation = useRef(new Animated.Value(1)).current;
+  const micButtonFadeAnimation = useRef(new Animated.Value(1)).current;
 
   // 1. db에서 인자로 입력받은 날짜의 할 일 목록 가져와서 로컬 상태에 추가
   const fetchTodosForDate = async (date: string) => {
@@ -117,6 +266,18 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       fetchTodosForDate(targetDate);
     }
   }, [targetDate]);
+
+  // 5. + Button transition detection - trigger fade out when coming from plus button
+  useEffect(() => {
+    if (params.transition === 'plus-button') {
+      // Small delay to ensure HomeScreen is fully mounted before triggering animation
+      const timer = setTimeout(() => {
+        startCustomTransition('goal-setting-from-plus');
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [params.transition, startCustomTransition]);
 
   // 2. 저장된 로컬 상태 중에서, targetDate에 해당하는 할 일 목록 가져오기
   const todosForSelectedDate = useMemo(() => {
@@ -222,13 +383,158 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   }, []);
 
   const handleVoiceChatOpen = useCallback((): void => {
-    setVoiceChatVisible(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, []);
+    startCustomTransition('voice-chat');
+  }, [startCustomTransition]);
 
   const handleVoiceChatClose = useCallback((): void => {
     setVoiceChatVisible(false);
-  }, []);
+    // Restore components with animation when returning from voice chat
+    if (isTransitioning) {
+      setTimeout(restoreComponentsAnimation, 100);
+    }
+  }, [isTransitioning, restoreComponentsAnimation]);
+
+  // Delayed restoration helper - restores HomeScreen after screen transition completes
+  const restoreHomeScreenDelayed = useCallback((): void => {
+    // Set all animation values to 1 after delay (user can't see HomeScreen during transition)
+    profileHeaderFadeAnimation.setValue(1);
+    calendarFadeAnimation.setValue(1);
+    coachFadeAnimation.setValue(1);
+    todoFadeAnimation.setValue(1);
+    micButtonFadeAnimation.setValue(1);
+    goalFadeAnimation.setValue(1);
+    setIsTransitioning(false);
+  }, [profileHeaderFadeAnimation, calendarFadeAnimation, coachFadeAnimation, todoFadeAnimation, micButtonFadeAnimation, goalFadeAnimation]);
+
+  // Custom transition animation controller
+  const startCustomTransition = useCallback((destination: 'goal-setting' | 'voice-chat' | 'goal-setting-from-plus'): void => {
+    if (isTransitioning) return; // Prevent multiple transitions
+    
+    setIsTransitioning(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    
+    // Sequential fade out animation with custom timing for todo card (reliable version)
+    // Also sync content animations to prevent glass/content mismatch
+    Animated.sequence([
+      // Immediate fadeout group (0ms) - Profile header and todo card together
+      Animated.parallel([
+        Animated.timing(profileHeaderFadeAnimation, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(todoFadeAnimation, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        // Sync goal content animation too (if it exists)
+        Animated.timing(goalFadeAnimation, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]),
+      // Small delay, then calendar
+      Animated.delay(30),
+      Animated.timing(calendarFadeAnimation, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      // Small delay, then coach
+      Animated.delay(30),
+      Animated.timing(coachFadeAnimation, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      // Small delay, then mic button
+      Animated.delay(30),
+      Animated.timing(micButtonFadeAnimation, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Navigate after animation completes
+      if (destination === 'goal-setting') {
+        router.push('/goal-setting');
+        // Wait 1.5s for screen transition to complete before restoring HomeScreen
+        setTimeout(restoreHomeScreenDelayed, 1500);
+      } else if (destination === 'goal-setting-from-plus') {
+        router.push('/goal-setting');
+        // Wait 1.5s for screen transition to complete before restoring HomeScreen
+        setTimeout(restoreHomeScreenDelayed, 1500);
+      } else if (destination === 'voice-chat') {
+        setVoiceChatVisible(true);
+        // Don't restore - user still on HomeScreen with modal
+      }
+    });
+  }, [isTransitioning, router, profileHeaderFadeAnimation, calendarFadeAnimation, coachFadeAnimation, todoFadeAnimation, micButtonFadeAnimation, goalFadeAnimation, restoreHomeScreenDelayed]);
+
+  // Restore components when returning from transitions
+  const restoreComponentsAnimation = useCallback((): void => {
+    if (!isTransitioning) return;
+    
+    setIsTransitioning(false);
+    
+    // Smooth fade back in (faster to match fade out speed)
+    // Sync all content animations to restore properly
+    Animated.parallel([
+      Animated.timing(profileHeaderFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(calendarFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(coachFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(todoFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(micButtonFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      // Restore goal content animation too
+      Animated.timing(goalFadeAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [isTransitioning, profileHeaderFadeAnimation, calendarFadeAnimation, coachFadeAnimation, todoFadeAnimation, micButtonFadeAnimation, goalFadeAnimation]);
+
+  const handleStreakPress = useCallback((): void => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const messages = {
+      active: `🔥 ${streakData.currentStreak}일 연속 달성 중!\n\n최고 기록: ${streakData.longestStreak}일`,
+      'at-risk': `⏰ 오늘 ${Math.round(streakData.todayCompletion * 100)}% 완료\n\n조금만 더 힘내면 ${streakData.currentStreak + 1}일 연속 달성!`,
+      broken: `💔 연속 기록이 끊어졌어요\n\n이전 최고 기록: ${streakData.longestStreak}일\n다시 시작해보세요!`,
+      celebrating: `✨ ${streakData.currentStreak}일 연속 달성 축하합니다!\n\n이런 멋진 습관을 계속 유지해보세요!`
+    };
+    
+    const titles = {
+      active: '연속 달성 기록 🔥',
+      'at-risk': '오늘 하루 더! ⏰', 
+      broken: '새로운 시작 💪',
+      celebrating: '마일스톤 달성! 🎉'
+    };
+    
+    Alert.alert(titles[streakData.status], messages[streakData.status]);
+  }, [streakData]);
 
   const handleReportCreationComplete = async (data: any) => {
     setReportVoiceChatVisible(false);
@@ -338,6 +644,107 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       isComplete
     };
   }, [todosForSelectedDate, todoCompletion]);
+
+  // Streak calculation using existing dailyTodosByDate
+  const streakData = useMemo((): StreakData => {
+    const calculateStreakFromTodos = (): StreakData => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Safety check: Handle empty or invalid data
+      if (!dailyTodosByDate || Object.keys(dailyTodosByDate).length === 0) {
+        return {
+          currentStreak: 0,
+          longestStreak: 0,
+          status: 'broken',
+          plantStage: 'seedling',
+          todayCompletion: 0
+        };
+      }
+      
+      const dates = Object.keys(dailyTodosByDate)
+        .filter(date => {
+          // Filter out future dates and invalid dates
+          const dateObj = new Date(date);
+          const todayObj = new Date(today);
+          return dateObj <= todayObj && !isNaN(dateObj.getTime());
+        })
+        .sort(); // Chronological order
+      
+      let currentStreak = 0;
+      let longestStreak = 0;
+      let tempStreak = 0;
+      let lastSuccessDate: string | null = null;
+      
+      // Calculate daily success rates and streaks
+      const dailySuccessData: { [date: string]: boolean } = {};
+      
+      for (const date of dates) {
+        const todos = dailyTodosByDate[date] || [];
+        if (todos.length === 0) {
+          dailySuccessData[date] = false;
+          continue;
+        }
+        
+        const completed = todos.filter(t => t.is_completed).length;
+        const completionRate = completed / todos.length;
+        
+        // Success threshold: 70% completion
+        const isSuccessfulDay = completionRate >= 0.7;
+        dailySuccessData[date] = isSuccessfulDay;
+        
+        if (isSuccessfulDay) {
+          tempStreak++;
+          longestStreak = Math.max(longestStreak, tempStreak);
+          lastSuccessDate = date;
+        } else {
+          tempStreak = 0;
+        }
+      }
+      
+      // Calculate current streak (consecutive days from most recent)
+      const reversedDates = dates.slice().reverse(); // Most recent first
+      for (const date of reversedDates) {
+        if (dailySuccessData[date]) {
+          currentStreak++;
+        } else {
+          break; // Stop at first unsuccessful day
+        }
+      }
+      
+      // Calculate today's completion rate
+      const todayTodos = dailyTodosByDate[today] || [];
+      const todayCompletion = todayTodos.length > 0 ? 
+        todayTodos.filter(t => t.is_completed).length / todayTodos.length : 0;
+      
+      // Determine current status
+      const status = getStreakStatus(currentStreak, todayCompletion, lastSuccessDate, today);
+      const plantStage = getPlantStage(currentStreak);
+      
+      return {
+        currentStreak,
+        longestStreak,
+        status,
+        plantStage,
+        todayCompletion
+      };
+    };
+    
+    const result = calculateStreakFromTodos();
+    
+    // Development debugging
+    if (__DEV__) {
+      console.log('🔥 Streak System Debug:', {
+        currentStreak: result.currentStreak,
+        longestStreak: result.longestStreak,
+        status: result.status,
+        plantStage: result.plantStage,
+        todayCompletion: Math.round(result.todayCompletion * 100) + '%',
+        dataPoints: Object.keys(dailyTodosByDate).length
+      });
+    }
+    
+    return result;
+  }, [dailyTodosByDate]);
 
   // Animate coach when status changes - optimized with cleanup
   useEffect(() => {
@@ -462,30 +869,186 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
   }, [progressStats.percentage, progressStats.isComplete, progressStats.total, 
       progressBarAnimation, celebrationScale, completionGlow]);
 
+  // Streak plant growth animation - only on actual stage changes
+  useEffect(() => {
+    let growthAnimation: Animated.CompositeAnimation | null = null;
+    
+    // Only animate when stage actually changes (not on initial render)
+    if (previousPlantStage !== streakData.plantStage && streakData.plantStage !== 'seedling') {
+      growthAnimation = Animated.sequence([
+        Animated.spring(plantGrowAnimation, {
+          toValue: 1.15,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 8,
+        }),
+        Animated.spring(plantGrowAnimation, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 10,
+        })
+      ]);
+      growthAnimation.start();
+    }
+    
+    // Update previous stage for next comparison
+    setPreviousPlantStage(streakData.plantStage);
+    
+    return () => {
+      if (growthAnimation) growthAnimation.stop();
+    };
+  }, [streakData.plantStage, previousPlantStage, plantGrowAnimation]);
+
+  // Streak status pulse animation - for at-risk status
+  useEffect(() => {
+    let pulseAnimation: Animated.CompositeAnimation | null = null;
+    
+    if (streakData.status === 'at-risk') {
+      pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(streakPulseAnimation, {
+            toValue: 1.08,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(streakPulseAnimation, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          })
+        ])
+      );
+      pulseAnimation.start();
+    } else {
+      streakPulseAnimation.setValue(1);
+    }
+    
+    return () => {
+      if (pulseAnimation) pulseAnimation.stop();
+    };
+  }, [streakData.status, streakPulseAnimation]);
+
+  // Streak celebration animation - for milestones
+  useEffect(() => {
+    if (streakData.status === 'celebrating') {
+      const celebration = Animated.sequence([
+        Animated.spring(streakCelebrationAnimation, {
+          toValue: 1.2,
+          useNativeDriver: true,
+          tension: 200,
+          friction: 8,
+        }),
+        Animated.spring(streakCelebrationAnimation, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 200,
+          friction: 10,
+        })
+      ]);
+      
+      celebration.start();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      streakCelebrationAnimation.setValue(1);
+    }
+  }, [streakData.status, streakCelebrationAnimation]);
+
   // Show ProfileScreen if settings is selected
   if (currentScreen === 'settings') {
     return <ProfileScreen onBackToHome={() => setCurrentScreen('home')} />;
   }
 
   return (
-    <VintagePaperBackground style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerArea}>
+        <Animated.View style={[styles.headerArea, { opacity: profileHeaderFadeAnimation }]}>
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>🌱</Text>
+              {/* Plant and Streak Row */}
+              <View style={styles.plantStreakRow}>
+                <Animated.Text 
+                  style={[
+                    styles.logoText, 
+                    { 
+                      transform: [
+                        { scale: plantGrowAnimation },
+                        { scale: streakCelebrationAnimation }
+                      ] 
+                    }
+                  ]}
+                >
+                  {getPlantEmoji(streakData.plantStage)}
+                </Animated.Text>
+                
+                {/* Streak Badge - Only show if streak > 0 */}
+                {streakData.currentStreak > 0 && (
+                  <StreakBadge 
+                    streak={streakData.currentStreak}
+                    status={streakData.status}
+                    pulseAnimation={streakData.status === 'at-risk' ? streakPulseAnimation : undefined}
+                    onPress={handleStreakPress}
+                  />
+                )}
+              </View>
+
+              {/* Fruit Harvest Countdown */}
+              {streakData.currentStreak < 7 && streakData.currentStreak > 0 && (
+                <Text style={styles.harvestCountdown}>
+                  {getHarvestCountdownText(streakData.currentStreak)}
+                </Text>
+              )}
+              
+              {/* Debug Mode Status Indicator */}
+              {__DEV__ && isDebugMode && (
+                <View style={styles.debugIndicator}>
+                  <Text style={styles.debugIndicatorText}>🐛 DEBUG</Text>
+                </View>
+              )}
             </View>
-            <TouchableOpacity 
-              style={styles.profileButton}
-              onPress={() => setCurrentScreen('settings')}
-            >
-              <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {/* Debug Toggle Button (Development Only) */}
+              {__DEV__ && (
+                <TouchableOpacity 
+                  style={[styles.debugToggleButton, isDebugMode && styles.debugToggleButtonActive]}
+                  onPress={() => {
+                    toggleDebug();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    // Refresh data when toggling debug mode
+                    if (targetDate) {
+                      fetchTodosForDate(targetDate);
+                    }
+                  }}
+                >
+                  <Text style={styles.debugToggleText}>
+                    {isDebugMode ? '🐛' : '🔧'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {isDebugMode && (
+                <TouchableOpacity
+                  style={styles.debugToggle}
+                  onPress={() => {
+                    console.log('Navigating to dev weekly report');
+                    router.push('/dev-weekly-report');
+                  }}
+                >
+                  <Text style={styles.debugToggleText}>📊</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={styles.profileButton}
+                onPress={() => setCurrentScreen('settings')}
+              >
+                <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <Text style={styles.greetingText}>{getGreeting()}</Text>
 
+          <Animated.View style={{ opacity: calendarFadeAnimation }}>
           <SecondaryGlassCard
             blur="subtle"
             opacity="light"
@@ -502,41 +1065,45 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
               {calendarDates.map((date, index) => {
                 const dateInfo = formatCalendarDate(date);
                 const isSelected = targetDate === dateInfo.dateString;
-                const hasAchievement = Math.random() > 0.6;
-                const hasStreak = Math.random() > 0.7;
+                const completionRate = getDailyCompletionRate(dateInfo.dateString, dailyTodosByDate);
+                const heatMapColor = getHeatMapColor(completionRate, colors);
                 
                 return (
                   <TouchableOpacity
                     key={index}
                     style={[
                       styles.calendarDate, 
+                      { backgroundColor: heatMapColor }, // Heat map background
                       dateInfo.isToday && styles.calendarDateToday, 
                       isSelected && styles.calendarDateSelected,
-                      hasAchievement && styles.calendarDateWithAchievement
                     ]}
                     onPress={() => handleCalendarDatePress(dateInfo.dateString)}
                     activeOpacity={0.7}
+                    accessibilityLabel={`${dateInfo.dayName} ${dateInfo.dayNumber}, ${completionRate}% completed`}
+                    accessibilityHint={`Todo completion rate: ${completionRate}%`}
                   >
-                    <Text style={styles.calendarDayName}>{dateInfo.dayName}</Text>
-                    <Text style={[styles.calendarDayNumber, (dateInfo.isToday || isSelected) && styles.calendarTextActive]}>
+                    <Text style={[
+                      styles.calendarDayName,
+                      // Adjust text color for better contrast on dark backgrounds
+                      completionRate > 50 && { color: colors.card }
+                    ]}>
+                      {dateInfo.dayName}
+                    </Text>
+                    <Text style={[
+                      styles.calendarDayNumber, 
+                      (dateInfo.isToday || isSelected) && styles.calendarTextActive,
+                      // Adjust text color for better contrast on dark backgrounds
+                      completionRate > 50 && !dateInfo.isToday && !isSelected && { color: colors.card }
+                    ]}>
                       {dateInfo.dayNumber}
                     </Text>
-                    
-                    {/* Achievement indicator dot */}
-                    {hasAchievement && !dateInfo.isToday && (
-                      <View style={styles.achievementIndicator} />
-                    )}
-                    
-                    {/* Streak indicator bar */}
-                    {hasStreak && !dateInfo.isToday && (
-                      <View style={styles.streakIndicator} />
-                    )}
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
           </SecondaryGlassCard>
-        </View>
+          </Animated.View>
+        </Animated.View>
 
         <View style={styles.mainContent}>
           {/* Enhanced Coach Card with GlassCard */}
@@ -551,7 +1118,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
                 accessibilityHint="Shows your current progress status with motivational message"
               >
                 <View style={styles.coachHeader}>
-                  <Text style={styles.cardTitle}>Coach's Status</Text>
+                  <Text style={styles.cardTitle}>Routy의 브리핑</Text>
                   <View style={[styles.statusBadge, { backgroundColor: coachStatus.color }]}>
                     <Text style={styles.statusBadgeText}>Live</Text>
                   </View>
@@ -604,7 +1171,8 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
           {/* Enhanced Todo Card with GlassCard */}
           <Animated.View 
             style={[
-              { transform: [{ scale: celebrationScale }] }
+              { transform: [{ scale: celebrationScale }] },
+              { opacity: todoFadeAnimation }
             ]}
           >
             <SecondaryGlassCard
@@ -634,17 +1202,19 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
       </ScrollView>
 
       {/* Floating Voice Chat Button */}
-      <TouchableOpacity
-        style={styles.floatingVoiceButton}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-          handleVoiceChatOpen();
-        }}
-        activeOpacity={0.85}
-        onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-      >
-        <Text style={styles.voiceButtonIcon}>🎤</Text>
-      </TouchableOpacity>
+      <Animated.View style={{ opacity: micButtonFadeAnimation }}>
+        <TouchableOpacity
+          style={styles.floatingVoiceButton}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            handleVoiceChatOpen();
+          }}
+          activeOpacity={0.85}
+          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+        >
+          <Text style={styles.voiceButtonIcon}>🎤</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Voice Chat Modals */}
       {voiceChatVisible && (
@@ -683,50 +1253,60 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         </View>
       </Modal>
       </SafeAreaView>
-    </VintagePaperBackground>
+    </View>
   );
 }
 
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  container: { flex: 1 },
-  safeArea: { flex: 1 },
+  container: { 
+    flex: 1,
+    backgroundColor: colors.background, // Solid background matching voice chat
+  },
+  safeArea: { 
+    flex: 1,
+    backgroundColor: colors.background, // Consistent background
+  },
   scrollView: { flex: 1 },
   headerArea: { 
     paddingHorizontal: Spacing.screen.paddingHorizontal, 
-    paddingTop: Spacing['5xl'], 
+    paddingTop: Spacing['2xl'], 
     paddingBottom: Spacing.xl 
   },
   mainContent: {
     paddingHorizontal: Spacing.screen.paddingHorizontal,
     paddingBottom: Spacing['4xl'],
-    gap: Spacing['2xl'],
+    gap: Spacing.lg,
   },
   profileHeader: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginBottom: Spacing['3xl'],
+    marginBottom: Spacing.lg,
     paddingTop: Spacing.md,
   },
-  logoContainer: { 
-    flexDirection: 'row', 
+  headerActions: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.md,
+  },
+  logoContainer: { 
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
     // Enhanced visual container
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     borderRadius: Spacing.layout.borderRadius.lg,
     backgroundColor: colors.primaryOpacity[10],
   },
   logoText: { 
-    fontSize: 40, 
+    fontSize: 32, 
     color: colors.primary, 
     fontWeight: colors.typography.fontWeight.bold,
     // Enhanced shadow for depth
     textShadowColor: colors.primaryOpacity[20],
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
-    // Add subtle scaling transform for better visual impact
-    transform: [{ scale: 1.1 }],
   },
   profileButton: { 
     padding: Spacing.md,
@@ -735,9 +1315,9 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: 'transparent',
   },
   profileIcon: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
     backgroundColor: colors.card, 
     justifyContent: 'center', 
     alignItems: 'center',
@@ -751,18 +1331,18 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     elevation: Spacing.layout.elevation.sm,
   },
   profileIconText: { 
-    fontSize: 28, 
+    fontSize: 24, 
     color: colors.primary,
     // Add subtle transform for better visual balance
     transform: [{ scale: 0.9 }],
   },
   greetingText: { 
-    fontSize: colors.typography.fontSize['2xl'], 
+    fontSize: colors.typography.fontSize.xl, 
     fontWeight: colors.typography.fontWeight.bold, 
     color: colors.text, 
-    marginBottom: Spacing['2xl'],
+    marginBottom: Spacing.lg,
     fontFamily: 'Inter',
-    lineHeight: colors.typography.fontSize['2xl'] * colors.typography.lineHeight.relaxed,
+    lineHeight: colors.typography.fontSize.xl * colors.typography.lineHeight.relaxed,
     letterSpacing: colors.typography.letterSpacing.normal,
     textAlign: 'center',
     // Enhanced styling for Korean greeting
@@ -794,21 +1374,21 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   calendarDate: { 
-    width: Spacing['6xl'] + Spacing.sm, // ~64px for better proportion
-    height: 88, 
+    width: Spacing['5xl'], // ~48px for more compact appearance
+    height: 62, // Reduced to 70% of original height (88px → 62px)
     borderRadius: Spacing.layout.borderRadius.lg, 
     backgroundColor: colors.card, 
     justifyContent: 'center', 
     alignItems: 'center', 
     marginHorizontal: Spacing.sm, 
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm, // Reduced from Spacing.md for compact design
     // Enhanced modern styling
     borderWidth: 1.5,
     borderColor: colors.neutral[100],
     shadowColor: colors.text,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 }, // Scaled down proportionally
     shadowOpacity: 0.08,
-    shadowRadius: Spacing.md,
+    shadowRadius: Spacing.sm, // Reduced shadow radius for smaller height
     elevation: 2,
     // Add subtle transform for better visual impact
     transform: [{ scale: 1 }],
@@ -816,86 +1396,63 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     overflow: 'visible',
   },
   calendarDateToday: { 
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryLight,
-    borderWidth: 2,
-    // Enhanced today styling
+    // Today uses heat map background but with enhanced border
+    borderColor: colors.primary,
+    borderWidth: 3,
+    // Enhanced today styling with stronger shadow
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: Spacing.lg,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: Spacing.md,
+    elevation: 8,
     // Add subtle pulse effect preparation
-    transform: [{ scale: 1.05 }],
+    transform: [{ scale: 1.08 }],
   },
   calendarDateSelected: { 
+    // Selected uses heat map background but with distinct border
     borderWidth: 2.5, 
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryOpacity[10],
+    borderColor: colors.info,
     // Enhanced selection styling
-    shadowColor: colors.primary,
+    shadowColor: colors.info,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: Spacing.md,
-    elevation: 3,
-    transform: [{ scale: 1.02 }],
+    elevation: 4,
+    transform: [{ scale: 1.04 }],
   },
   calendarDayName: { 
-    fontSize: colors.typography.fontSize.xs, 
+    fontSize: colors.typography.fontSize.xs * 0.9, // Slightly smaller for compact height
     color: colors.textMuted, 
     fontFamily: 'Inter',
     fontWeight: colors.typography.fontWeight.medium,
     letterSpacing: colors.typography.letterSpacing.wide,
     textTransform: 'uppercase',
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.xs * 0.7, // Reduced margin for compact spacing
   },
   calendarDayNumber: { 
-    fontSize: colors.typography.fontSize.xl, 
+    fontSize: colors.typography.fontSize.lg, // Reduced from xl to lg for compact height
     fontWeight: colors.typography.fontWeight.bold, 
     color: colors.text, 
     fontFamily: 'Inter',
-    lineHeight: colors.typography.fontSize.xl * colors.typography.lineHeight.tight,
+    lineHeight: colors.typography.fontSize.lg * colors.typography.lineHeight.tight, // Adjusted line height
   },
   calendarTextActive: { 
     color: '#ffffff', // White text for active states
   },
   
-  // Achievement indicators for calendar dates
-  calendarDateWithAchievement: {
-    borderTopRightRadius: Spacing.layout.borderRadius.lg,
-    // Add achievement indicator dot
-    position: 'relative',
-  },
-  achievementIndicator: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.success,
-    borderWidth: 2,
-    borderColor: colors.card,
-    // Achievement glow effect
-    shadowColor: colors.success,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
-  },
-  streakIndicator: {
-    position: 'absolute',
-    bottom: -2,
-    left: '50%',
-    marginLeft: -8,
-    width: 16,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.warning,
-    // Streak glow effect
-    shadowColor: colors.warning,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 3,
+  // Heat map specific styles - optimized for GitHub-style visualization
+  calendarDateHeatMap: {
+    // Enhanced border radius for better heat map appearance
+    borderRadius: Spacing.layout.borderRadius.md,
+    // Subtle border for definition
+    borderWidth: 1,
+    borderColor: colors.neutral[100] + '30', // Semi-transparent border
+    // Better shadow for depth
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   
   // Enhanced calendar hover states (for future interactivity)
@@ -924,7 +1481,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   calendarGlass: {
     marginHorizontal: -Spacing.md, // Extend to screen edges for glass effect
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   coachCard: { 
     flex: 1, 
@@ -1308,6 +1865,109 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: 28,
     textAlign: 'center',
     lineHeight: 28,
+  },
+  // Debug UI Styles (Development Only)
+  debugIndicator: {
+    marginLeft: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs / 2,
+    backgroundColor: colors.warning + '20',
+    borderRadius: Spacing.layout.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  debugIndicatorText: {
+    fontSize: colors.typography.fontSize.xs,
+    color: colors.warning,
+    fontWeight: colors.typography.fontWeight.bold,
+    letterSpacing: colors.typography.letterSpacing.wide,
+  },
+  debugToggleButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.neutral[300],
+  },
+  debugToggleButtonActive: {
+    backgroundColor: colors.warning + '20',
+    borderColor: colors.warning,
+  },
+  debugToggleText: {
+    fontSize: 14,
+  },
+  debugToggle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.neutral[300],
+  },
+  
+  // Streak system styles
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: Spacing.sm,
+    paddingHorizontal: Spacing.md, // Increased from xs + 2
+    paddingVertical: Spacing.sm, // Increased from xs
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: Spacing.layout.borderRadius.md, // Increased from sm
+    borderWidth: 2, // Increased from 1.5
+    minHeight: 32, // Increased from 24
+    // Enhanced glass effect
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 }, // Increased shadow
+    shadowOpacity: 0.15, // Increased opacity
+    shadowRadius: 4, // Increased radius
+    elevation: 4, // Increased elevation
+  },
+  
+  streakIcon: {
+    fontSize: 14, // Increased from 11
+    marginRight: Spacing.xs,
+    lineHeight: 14,
+  },
+  
+  streakCount: {
+    fontSize: colors.typography.fontSize.sm, // Increased from xs
+    fontWeight: colors.typography.fontWeight.bold,
+    fontFamily: 'Inter',
+    letterSpacing: 0.5,
+  },
+  
+  streakBadgeInner: {
+    flexDirection: 'row', 
+    alignItems: 'center',
+  },
+
+  // Plant and streak row styles
+  plantStreakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.xs,
+  },
+
+  // Harvest countdown styles
+  harvestCountdown: {
+    fontSize: colors.typography.fontSize.sm * 0.7,
+    color: colors.success,
+    fontWeight: colors.typography.fontWeight.medium,
+    fontFamily: 'Inter',
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    // Subtle glow effect
+    textShadowColor: colors.success + '30',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 }); 
 

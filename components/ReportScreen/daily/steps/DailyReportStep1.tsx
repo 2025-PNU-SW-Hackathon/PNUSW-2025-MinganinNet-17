@@ -105,7 +105,11 @@ export default function DailyReportStep1({ onComplete, onBack }: DailyReportStep
       setError(null);
       try {
         const plan: Plan | null = await getActivePlan();
+        console.log('🔍 DailyReportStep1: Fetched plan:', plan ? 'Found' : 'Not found');
+        
         if (plan && plan.milestones && plan.start_date) {
+          console.log('📅 Plan start date:', plan.start_date);
+          console.log('📊 Plan has', plan.milestones.length, 'milestones');
           const today = new Date();
           today.setHours(0, 0, 0, 0);
 
@@ -113,8 +117,10 @@ export default function DailyReportStep1({ onComplete, onBack }: DailyReportStep
           startDate.setHours(0, 0, 0, 0);
 
           const diffDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          console.log('📊 Days difference:', diffDays);
 
           if (diffDays < 0) {
+            console.log('⚠️ Plan starts in the future, no todos for today');
             setTodos([]);
             return;
           }
@@ -122,7 +128,10 @@ export default function DailyReportStep1({ onComplete, onBack }: DailyReportStep
           let dayCounter = 0;
           for (const milestone of plan.milestones) {
             const durationInDays = parseDurationToDays(milestone.duration);
+            console.log(`🎯 Checking milestone "${milestone.title}": days ${dayCounter}-${dayCounter + durationInDays - 1}`);
+            
             if (diffDays >= dayCounter && diffDays < dayCounter + durationInDays) {
+              console.log(`✅ Found matching milestone with ${milestone.daily_todos.length} todos`);
               setTodos(milestone.daily_todos);
               
               const initialCompletion: { [key: string]: boolean } = {};
@@ -134,6 +143,7 @@ export default function DailyReportStep1({ onComplete, onBack }: DailyReportStep
             }
             dayCounter += durationInDays;
           }
+          console.log('❌ No matching milestone found for today, setting empty todos');
           setTodos([]);
         } else {
           setTodos([]);
@@ -238,7 +248,7 @@ export default function DailyReportStep1({ onComplete, onBack }: DailyReportStep
       {/* Next Button */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.nextButton}
+          style={[styles.nextButton, { backgroundColor: Colors[colorScheme ?? 'light'].buttonPrimary }]}
           onPress={handleNext}
         >
           <Text style={styles.nextButtonText}>
@@ -377,7 +387,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 56,
-    backgroundColor: '#6c63ff',
   },
   nextButtonText: {
     fontSize: 18,

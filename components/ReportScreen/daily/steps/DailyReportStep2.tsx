@@ -8,7 +8,7 @@ import {
 import { Colors } from '../../../../constants/Colors';
 import { useColorScheme } from '../../../../hooks/useColorScheme';
 import { DailyTodo } from '../../../../types/habit';
-import ChatContainer, { ChatMessage } from '../../../Chat/ChatContainer';
+import ChatContainer, { ChatMessageType } from '../../../Chat/ChatContainer';
 import VoiceChatScreen from '../../../VoiceChatScreen';
 
 interface DailyReportStep2Props {
@@ -23,15 +23,16 @@ type ChatMode = 'chat' | 'voice';
 export default function DailyReportStep2({ todos, achievementScore, onComplete, onBack }: DailyReportStep2Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const [mode, setMode] = useState<ChatMode>('chat');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
+  const [canSubmit, setCanSubmit] = useState(false);
   const messageIdCounter = useRef(0);
 
   // Initialize chat with welcome message
   useEffect(() => {
-    const welcomeMessage: ChatMessage = {
+    const welcomeMessage: ChatMessageType = {
       id: `msg-${messageIdCounter.current++}`,
       role: 'coach',
       content: `안녕하세요! 😊 오늘 하루 정말 수고하셨어요. 오늘은 ${todos.filter(t => t.is_completed).length}개의 할 일을 완료하셨고, 스스로 ${achievementScore}/10점을 주셨네요. 어떤 하루였는지 편안하게 이야기해보시겠어요?`,
@@ -40,13 +41,19 @@ export default function DailyReportStep2({ todos, achievementScore, onComplete, 
     setMessages([welcomeMessage]);
   }, [todos, achievementScore]);
 
+  // Track if user can submit conversation
+  useEffect(() => {
+    const userMessages = messages.filter(msg => msg.role === 'user');
+    setCanSubmit(userMessages.length >= 2); // Allow submission after 2 user messages
+  }, [messages]);
+
   const generateUniqueId = () => `msg-${messageIdCounter.current++}`;
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
 
     // Add user message
-    const userMessage: ChatMessage = {
+    const userMessage: ChatMessageType = {
       id: generateUniqueId(),
       role: 'user',
       content: content.trim(),
@@ -66,17 +73,21 @@ export default function DailyReportStep2({ todos, achievementScore, onComplete, 
         completed: t.is_completed,
       }));
 
+      // Get user message count for flow control
+      const userMessages = updatedMessages.filter(msg => msg.role === 'user');
+      
       // Check if conversation is complete enough for final analysis
       const completionStatus = await evaluateDailyReflectionCompletion(updatedMessages);
       
       let aiResponse: string;
       
-      if (completionStatus.isComplete && completionStatus.completionScore >= 70) {
-        // Generate final comprehensive summary
-        aiResponse = "정말 좋은 대화였어요! ✨ 이제 오늘 하루에 대한 종합적인 분석을 정리해드릴게요. 잠시만 기다려주세요...";
+      // Check if conversation should auto-complete (for very long conversations)
+      if (completionStatus.isComplete && completionStatus.completionScore >= 90 && userMessages.length >= 8) {
+        // Auto-complete only for very comprehensive conversations
+        aiResponse = "정말 풍성한 대화였어요! ✨ 충분히 많은 이야기를 나누었으니 이제 오늘 하루에 대한 종합적인 분석을 정리해드릴게요.";
         
         // Add AI response first
-        const finalMessage: ChatMessage = {
+        const finalMessage: ChatMessageType = {
           id: generateUniqueId(),
           role: 'coach',
           content: aiResponse,
@@ -121,7 +132,7 @@ export default function DailyReportStep2({ todos, achievementScore, onComplete, 
       }
 
       // Add AI response
-      const aiMessage: ChatMessage = {
+      const aiMessage: ChatMessageType = {
         id: generateUniqueId(),
         role: 'coach',
         content: aiResponse,
@@ -132,7 +143,7 @@ export default function DailyReportStep2({ todos, achievementScore, onComplete, 
       
     } catch (error) {
       console.error('Error generating AI response:', error);
-      const errorMessage: ChatMessage = {
+      const errorMessage: ChatMessageType = {
         id: generateUniqueId(),
         role: 'coach',
         content: '죄송해요, 일시적인 오류가 발생했어요. 다시 한 번 말씀해주시겠어요? 🙏',
@@ -157,6 +168,40 @@ export default function DailyReportStep2({ todos, achievementScore, onComplete, 
     }
   };
 
+  const handleSubmitConversation = async () => {
+    if (!canSubmit || isLoading) return;
+
+    setIsLoading(true);
+    
+    try {
+      const feedbackTodos = todos.map(t => ({
+        id: t.id.toString(),
+        description: t.description,
+        completed: t.is_completed,
+      }));
+
+      // Generate final comprehensive analysis
+      const comprehensiveAnalysis = await generateFinalDailyReflectionSummary(
+        messages, 
+        feedbackTodos, 
+        achievementScore
+      );
+      
+      // Convert the conversation to a summary format for the existing flow
+      const conversationSummary = messages
+        .filter(msg => msg.role === 'user')
+        .map(msg => msg.content)
+        .join(' ');
+      
+      onComplete(conversationSummary, comprehensiveAnalysis);
+    } catch (error) {
+      console.error('Manual submission failed:', error);
+      Alert.alert('오류', '대화를 제출하는 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (mode === 'voice' || voiceChatVisible) {
     return (
       <VoiceChatScreen
@@ -176,12 +221,14 @@ export default function DailyReportStep2({ todos, achievementScore, onComplete, 
       messages={messages}
       onSendMessage={handleSendMessage}
       onVoicePress={handleVoicePress}
+      onSubmitConversation={handleSubmitConversation}
       onBack={onBack}
       isTyping={isTyping}
       disabled={isLoading}
       coachName="루티"
       placeholder="오늘 하루에 대해 이야기해보세요..."
       showVoiceButton={true}
+      showSubmitButton={canSubmit && !isLoading}
     />
   );
 }

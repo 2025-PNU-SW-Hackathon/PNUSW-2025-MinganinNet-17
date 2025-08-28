@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState, useRef } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, Animated } from 'react-native';
 import { submitHabitData } from '../backend/hwirang/habit';
 import { createNewHabitAndPlan } from '../backend/supabase/habits';
+import { supabase } from '../backend/supabase/client';
 import { useHabitStore } from '../lib/habitStore';
+import { validateAndRecoverSession } from '../utils/sessionRecovery';
 import { PlanForCreation } from '../types/habit';
 import DebugNextButton from './DebugNextButton';
+import VoiceChatScreen from './VoiceChatScreen';
 import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { useColorScheme } from '../hooks/useColorScheme';
@@ -35,6 +38,10 @@ export default function GoalSettingStep5({
   const styles = createStyles(colors);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showVoiceTranscript, setShowVoiceTranscript] = useState(false);
+  const [voiceChatVisible, setVoiceChatVisible] = useState(false);
+  
+  // Loading screen fade in animation (400ms duration)
+  const loadingFadeAnimation = useRef(new Animated.Value(0)).current;
   
   // Use all the necessary states from the store
   const {
@@ -88,6 +95,22 @@ export default function GoalSettingStep5({
     }
     return null;
   };
+
+  // Loading screen fade in animation when AI generation starts
+  useEffect(() => {
+    if (isSubmitting) {
+      // Reset animation value and start 400ms fade in
+      loadingFadeAnimation.setValue(0);
+      Animated.timing(loadingFadeAnimation, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Reset when not submitting
+      loadingFadeAnimation.setValue(0);
+    }
+  }, [isSubmitting, loadingFadeAnimation]);
 
   // 음성/텍스트 모드에서 전달받은 정보를 파싱하여 습관 정보 추출
   const parseVoiceData = (transcript: string) => {
@@ -330,16 +353,34 @@ export default function GoalSettingStep5({
       
       console.log('💾 Saving habit and plan to database...');
       console.log('📝 Plan status being saved:', planForCreation.status);
+      
+      // DEBUG: Validate session before habit creation
+      console.log('🔍 DEBUG: Validating session before habit creation...');
+      const sessionValid = await validateAndRecoverSession();
+      
+      if (!sessionValid) {
+        Alert.alert(
+          '인증 오류', 
+          '세션이 만료되었습니다. 다시 로그인해주세요.',
+          [{ text: '확인', onPress: () => {
+            // Could navigate to login screen here
+            console.log('🔧 RECOVERY: User needs to login again');
+          }}]
+        );
+        return;
+      }
+      
       const finalPlan = await createNewHabitAndPlan(habitName, planForCreation);
       console.log('✅ Successfully saved to database with ID:', finalPlan?.id);
       console.log('📊 Final plan status:', finalPlan?.status);
       
       // 저장된 결과를 store에 설정
       setPlan(finalPlan);
-      console.log('🏪 Plan set in store, proceeding to next step...');
+      console.log('🏪 Plan set in store, proceeding to voice chat...');
       
       Alert.alert('성공', 'AI가 맞춤형 루틴을 생성하고 저장했습니다!');
-      onComplete();
+      // Open VoiceChatScreen after AI generation completes instead of going directly to next step
+      setVoiceChatVisible(true);
       
     } catch (error) {
       console.error('💥 Error in AI routine generation and DB save:', error);
@@ -368,23 +409,95 @@ export default function GoalSettingStep5({
   };
 
   // Debug handlers for mock data
-  const handleDebugWithHealthPlan = () => {
+  const handleDebugWithHealthPlan = async () => {
     if (isDebugEnabled) {
-      console.log('🐛 DEBUG: Using mock health plan');
-      setPlan(MOCK_PLAN);
-      Alert.alert('Debug Mode', '건강 습관 모크 데이터가 로드되었습니다!', [
-        { text: 'OK', onPress: onComplete }
-      ]);
+      try {
+        console.log('🐛 DEBUG: Using mock health plan with database save');
+        setIsSubmitting(true);
+        
+        // Convert MOCK_PLAN to PlanForCreation format
+        const planForCreation: PlanForCreation = {
+          plan_title: MOCK_PLAN.plan_title,
+          status: 'in_progress',
+          start_date: MOCK_PLAN.start_date,
+          difficulty_reason: MOCK_PLAN.difficulty_reason,
+          intensity: MOCK_PLAN.intensity,
+          available_time: MOCK_PLAN.available_time,
+          milestones: MOCK_PLAN.milestones.map((milestone) => ({
+            title: milestone.title,
+            duration: milestone.duration,
+            status: milestone.status,
+            daily_todos: milestone.daily_todos.map((todo) => ({
+              description: todo.description,
+              is_completed: todo.is_completed
+            }))
+          }))
+        };
+        
+        console.log('🐛 DEBUG: Saving mock health plan to database...');
+        const finalPlan = await createNewHabitAndPlan(MOCK_PLAN.plan_title, planForCreation);
+        
+        if (finalPlan) {
+          setPlan(finalPlan);
+          console.log('🐛 DEBUG: Mock health plan saved successfully with ID:', finalPlan.id);
+          Alert.alert('Debug Mode', '건강 습관 모크 데이터가 로드되고 저장되었습니다!', [
+            { text: 'OK', onPress: onComplete }
+          ]);
+        } else {
+          throw new Error('Failed to save mock plan to database');
+        }
+      } catch (error) {
+        console.error('🐛 DEBUG: Error saving mock health plan:', error);
+        Alert.alert('Debug Error', '모크 데이터 저장에 실패했습니다.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
-  const handleDebugWithStudyPlan = () => {
+  const handleDebugWithStudyPlan = async () => {
     if (isDebugEnabled) {
-      console.log('🐛 DEBUG: Using mock study plan');
-      setPlan(MOCK_PLAN_STUDY);
-      Alert.alert('Debug Mode', '학습 습관 모크 데이터가 로드되었습니다!', [
-        { text: 'OK', onPress: onComplete }
-      ]);
+      try {
+        console.log('🐛 DEBUG: Using mock study plan with database save');
+        setIsSubmitting(true);
+        
+        // Convert MOCK_PLAN_STUDY to PlanForCreation format
+        const planForCreation: PlanForCreation = {
+          plan_title: MOCK_PLAN_STUDY.plan_title,
+          status: 'in_progress',
+          start_date: MOCK_PLAN_STUDY.start_date,
+          difficulty_reason: MOCK_PLAN_STUDY.difficulty_reason,
+          intensity: MOCK_PLAN_STUDY.intensity,
+          available_time: MOCK_PLAN_STUDY.available_time,
+          milestones: MOCK_PLAN_STUDY.milestones.map((milestone) => ({
+            title: milestone.title,
+            duration: milestone.duration,
+            status: milestone.status,
+            daily_todos: milestone.daily_todos.map((todo) => ({
+              description: todo.description,
+              is_completed: todo.is_completed
+            }))
+          }))
+        };
+        
+        console.log('🐛 DEBUG: Saving mock study plan to database...');
+        const finalPlan = await createNewHabitAndPlan(MOCK_PLAN_STUDY.plan_title, planForCreation);
+        
+        if (finalPlan) {
+          setPlan(finalPlan);
+          console.log('🐛 DEBUG: Mock study plan saved successfully with ID:', finalPlan.id);
+          Alert.alert('Debug Mode', '학습 습관 모크 데이터가 로드되고 저장되었습니다!', [
+            { text: 'OK', onPress: onComplete }
+          ]);
+        } else {
+          throw new Error('Failed to save mock plan to database');
+        }
+      } catch (error) {
+        console.error('🐛 DEBUG: Error saving mock study plan:', error);
+        Alert.alert('Debug Error', '모크 데이터 저장에 실패했습니다.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -400,6 +513,18 @@ export default function GoalSettingStep5({
       return line;
     });
     return formattedLines.join('\n');
+  };
+
+  // VoiceChatScreen handlers
+  const handleVoiceChatClose = () => {
+    setVoiceChatVisible(false);
+  };
+
+  const handleVoiceChatComplete = (data: any) => {
+    setVoiceChatVisible(false);
+    // After VoiceChatScreen completes, proceed to next step (Step6)
+    console.log('🎤 VoiceChat completed, proceeding to Step 6...');
+    onComplete();
   };
 
   return (
@@ -437,8 +562,6 @@ export default function GoalSettingStep5({
         </ScrollView>
       )}
 
-      {/* 빈 공간을 위한 Spacer */}
-      <View style={styles.spacer} />
 
       <TouchableOpacity
         style={[
@@ -448,9 +571,13 @@ export default function GoalSettingStep5({
         onPress={handleSubmit}
         disabled={isSubmitting}
       >
-        <Text style={styles.submitButtonText}>
-          {isSubmitting ? '생성 중...' : 'AI 루틴 생성하기'}
-        </Text>
+        {isSubmitting ? (
+          <Animated.View style={{ opacity: loadingFadeAnimation }}>
+            <Text style={styles.submitButtonText}>생성 중...</Text>
+          </Animated.View>
+        ) : (
+          <Text style={styles.submitButtonText}>AI 루틴 생성하기</Text>
+        )}
       </TouchableOpacity>
       
       {/* Debug buttons for mock data */}
@@ -476,6 +603,17 @@ export default function GoalSettingStep5({
         disabled={isSubmitting}
         style={{ bottom: 20 }}
       />
+
+      {/* VoiceChatScreen for goal-setting flow with custom entry animation */}
+      {voiceChatVisible && (
+        <VoiceChatScreen 
+          visible={voiceChatVisible}
+          mode="plan"
+          onClose={handleVoiceChatClose}
+          onComplete={handleVoiceChatComplete}
+          customEntry={true}  // Use the existing 700ms fade in animation we built
+        />
+      )}
     </View>
   );
 }
@@ -486,6 +624,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: colors.background,
     paddingHorizontal: 24,
     paddingTop: 100,
+    paddingBottom: 120,
   },
   stepIndicator: {
     fontSize: 16,
@@ -522,24 +661,24 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     maxHeight: 200,
   },
   habitInfoContainer: {
-    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
-    marginBottom: 40,
+    marginBottom: 160,
     maxHeight: 300,
     borderWidth: 1,
-    borderColor: 'rgba(108, 99, 255, 0.3)',
+    borderColor: colors.border,
   },
   habitInfoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text,
     marginBottom: 16,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
   habitInfoText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: colors.text,
     lineHeight: 24,
     marginBottom: 8,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -560,7 +699,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   submitButton: {
     backgroundColor: colors.primary,
     borderRadius: 28,
-    paddingVertical: 19,
+    paddingVertical: 12,
     alignItems: 'center',
     height: 56,
     justifyContent: 'center',
@@ -574,7 +713,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     opacity: 0.5,
   },
   submitButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: colors.text,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
@@ -593,8 +732,5 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
-  },
-  spacer: {
-    height: 40, // Adjust as needed for spacing
   },
 }); 

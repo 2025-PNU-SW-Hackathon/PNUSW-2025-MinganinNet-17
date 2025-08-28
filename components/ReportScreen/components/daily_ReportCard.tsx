@@ -58,17 +58,19 @@ export const ReportCard = ({ data, isToday = false }: ReportCardProps) => {
         </Text>
       </View>
 
-      {/* AI Coach's Feedback Summary */}
-      <View style={styles.feedbackContainer}>
-        {data.ai_coach_feedback.map((feedback, index) => (
-          <View key={index} style={styles.feedbackItem}>
-            <Text style={styles.feedbackBullet}>•</Text>
-            <Text style={[styles.feedbackText, { color: Colors[colorScheme ?? 'light'].text }]}>
-              {feedback}
-            </Text>
-          </View>
-        ))}
-      </View>
+      {/* AI Coach's Feedback Summary - Only show for today's report */}
+      {isToday && (
+        <View style={styles.feedbackContainer}>
+          {data.ai_coach_feedback.map((feedback, index) => (
+            <View key={index} style={styles.feedbackItem}>
+              <Text style={styles.feedbackBullet}>•</Text>
+              <Text style={[styles.feedbackText, { color: Colors[colorScheme ?? 'light'].text }]}>
+                {feedback}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 };

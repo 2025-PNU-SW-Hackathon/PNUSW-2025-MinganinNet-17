@@ -10,19 +10,26 @@ interface DailyReportSectionProps {
   todayReport: ReportFromSupabase | null;
   historicalReports: ReportFromSupabase[];
   isLoading: boolean;
+  onReportSaved: () => Promise<void>;
 }
 
 export const DailyReportSection = ({ 
   todayReport, 
   historicalReports, 
-  isLoading
+  isLoading,
+  onReportSaved
 }: DailyReportSectionProps) => {
   const colorScheme = useColorScheme();
   const [isCreating, setIsCreating] = useState(false);
 
   // If creating report, show the create flow
   if (isCreating) {
-    return <DailyReportCreateFlow onBack={() => setIsCreating(false)} />;
+    return (
+      <DailyReportCreateFlow 
+        onBack={() => setIsCreating(false)} 
+        onReportSaved={onReportSaved}
+      />
+    );
   }
 
   const CreateReportPrompt = () => {
@@ -62,12 +69,15 @@ export const DailyReportSection = ({
   
   return (
     <View style={styles.dailyReportContainer}>
-      {/* Sticky Today's Report Card - Conditional Rendering */}
+      {/* Always Show Create Report Button */}
       <View style={styles.stickyHeaderContainer}>
-        {todayReport ? (
-          <ReportCard data={todayReport} isToday={true} />
-        ) : (
-          <CreateReportPrompt />
+        <CreateReportPrompt />
+        
+        {/* Today's Report Card - Show if exists */}
+        {todayReport && (
+          <View style={styles.todayReportContainer}>
+            <ReportCard data={todayReport} isToday={true} />
+          </View>
         )}
       </View>
 
@@ -99,6 +109,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     zIndex: 10,
   },
+  todayReportContainer: {
+    marginTop: 16,
+  },
   historyContainer: {
     flex: 1,
     paddingHorizontal: 24,
@@ -124,7 +137,6 @@ const styles = StyleSheet.create({
   createReportCard: {
     padding: 20,
     borderRadius: 16,
-    marginBottom: 8,
     borderWidth: 2,
     borderColor: 'rgba(0, 0, 0, 0.1)',
     borderStyle: 'dashed',
