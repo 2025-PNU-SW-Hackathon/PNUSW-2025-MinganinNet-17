@@ -161,7 +161,7 @@ export default function MainApp() {
 
   // 음성 채팅에서 수집된 목표 정보 업데이트
   const updateCollectedGoalInfo = (goalInfo: any) => {
-    console.log('🎯 Updating collected goal info:', goalInfo);
+    console.log('🎯 MainApp - Updating collected goal info:', goalInfo);
     setAppData(prev => ({ ...prev, collectedGoalInfo: goalInfo }));
   };
 
@@ -350,6 +350,7 @@ export default function MainApp() {
           <GoalSettingStep5
             onComplete={handleGoalStep5Complete}
             onBack={handleGoalStep5Back}
+            collectedGoalInfo={appData.collectedGoalInfo}
           />
         );
       

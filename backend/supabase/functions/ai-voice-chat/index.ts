@@ -154,23 +154,6 @@ serve(async (req) => {
               userGoals = goals;
               console.log('[ai-voice-chat] 사용자 목표 조회 완료:', userGoals?.length || 0, '개');
             }
-          }
-           
-           // 사용자 이전 대화 맥락 조회 (최근 7일간)
-           let conversationContext = null;
-           try {
-             const { data: contextData, error: contextError } = await supabase
-               .rpc('get_user_conversation_context', { 
-                 p_user_id: user.id, 
-                 p_limit: 5 
-               });
-             
-             if (!contextError && contextData && contextData.length > 0) {
-               conversationContext = contextData[0];
-               console.log('[ai-voice-chat] 이전 대화 맥락 조회 완료:', conversationContext);
-             }
-           } catch (contextError) {
-             console.error('[ai-voice-chat] 대화 맥락 조회 오류:', contextError);
            }
       
       // 프로덕션 모드에서만 supabase 클라이언트를 전역으로 설정
@@ -182,11 +165,210 @@ serve(async (req) => {
     // 5. LLM 시작 (목표 정보를 포함한 프롬프트 생성)
     console.log('[ai-voice-chat] LLM 시작...');
     
+    // conversationMemory 전체를 파싱하는 함수
+    const parseConversationMemory = (conversationText: string) => {
+      const info: any = {};
+      
+      console.log('[ai-voice-chat] parseConversationMemory 시작 - 입력:', conversationText);
+      
+      // 사용자 발화만 추출 (더 정확한 패턴)
+      const userPattern = /사용자:\s*([^\n\r]+)/g;
+      const userUtterances = [];
+      let match;
+      while ((match = userPattern.exec(conversationText)) !== null) {
+        const utterance = match[1].trim();
+        if (utterance.length > 0 && !utterance.includes('AI:')) { // 빈 문자열과 AI 응답 제외
+          userUtterances.push(utterance);
+        }
+      }
+
+      // 대안 패턴 시도
+      if (userUtterances.length === 0) {
+        const alternativePattern = /사용자:\s*(.+?)(?=AI:|$)/gs;
+        while ((match = alternativePattern.exec(conversationText)) !== null) {
+          const utterance = match[1].trim();
+          if (utterance.length > 0) {
+            userUtterances.push(utterance);
+          }
+        }
+      }
+      
+      const allUserText = userUtterances.join(' ');
+      console.log('[ai-voice-chat] 추출된 사용자 발화:', userUtterances);
+      console.log('[ai-voice-chat] 모든 사용자 발화 합친 텍스트:', allUserText);
+      
+      // 목표 추출 (더 구체적이고 정확한 패턴)
+      if (allUserText.includes('코딩') && allUserText.includes('공부')) {
+        info.goal = '코딩 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 코딩 공부');
+      } else if (allUserText.includes('프로그래밍') && allUserText.includes('공부')) {
+        info.goal = '프로그래밍 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 프로그래밍 공부');
+      } else if (allUserText.includes('개발') && allUserText.includes('공부')) {
+        info.goal = '개발 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 개발 공부');
+      } else if (allUserText.includes('리액트') || allUserText.includes('React')) {
+        info.goal = '리액트 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 리액트 공부');
+      } else if (allUserText.includes('자바스크립트') || allUserText.includes('JavaScript')) {
+        info.goal = '자바스크립트 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 자바스크립트 공부');
+      } else if (allUserText.includes('파이썬') || allUserText.includes('Python')) {
+        info.goal = '파이썬 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 파이썬 공부');
+      } else if (allUserText.includes('코딩')) {
+        info.goal = '코딩 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 코딩 공부');
+      } else if (allUserText.includes('프로그래밍')) {
+        info.goal = '프로그래밍';
+        console.log('[ai-voice-chat] 목표 추출됨: 프로그래밍');
+      } else if (allUserText.includes('개발')) {
+        info.goal = '개발 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 개발 공부');
+      } else if (allUserText.includes('공부')) {
+        // 공부 앞에 있는 단어를 찾아서 목표로 설정
+        const studyMatch = allUserText.match(/([가-힣a-zA-Z]+)\s*공부/);
+        if (studyMatch) {
+          info.goal = studyMatch[1] + ' 공부';
+          console.log('[ai-voice-chat] 목표 추출됨:', studyMatch[1] + ' 공부');
+        } else {
+          info.goal = '공부';
+          console.log('[ai-voice-chat] 목표 추출됨: 공부');
+        }
+      } else if (allUserText.includes('운동') || allUserText.includes('헬스')) {
+        info.goal = '운동';
+        console.log('[ai-voice-chat] 목표 추출됨: 운동');
+      } else if (allUserText.includes('독서') || allUserText.includes('책')) {
+        info.goal = '독서';
+        console.log('[ai-voice-chat] 목표 추출됨: 독서');
+      } else if (allUserText.includes('다이어트') || allUserText.includes('체중')) {
+        info.goal = '다이어트';
+        console.log('[ai-voice-chat] 목표 추출됨: 다이어트');
+      } else if (allUserText.includes('금연') || allUserText.includes('담배')) {
+        info.goal = '금연';
+        console.log('[ai-voice-chat] 목표 추출됨: 금연');
+      }
+      
+      // 기간 추출 (한국어 숫자 지원)
+      let periodExtracted = null;
+      
+      // 한국어 숫자 → 아라비아 숫자 매핑
+      const koreanToNumber = {
+        '한': '1', '두': '2', '세': '3', '네': '4', '다섯': '5', '여섯': '6',
+        '일곱': '7', '여덟': '8', '아홉': '9', '열': '10'
+      };
+      
+      // 패턴 1: "세 달", "한 달" 등
+      const koreanPeriodMatch = allUserText.match(/(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(달|개월)/);
+      if (koreanPeriodMatch) {
+        const koreanNum = koreanPeriodMatch[1];
+        const unit = koreanPeriodMatch[2] === '달' ? '개월' : koreanPeriodMatch[2];
+        periodExtracted = koreanToNumber[koreanNum] + unit;
+        console.log('[ai-voice-chat] 한국어 기간 추출됨:', koreanPeriodMatch[0], '→', periodExtracted);
+      }
+      
+      // 패턴 2: "3개월", "6달" 등
+      if (!periodExtracted) {
+        const numberPeriodMatch = allUserText.match(/(\d+)\s*(개월|달|년)/);
+        if (numberPeriodMatch) {
+          const unit = numberPeriodMatch[2] === '달' ? '개월' : numberPeriodMatch[2];
+          periodExtracted = numberPeriodMatch[1] + unit;
+          console.log('[ai-voice-chat] 숫자 기간 추출됨:', periodExtracted);
+        }
+      }
+      
+      if (periodExtracted) {
+        info.period = periodExtracted;
+        console.log('[ai-voice-chat] 최종 기간 추출됨:', info.period);
+      }
+      
+      // 시간 추출 (더 정확한 패턴)
+      let timeMatch = allUserText.match(/(오전|오후|아침|저녁|밤|새벽)\s*(\d+)시\s*부터\s*(\d+)시\s*까지/);
+      if (timeMatch) {
+        info.time = `${timeMatch[1]} ${timeMatch[2]}시부터 ${timeMatch[3]}시까지`;
+        console.log('[ai-voice-chat] 시간 추출됨:', info.time);
+      } else {
+        // "한 달 동안 오후 5시부터 8시까지" 같은 패턴도 매칭
+        timeMatch = allUserText.match(/(\d+개월|\d+달|한 달|두 달|세 달|네 달|다섯 달|여섯 달)\s*동안\s*(오전|오후|아침|저녁|밤|새벽)\s*(\d+)시\s*부터\s*(\d+)시\s*까지/);
+        if (timeMatch) {
+          info.period = timeMatch[1];
+          info.time = `${timeMatch[2]} ${timeMatch[3]}시부터 ${timeMatch[4]}시까지`;
+          console.log('[ai-voice-chat] 복합 패턴 매칭 - 기간:', info.period, '시간:', info.time);
+        }
+      }
+      
+      // 어려운 점 추출 (더 정확한 패턴)
+      if (allUserText.includes('까먹어') || allUserText.includes('까먹') || allUserText.includes('잊어') || allUserText.includes('기억')) {
+        info.difficulty = '까먹어';
+        console.log('[ai-voice-chat] 어려운 점 추출됨: 까먹어');
+      } else if (allUserText.includes('시간') || allUserText.includes('바쁘') || allUserText.includes('시간이')) {
+        info.difficulty = '시간 부족';
+        console.log('[ai-voice-chat] 어려운 점 추출됨: 시간 부족');
+      } else if (allUserText.includes('의지') || allUserText.includes('동기') || allUserText.includes('귀찮') || allUserText.includes('힘들')) {
+        info.difficulty = '의지 부족';
+        console.log('[ai-voice-chat] 어려운 점 추출됨: 의지 부족');
+      } else if (allUserText.includes('어려워') || allUserText.includes('어렵')) {
+        info.difficulty = '어려움';
+        console.log('[ai-voice-chat] 어려운 점 추출됨: 어려움');
+      }
+      
+      // 강도 추출 (더 정확한 패턴)
+      if (allUserText.includes('높은') || allUserText.includes('높음') || allUserText.includes('어려워')) {
+        info.intensity = '높음';
+        console.log('[ai-voice-chat] 강도 추출됨: 높음');
+      } else if (allUserText.includes('보통') || allUserText.includes('적당')) {
+        info.intensity = '보통';
+        console.log('[ai-voice-chat] 강도 추출됨: 보통');
+      } else if (allUserText.includes('낮은') || allUserText.includes('낮음') || allUserText.includes('쉬워')) {
+        info.intensity = '낮음';
+        console.log('[ai-voice-chat] 강도 추출됨: 낮음');
+      }
+      
+      console.log('[ai-voice-chat] parseConversationMemory 최종 결과:', info);
+      
+      return info;
+    };
+
     // 사용자 입력에서 목표 설정 정보 파싱 (개선된 버전)
     const parseGoalSettingInfo = (text, previousInfo = {}) => {
       const info = { ...previousInfo }; // 이전 정보 유지
       console.log('[ai-voice-chat] 파싱 시작 - 입력 텍스트:', text);
       console.log('[ai-voice-chat] 이전 정보:', previousInfo);
+      
+      // conversationMemory 전체에서 정보 추출 시도 (강제 실행)
+      if (text.length > 20 && text.includes('사용자:')) {
+        console.log('[ai-voice-chat] conversationMemory 전체 파싱 시도');
+        console.log('[ai-voice-chat] 파싱할 텍스트 길이:', text.length);
+        console.log('[ai-voice-chat] 파싱할 텍스트 내용 (처음 300자):', text.substring(0, 300));
+
+        const conversationInfo = parseConversationMemory(text);
+        console.log('[ai-voice-chat] parseConversationMemory 실행 결과:', conversationInfo);
+        console.log('[ai-voice-chat] 추출된 정보 개수:', Object.keys(conversationInfo).length);
+        console.log('[ai-voice-chat] 각 정보 필드:', {
+          goal: conversationInfo.goal,
+          period: conversationInfo.period,
+          time: conversationInfo.time,
+          difficulty: conversationInfo.difficulty,
+          intensity: conversationInfo.intensity
+        });
+
+        if (Object.keys(conversationInfo).length > 0) {
+          Object.assign(info, conversationInfo);
+          console.log('[ai-voice-chat] conversationMemory 파싱 결과 병합됨:', conversationInfo);
+          console.log('[ai-voice-chat] 병합 후 info:', info);
+          console.log('[ai-voice-chat] 병합 후 info 개수:', Object.keys(info).length);
+        } else {
+          console.log('[ai-voice-chat] parseConversationMemory에서 정보 추출 실패 - 텍스트 내용:', text.substring(0, 200));
+        }
+      } else {
+        console.log('[ai-voice-chat] conversationMemory 파싱 조건 불충족:', {
+          textLength: text.length,
+          hasUserPattern: text.includes('사용자:'),
+          textPreview: text.substring(0, 100)
+        });
+      }
+      
+      // 현재 입력에서도 정보 추출 (기존 파싱 로직 사용)
       
       // 목표 추출 (예: "100만원 모으기", "운동하기", "코딩 연습하기", "코딩 연습을 하고 싶어")
       const goalPatterns = [
@@ -245,18 +427,57 @@ serve(async (req) => {
       
       // 3. 시간 추출 (더 정확한 패턴)
       const timePatterns = [
-        /(아침|저녁|오전|오후)\s*(\d+시)/,
+        // "오후 2시부터 7시까지" 형태
+        /(오전|오후|아침|저녁|밤|새벽)\s*(\d+)시\s*부터\s*(\d+)시\s*까지/,
+        // "2시부터 7시까지" 형태
         /(\d+)시\s*부터\s*(\d+)시\s*까지/,
-        /(\d+)시\s*~?\s*(\d+)시/
+        // "오후 2시~7시" 형태
+        /(오전|오후|아침|저녁|밤|새벽)\s*(\d+)시\s*[~-]\s*(\d+)시/,
+        // "2시~7시" 형태
+        /(\d+)시\s*[~-]\s*(\d+)시/,
+        // "오후 2시" 형태 (단일 시간)
+        /(오전|오후|아침|저녁|밤|새벽)\s*(\d+)시/,
+        // "다섯 시부터 일곱 시까지" 형태 (한글 숫자)
+        /(다섯|여섯|일곱|여덟|아홉|열|열한|열두)시\s*부터\s*(다섯|여섯|일곱|여덟|아홉|열|열한|열두)시\s*까지/
       ];
       
       for (const pattern of timePatterns) {
         const match = text.match(pattern);
         if (match) {
-          if (match[1] && match[2]) {
-            info.time = `${match[1]} ${match[2]}시`;
-          } else if (match[0]) {
-            info.time = match[0];
+          if (pattern.source.includes('부터') && pattern.source.includes('까지')) {
+            // 시작 시간과 종료 시간이 모두 있는 경우
+            if (match[1] && match[2] && match[3]) {
+              // "오후 2시부터 7시까지" 형태
+              info.time = `${match[1]} ${match[2]}시부터 ${match[3]}시까지`;
+            } else if (match[1] && match[2]) {
+              // "2시부터 7시까지" 형태
+              info.time = `${match[1]}시부터 ${match[2]}시까지`;
+            }
+          } else if (pattern.source.includes('[~-]')) {
+            // 시작 시간과 종료 시간이 ~ 또는 -로 연결된 경우
+            if (match[1] && match[2] && match[3]) {
+              // "오후 2시~7시" 형태
+              info.time = `${match[1]} ${match[2]}시~${match[3]}시`;
+            } else if (match[1] && match[2]) {
+              // "2시~7시" 형태
+              info.time = `${match[1]}시~${match[2]}시`;
+            }
+          } else if (pattern.source.includes('한글 숫자')) {
+            // 한글 숫자로 된 시간 범위
+            const timeMap = {
+              '다섯': '5', '여섯': '6', '일곱': '7', '여덟': '8', '아홉': '9',
+              '열': '10', '열한': '11', '열두': '12'
+            };
+            const startTime = timeMap[match[1]] || match[1];
+            const endTime = timeMap[match[2]] || match[2];
+            info.time = `${startTime}시부터 ${endTime}시까지`;
+          } else {
+            // 단일 시간인 경우
+            if (match[1] && match[2]) {
+              info.time = `${match[1]} ${match[2]}시`;
+            } else if (match[0]) {
+              info.time = match[0];
+            }
           }
           console.log('[ai-voice-chat] 시간 추출됨:', info.time);
           break;
@@ -321,66 +542,144 @@ serve(async (req) => {
       const allUserText = userUtterances.join(' ');
       console.log('[ai-voice-chat] 모든 사용자 발화 합친 텍스트:', allUserText);
       
-      // 목표 내용 추출 (더 유연한 패턴)
-      const goalPatterns = [
-        /(코딩\s*연습|프로그래밍|개발|운동|공부|독서|저축|다이어트|금연|금주|습관|목표|계획)/,
-        /([^,\n]+)\s*(하고?\s*싶어|하려고|할래|할\s*거야|할\s*예정이야|해볼래)/,
-        /(매일|매주|매월|정기적으로)\s*(하는|할|하려는)\s*([^,\n]+)/,
-        /(코딩\s*연습을?\s*하고?\s*싶어)/,
-        /(코딩\s*연습을?\s*할래)/
-      ];
+      // 목표 내용 추출 (parseConversationMemory와 동일한 로직 사용)
+      if (allUserText.includes('코딩') && allUserText.includes('공부')) {
+        info.goal = '코딩 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 코딩 공부');
+      } else if (allUserText.includes('프로그래밍') && allUserText.includes('공부')) {
+        info.goal = '프로그래밍 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 프로그래밍 공부');
+      } else if (allUserText.includes('개발') && allUserText.includes('공부')) {
+        info.goal = '개발 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 개발 공부');
+      } else if (allUserText.includes('리액트') || allUserText.includes('React')) {
+        info.goal = '리액트 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 리액트 공부');
+      } else if (allUserText.includes('자바스크립트') || allUserText.includes('JavaScript')) {
+        info.goal = '자바스크립트 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 자바스크립트 공부');
+      } else if (allUserText.includes('파이썬') || allUserText.includes('Python')) {
+        info.goal = '파이썬 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 파이썬 공부');
+      } else if (allUserText.includes('코딩')) {
+        info.goal = '코딩 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 코딩 공부');
+      } else if (allUserText.includes('프로그래밍')) {
+        info.goal = '프로그래밍';
+        console.log('[ai-voice-chat] 목표 추출됨: 프로그래밍');
+      } else if (allUserText.includes('개발')) {
+        info.goal = '개발 공부';
+        console.log('[ai-voice-chat] 목표 추출됨: 개발 공부');
+      } else if (allUserText.includes('공부')) {
+        // 공부 앞에 있는 단어를 찾아서 목표로 설정
+        const studyMatch = allUserText.match(/([가-힣a-zA-Z]+)\s*공부/);
+        if (studyMatch) {
+          info.goal = studyMatch[1] + ' 공부';
+          console.log('[ai-voice-chat] 목표 추출됨:', studyMatch[1] + ' 공부');
+        } else {
+          info.goal = '공부';
+          console.log('[ai-voice-chat] 목표 추출됨: 공부');
+        }
+      } else if (allUserText.includes('운동') || allUserText.includes('헬스')) {
+        info.goal = '운동';
+        console.log('[ai-voice-chat] 목표 추출됨: 운동');
+      } else if (allUserText.includes('독서') || allUserText.includes('책')) {
+        info.goal = '독서';
+        console.log('[ai-voice-chat] 목표 추출됨: 독서');
+      } else if (allUserText.includes('다이어트') || allUserText.includes('체중')) {
+        info.goal = '다이어트';
+        console.log('[ai-voice-chat] 목표 추출됨: 다이어트');
+      } else if (allUserText.includes('금연') || allUserText.includes('담배')) {
+        info.goal = '금연';
+        console.log('[ai-voice-chat] 목표 추출됨: 금연');
+      }
       
-      for (const pattern of goalPatterns) {
-        const goalMatch = allUserText.match(pattern);
-        if (goalMatch) {
-          info.goal = goalMatch[0].trim();
-          console.log('[ai-voice-chat] 목표 추출됨:', info.goal);
-          break;
+      // 기간 추출 (한국어 숫자 지원 - parseConversationMemory와 동일)
+      let periodExtracted = null;
+      
+      // 한국어 숫자 → 아라비아 숫자 매핑
+      const koreanToNumber = {
+        '한': '1', '두': '2', '세': '3', '네': '4', '다섯': '5', '여섯': '6',
+        '일곱': '7', '여덟': '8', '아홉': '9', '열': '10'
+      };
+      
+      // 패턴 1: "세 달", "한 달" 등
+      const koreanPeriodMatch = allUserText.match(/(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(달|개월)/);
+      if (koreanPeriodMatch) {
+        const koreanNum = koreanPeriodMatch[1];
+        const unit = koreanPeriodMatch[2] === '달' ? '개월' : koreanPeriodMatch[2];
+        periodExtracted = koreanToNumber[koreanNum] + unit;
+        console.log('[ai-voice-chat] 한국어 기간 추출됨:', koreanPeriodMatch[0], '→', periodExtracted);
+      }
+      
+      // 패턴 2: "3개월", "6달" 등
+      if (!periodExtracted) {
+        const numberPeriodMatch = allUserText.match(/(\d+)\s*(개월|달|년)/);
+        if (numberPeriodMatch) {
+          const unit = numberPeriodMatch[2] === '달' ? '개월' : numberPeriodMatch[2];
+          periodExtracted = numberPeriodMatch[1] + unit;
+          console.log('[ai-voice-chat] 숫자 기간 추출됨:', periodExtracted);
         }
       }
       
-      // 기간 추출 (더 정확한 패턴)
-      const periodPatterns = [
-        /(\d+개월)\s*동안/,
-        /(\d+년)\s*동안/,
-        /(\d+주)\s*동안/,
-        /(\d+일)\s*동안/,
-        /일주일\s*동안/,
-        /한달\s*동안/,
-        /(\d+개월)/,
-        /(\d+주)/,
-        /(\d+일)/,
-        /삼개월/,
-        /(\d+)개월\s*할래/,
-        /(\d+)개월\s*하고?\s*싶어/
-      ];
-      
-      for (const pattern of periodPatterns) {
-        const periodMatch = allUserText.match(pattern);
-        if (periodMatch) {
-          info.period = periodMatch[1] || periodMatch[0];
-          console.log('[ai-voice-chat] 기간 추출됨:', info.period);
-          break;
-        }
+      if (periodExtracted) {
+        info.period = periodExtracted;
+        console.log('[ai-voice-chat] 최종 기간 추출됨:', info.period);
       }
       
       // 시간 추출 (더 정확한 패턴)
       const timePatterns = [
-        /(아침|저녁|오전|오후)\s*(\d+시)/,
+        // "오후 2시부터 7시까지" 형태
+        /(오전|오후|아침|저녁|밤|새벽)\s*(\d+)시\s*부터\s*(\d+)시\s*까지/,
+        // "2시부터 7시까지" 형태
         /(\d+)시\s*부터\s*(\d+)시\s*까지/,
-        /(\d+)시\s*~?\s*(\d+)시/,
-        /(새벽|밤|아침|점심|저녁)\s*(\d+)시/,
-        /다섯\s*시\s*에서\s*(\d+)시\s*까지/,
-        /오후\s*(\d+)시\s*부터\s*(\d+)시\s*까지/
+        // "오후 2시~7시" 형태
+        /(오전|오후|아침|저녁|밤|새벽)\s*(\d+)시\s*[~-]\s*(\d+)시/,
+        // "2시~7시" 형태
+        /(\d+)시\s*[~-]\s*(\d+)시/,
+        // "오후 2시" 형태 (단일 시간)
+        /(오전|오후|아침|저녁|밤|새벽)\s*(\d+)시/,
+        // "다섯 시부터 일곱 시까지" 형태 (한글 숫자)
+        /(다섯|여섯|일곱|여덟|아홉|열|열한|열두)시\s*부터\s*(다섯|여섯|일곱|여덟|아홉|열|열한|열두)시\s*까지/
       ];
       
       for (const pattern of timePatterns) {
         const timeMatch = allUserText.match(pattern);
-        if (timeMatch) {
-          if (timeMatch[1] && timeMatch[2]) {
-            info.time = `${timeMatch[1]} ${timeMatch[2]}시`;
-          } else if (timeMatch[0]) {
-            info.time = timeMatch[0];
+      if (timeMatch) {
+          if (pattern.source.includes('부터') && pattern.source.includes('까지')) {
+            // 시작 시간과 종료 시간이 모두 있는 경우
+            if (timeMatch[1] && timeMatch[2] && timeMatch[3]) {
+              // "오후 2시부터 7시까지" 형태
+              info.time = `${timeMatch[1]} ${timeMatch[2]}시부터 ${timeMatch[3]}시까지`;
+            } else if (timeMatch[1] && timeMatch[2]) {
+              // "2시부터 7시까지" 형태
+              info.time = `${timeMatch[1]}시부터 ${timeMatch[2]}시까지`;
+            }
+          } else if (pattern.source.includes('[~-]')) {
+            // 시작 시간과 종료 시간이 ~ 또는 -로 연결된 경우
+            if (timeMatch[1] && timeMatch[2] && timeMatch[3]) {
+              // "오후 2시~7시" 형태
+              info.time = `${timeMatch[1]} ${timeMatch[2]}시~${timeMatch[3]}시`;
+            } else if (timeMatch[1] && timeMatch[2]) {
+              // "2시~7시" 형태
+              info.time = `${timeMatch[1]}시~${timeMatch[2]}시`;
+            }
+          } else if (pattern.source.includes('한글 숫자')) {
+            // 한글 숫자로 된 시간 범위
+            const timeMap = {
+              '다섯': '5', '여섯': '6', '일곱': '7', '여덟': '8', '아홉': '9',
+              '열': '10', '열한': '11', '열두': '12'
+            };
+            const startTime = timeMap[timeMatch[1]] || timeMatch[1];
+            const endTime = timeMap[timeMatch[2]] || timeMatch[2];
+            info.time = `${startTime}시부터 ${endTime}시까지`;
+          } else {
+            // 단일 시간인 경우
+            if (timeMatch[1] && timeMatch[2]) {
+              info.time = `${timeMatch[1]} ${timeMatch[2]}시`;
+            } else if (timeMatch[0]) {
+        info.time = timeMatch[0];
+            }
           }
           console.log('[ai-voice-chat] 시간 추출됨:', info.time);
           break;
@@ -398,7 +697,7 @@ serve(async (req) => {
       
       for (const pattern of difficultyPatterns) {
         const difficultyMatch = allUserText.match(pattern);
-        if (difficultyMatch) {
+      if (difficultyMatch) {
           info.difficulty = difficultyMatch[0];
           console.log('[ai-voice-chat] 어려운 점 추출됨:', info.difficulty);
           break;
@@ -414,7 +713,7 @@ serve(async (req) => {
       
       for (const pattern of intensityPatterns) {
         const intensityMatch = allUserText.match(pattern);
-        if (intensityMatch) {
+      if (intensityMatch) {
           info.intensity = intensityMatch[1];
           console.log('[ai-voice-chat] 강도 추출됨:', info.intensity);
           break;
@@ -487,31 +786,63 @@ serve(async (req) => {
     
     // 목표 설정 중에는 이전 정보 유지, 홈화면에서만 초기화
     if (context.screen === 'goalSetting') {
-      console.log('[ai-voice-chat] 목표 설정 모드 - conversationContext 확인:', conversationContext);
-      
-      // 이전 대화에서 이미 설정된 정보들 확인
-      if (conversationContext?.conversation_context) {
-        console.log('[ai-voice-chat] conversation_context 존재, 길이:', conversationContext.conversation_context.length);
-        console.log('[ai-voice-chat] extractPreviousGoalInfo 함수 호출 시작');
-        try {
-          const previousGoalInfo = extractPreviousGoalInfo(conversationContext.conversation_context);
-          console.log('[ai-voice-chat] extractPreviousGoalInfo 함수 실행 완료');
-          console.log('[ai-voice-chat] 이전 대화에서 파싱된 정보:', previousGoalInfo);
-          allGoalInfo = { ...previousGoalInfo };
-          console.log('[ai-voice-chat] previousGoalInfo 적용 후 allGoalInfo:', allGoalInfo);
-        } catch (error) {
-          console.error('[ai-voice-chat] extractPreviousGoalInfo 함수 실행 중 오류:', error);
+              // 새로운 목표인지 확인 - conversationMemory 길이와 사용자 발화 개수로 판단
+        const conversationLength = context.conversationMemory?.length || 0;
+        const hasExistingGoalInfo = conversationLength > 10; // 매우 낮은 임계값
+        const isFirstTurn = !hasExistingGoalInfo;
+
+        console.log('[ai-voice-chat] isNewGoal 판단 디버깅:', {
+          conversationMemoryLength: conversationLength,
+          hasExistingGoalInfo: hasExistingGoalInfo,
+          isFirstTurn: isFirstTurn,
+          conversationMemoryPreview: context.conversationMemory?.substring(0, 100) || '없음'
+        });
+
+        if (isFirstTurn) {
+          console.log('[ai-voice-chat] 첫 번째 턴 - 새로운 목표 설정 시작');
           allGoalInfo = {};
+          console.log('[ai-voice-chat] 새로운 목표 - allGoalInfo 초기화됨:', allGoalInfo);
+        } else {
+        // 기존 목표 계속 진행 - 현재 세션의 conversationMemory에서 정보 추출
+        console.log('[ai-voice-chat] 기존 목표 계속 진행 - conversationMemory 확인:', context.conversationMemory);
+        console.log('[ai-voice-chat] conversationMemory 타입:', typeof context.conversationMemory);
+        console.log('[ai-voice-chat] conversationMemory가 null/undefined인지:', context.conversationMemory == null);
+
+        if (context.conversationMemory && context.conversationMemory.length > 20) {
+          console.log('[ai-voice-chat] conversationMemory 존재, 길이:', context.conversationMemory.length);
+          console.log('[ai-voice-chat] extractPreviousGoalInfo 함수 호출 시작');
+          try {
+            const previousGoalInfo = extractPreviousGoalInfo(context.conversationMemory);
+            console.log('[ai-voice-chat] extractPreviousGoalInfo 함수 실행 완료');
+      console.log('[ai-voice-chat] 이전 대화에서 파싱된 정보:', previousGoalInfo);
+            
+            // 기존 정보와 병합 (덮어쓰지 않음)
+            allGoalInfo = { ...allGoalInfo, ...previousGoalInfo };
+            console.log('[ai-voice-chat] previousGoalInfo 병합 후 allGoalInfo:', allGoalInfo);
+            
+            // 병합 후에도 정보가 없으면 conversationMemory에서 직접 파싱 시도
+            if (Object.keys(allGoalInfo).length === 0) {
+              console.log('[ai-voice-chat] 병합 후에도 정보가 없음, 직접 파싱 시도');
+              const directParsed = parseGoalSettingInfo(context.conversationMemory);
+              if (Object.keys(directParsed).length > 0) {
+                allGoalInfo = { ...allGoalInfo, ...directParsed };
+                console.log('[ai-voice-chat] 직접 파싱 결과 병합 후 allGoalInfo:', allGoalInfo);
+              }
+            }
+          } catch (error) {
+            console.error('[ai-voice-chat] extractPreviousGoalInfo 함수 실행 중 오류:', error);
+            // 에러가 발생해도 기존 정보는 유지
+          }
+        } else {
+          console.log('[ai-voice-chat] conversationMemory가 부족함');
         }
-      } else {
-        console.log('[ai-voice-chat] conversation_context가 없음');
       }
       
       // 현재 입력에서 정보 파싱 및 추가 (이전 정보와 합쳐서 파싱)
       const extractedInfo = parseGoalSettingInfo(transcribedText, allGoalInfo);
-      console.log('[ai-voice-chat] 현재 파싱된 정보:', extractedInfo);
-      allGoalInfo = { ...allGoalInfo, ...extractedInfo };
-      
+    console.log('[ai-voice-chat] 현재 파싱된 정보:', extractedInfo);
+    allGoalInfo = { ...allGoalInfo, ...extractedInfo };
+    
       console.log('[ai-voice-chat] 목표 설정 중 - 최종 allGoalInfo:', allGoalInfo);
     } else {
       // 홈화면 등에서는 새로운 목표 모드
@@ -526,8 +857,24 @@ serve(async (req) => {
       let basePrompt = "";
       switch(context.screen) {
         case 'goalSetting':
-          // 현재 단계 정보
-          const currentStep = context.currentStep || 1;
+          // 현재 단계 정보 - allGoalInfo 상태에 따라 동적으로 계산
+          let currentStep = 1;
+          if (allGoalInfo.goal && !allGoalInfo.period) {
+            currentStep = 2; // 목표는 있지만 기간이 없음
+          } else if (allGoalInfo.goal && allGoalInfo.period && !allGoalInfo.time) {
+            currentStep = 3; // 목표와 기간은 있지만 시간이 없음
+          } else if (allGoalInfo.goal && allGoalInfo.period && allGoalInfo.time && !allGoalInfo.difficulty) {
+            currentStep = 4; // 목표, 기간, 시간은 있지만 어려운 점이 없음
+          } else if (allGoalInfo.goal && allGoalInfo.period && allGoalInfo.time && allGoalInfo.difficulty && !allGoalInfo.intensity) {
+            currentStep = 5; // 목표, 기간, 시간, 어려운 점은 있지만 강도가 없음
+          } else if (allGoalInfo.goal && allGoalInfo.period && allGoalInfo.time && allGoalInfo.difficulty && allGoalInfo.intensity) {
+            currentStep = 6; // 모든 정보가 완성됨
+          }
+          
+          console.log('[ai-voice-chat] 동적 currentStep 계산:', {
+            allGoalInfo,
+            calculatedStep: currentStep
+          });
           
           const stepInfo = getGoalSettingStepInfo(currentStep, allGoalInfo);
           basePrompt = `사용자가 목표 설정 ${currentStep}단계에 있어요. ${stepInfo}
@@ -543,9 +890,13 @@ serve(async (req) => {
           
           IMPORTANT: 5단계가 완료되면 사용자에게 "목표 설정이 완료되었습니다! 이제 루틴을 만들어드릴게요."라고 말하고 
           골세팅 5번 화면으로 이동하도록 안내해주세요.
+          
+          CRITICAL: 현재 단계가 6단계(완료)라면 더 이상 질문하지 말고 "목표 설정이 완료되었습니다! 이제 루틴을 만들어드릴게요."라고 말하세요.
           CRITICAL: 사용자가 인사만 해도 무조건 위의 해당 단계 질문을 던져주세요!
           
-          사용자가 이미 제공한 정보 (이전 대화 포함):
+          ${Object.keys(allGoalInfo).length === 0 ? 
+            '새로운 목표 설정을 시작합니다. 이전 정보는 무시하고 처음부터 시작하세요.' :
+            `사용자가 이미 제공한 정보 (이전 대화 포함):
           ${JSON.stringify(allGoalInfo, null, 2)}
           
           IMPORTANT: 이 정보를 내부적으로 파악하고 맥락을 이해하세요. 
@@ -553,7 +904,8 @@ serve(async (req) => {
           다음 단계로 자연스럽게 진행하세요.
           
           CRITICAL: 사용자가 이미 제공한 정보를 절대 잊어버리지 마세요!
-          이전 대화에서 수집된 정보를 기억하고 활용하세요.
+            이전 대화에서 수집된 정보를 기억하고 활용하세요.`
+          }
           
           예시:
           - 사용자가 "3개월 동안 100만원 모으기"라고 했다면: "좋은 목표예요! 언제까지 달성하고 싶으신가요?"
@@ -763,13 +1115,27 @@ IMPORTANT RULES:
       const jobId = 'debug-' + Date.now();
       console.log('[ai-voice-chat] 디버그 작업 ID 생성됨:', jobId);
       
+      // intensity 값이 유효한지 확인 (높음/보통/낮음 중 하나여야 함)
+      const isValidIntensity = allGoalInfo.intensity && 
+        ['높음', '보통', '낮음', '높은', '보통한', '낮은'].includes(allGoalInfo.intensity);
+      
       // 5가지 정보 수집 완료 여부 확인 (디버그 모드)
-      const allInfoCollected = allGoalInfo && 
+      const isAllInfoCollected = allGoalInfo && 
         allGoalInfo.goal && 
         allGoalInfo.period && 
         allGoalInfo.time && 
         allGoalInfo.difficulty && 
-        allGoalInfo.intensity;
+        isValidIntensity;
+      
+      console.log('[ai-voice-chat] 디버그 모드 isAllInfoCollected 체크:', {
+        hasGoal: !!allGoalInfo.goal,
+        hasPeriod: !!allGoalInfo.period,
+        hasTime: !!allGoalInfo.time,
+        hasDifficulty: !!allGoalInfo.difficulty,
+        hasIntensity: !!allGoalInfo.intensity,
+        isValidIntensity: isValidIntensity,
+        isAllInfoCollected: isAllInfoCollected
+      });
       
       // 부족한 정보 분석
       const missingInfo = {
@@ -777,7 +1143,7 @@ IMPORTANT RULES:
         period: !allGoalInfo.period ? '목표 기간' : null,
         time: !allGoalInfo.time ? '실천 시간' : null,
         difficulty: !allGoalInfo.difficulty ? '어려운 점' : null,
-        intensity: !allGoalInfo.intensity ? '강도 설정' : null
+        intensity: !isValidIntensity ? '강도 설정' : null
       };
       
       const missingInfoList = Object.values(missingInfo).filter(info => info !== null);
@@ -800,23 +1166,35 @@ IMPORTANT RULES:
 
       // 6. 클라이언트에게 즉시 응답 반환 (디버그 모드)
       console.log('[ai-voice-chat] 디버그 모드 응답 전송 시작...');
+      
+      // 강제로 goalSettingComplete 설정 (디버깅용)
+      const forceGoalComplete = isAllInfoCollected || 
+        (allGoalInfo.goal && allGoalInfo.period && allGoalInfo.time && 
+         allGoalInfo.difficulty && isValidIntensity);
+      
+      console.log('[ai-voice-chat] 디버그 모드 강제 goalComplete 체크:', forceGoalComplete);
+      console.log('[ai-voice-chat] 디버그 모드 최종 응답 데이터 준비 중...');
+      console.log('[ai-voice-chat] 디버그 모드 - allGoalInfo 최종 상태:', JSON.stringify(allGoalInfo, null, 2));
+      console.log('[ai-voice-chat] 디버그 모드 - isValidIntensity 최종:', isValidIntensity);
+      console.log('[ai-voice-chat] 디버그 모드 - forceGoalComplete 최종:', forceGoalComplete);
+      
       const response = { 
         success: true, 
         jobId: jobId, 
         userText: transcribedText, 
         responseText: responseText,
-        goalSettingComplete: allInfoCollected || false,
-        nextScreen: allInfoCollected ? 'goalSettingStep5' : nextStep,
-        collectedGoalInfo: allInfoCollected ? allGoalInfo : allGoalInfo,
-        missingInfo: missingInfoList,
+        goalSettingComplete: !!forceGoalComplete, // boolean으로 강제 변환
+        nextScreen: forceGoalComplete ? 'goalSettingStep5' : nextStep,
+        collectedGoalInfo: allGoalInfo,
+        missingInfo: forceGoalComplete ? [] : missingInfoList,
         currentProgress: {
           total: 5,
-          completed: 5 - missingInfoList.length,
-          missing: missingInfoList
+          completed: forceGoalComplete ? 5 : (5 - missingInfoList.length),
+          missing: forceGoalComplete ? [] : missingInfoList
         }
       };
       
-      console.log('[ai-voice-chat] 디버그 모드 응답 데이터:', response);
+      console.log('[ai-voice-chat] 디버그 모드 응답 데이터:', JSON.stringify(response, null, 2));
       console.log('[ai-voice-chat] 디버그 모드 함수 성공적으로 완료됨');
       
       return new Response(JSON.stringify(response), {
@@ -871,13 +1249,27 @@ IMPORTANT RULES:
     }
     console.log('[ai-voice-chat] DB 저장 완료');
     
+    // intensity 값이 유효한지 확인 (높음/보통/낮음 중 하나여야 함)
+    const isValidIntensity = allGoalInfo.intensity && 
+      ['높음', '보통', '낮음', '높은', '보통한', '낮은'].includes(allGoalInfo.intensity);
+    
     // 5가지 정보 수집 완료 여부 확인 (프로덕션 모드)
-    const allInfoCollected = allGoalInfo && 
+    const isAllInfoCollected = allGoalInfo && 
       allGoalInfo.goal && 
       allGoalInfo.period && 
       allGoalInfo.time && 
       allGoalInfo.difficulty && 
-      allGoalInfo.intensity;
+      isValidIntensity;
+    
+    console.log('[ai-voice-chat] isAllInfoCollected 체크:', {
+      hasGoal: !!allGoalInfo.goal,
+      hasPeriod: !!allGoalInfo.period,
+      hasTime: !!allGoalInfo.time,
+      hasDifficulty: !!allGoalInfo.difficulty,
+      hasIntensity: !!allGoalInfo.intensity,
+      isValidIntensity: isValidIntensity,
+      isAllInfoCollected: isAllInfoCollected
+    });
     
     // 부족한 정보 분석
     const missingInfo = {
@@ -885,7 +1277,7 @@ IMPORTANT RULES:
       period: !allGoalInfo.period ? '목표 기간' : null,
       time: !allGoalInfo.time ? '실천 시간' : null,
       difficulty: !allGoalInfo.difficulty ? '어려운 점' : null,
-      intensity: !allGoalInfo.intensity ? '강도 설정' : null
+      intensity: !isValidIntensity ? '강도 설정' : null
     };
     
     const missingInfoList = Object.values(missingInfo).filter(info => info !== null);
@@ -908,19 +1300,46 @@ IMPORTANT RULES:
 
     // 6. 클라이언트에게 즉시 작업 ID(진동벨)와 텍스트 결과를 반환하고 함수 종료
     console.log('[ai-voice-chat] 응답 전송 시작...');
+    
+    // 5가지 정보가 모두 수집되었는지 최종 확인
+    const finalAllInfoCollected = allGoalInfo && 
+      allGoalInfo.goal && 
+      allGoalInfo.period && 
+      allGoalInfo.time && 
+      allGoalInfo.difficulty && 
+      isValidIntensity;
+    
+    console.log('[ai-voice-chat] 최종 allInfoCollected 확인:', finalAllInfoCollected);
+    console.log('[ai-voice-chat] 최종 allGoalInfo:', allGoalInfo);
+    
+    // 강제로 goalSettingComplete 설정 (디버깅용)
+    const forceGoalComplete = finalAllInfoCollected || 
+      (allGoalInfo.goal && allGoalInfo.period && allGoalInfo.time && 
+       allGoalInfo.difficulty && isValidIntensity);
+    
+    console.log('[ai-voice-chat] 강제 goalComplete 체크:', forceGoalComplete);
+    console.log('[ai-voice-chat] allGoalInfo 상세:', {
+      goal: allGoalInfo.goal,
+      period: allGoalInfo.period,
+      time: allGoalInfo.time,
+      difficulty: allGoalInfo.difficulty,
+      intensity: allGoalInfo.intensity,
+      isValidIntensity: isValidIntensity
+    });
+    
     const response = { 
       success: true, 
       jobId: jobId, 
       userText: transcribedText, 
       responseText: responseText,
-      goalSettingComplete: allInfoCollected || false,
-      nextScreen: allInfoCollected ? 'goalSettingStep5' : nextStep,
-      collectedGoalInfo: allInfoCollected ? allGoalInfo : allGoalInfo,
-      missingInfo: missingInfoList,
+      goalSettingComplete: !!forceGoalComplete, // boolean으로 강제 변환
+      nextScreen: forceGoalComplete ? 'goalSettingStep5' : nextStep,
+      collectedGoalInfo: allGoalInfo,
+      missingInfo: forceGoalComplete ? [] : missingInfoList,
       currentProgress: {
         total: 5,
-        completed: 5 - missingInfoList.length,
-        missing: missingInfoList
+        completed: forceGoalComplete ? 5 : (5 - missingInfoList.length),
+        missing: forceGoalComplete ? [] : missingInfoList
       }
     };
     

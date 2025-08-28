@@ -245,8 +245,37 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
       }
 
       // 2. 함수로부터 '진동벨(jobId)'과 텍스트 결과를 즉시 받음
-      const { jobId, userText, responseText } = data;
+      const { jobId, userText, responseText, goalSettingComplete, nextScreen, collectedGoalInfo } = data;
       console.log('[음성채팅] 작업 ID 받음:', jobId);
+      
+      // 목표 설정 완료 체크
+      if (goalSettingComplete && mode === 'goalSetting') {
+        console.log('[음성채팅] 🎯 목표 설정 완료됨! onComplete 콜백 호출');
+        console.log('[음성채팅] 🎯 완료 데이터:', {
+          goalSettingComplete,
+          nextScreen,
+          collectedGoalInfo,
+          userText,
+          responseText
+        });
+        
+        // 즉시 onComplete 콜백 호출
+        if (onComplete) {
+          onComplete({
+            goalSettingComplete: true,
+            nextScreen: nextScreen || 'goalSettingStep5',
+            collectedGoalInfo: collectedGoalInfo || {},
+            userText: userText,
+            responseText: responseText
+          });
+        }
+        
+        // 상태 초기화
+        setCurrentState('idle');
+        setDisplayedText('');
+        setAiResponseText('');
+        return; // 더 이상 진행하지 않음
+      }
       
       // 3. 사용자 텍스트와 AI 응답을 즉시 UI에 표시
       addMessageToHistory({ role: 'user', text: userText });
@@ -297,7 +326,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
             rawDataType: typeof finishResult.data, // 데이터 타입 확인
             // Base64 데이터는 너무 길어서 로그에서 제거
           });
-          
+
           // 응답 데이터가 문자열인 경우 파싱 시도
           let parsedData = finishResult.data;
           if (typeof finishResult.data === 'string') {
@@ -308,45 +337,44 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
               console.error('[음성채팅] 디버그 모드 - 문자열 파싱 실패:', parseError);
             }
           }
-          
+
           // audioData가 직접 있거나 data 속성 안에 있을 수 있음
           const audioData = parsedData?.audioData || parsedData?.data?.audioData;
           const mimeType = parsedData?.mimeType || parsedData?.data?.mimeType;
-          
+
           if (audioData) {
             console.log('[음성채팅] 디버그 모드 - 오디오 데이터 받음, 음성 재생 시작');
-            
+
             try {
               console.log('[음성채팅] 디버그 모드 - Base64 디코딩 시작');
-              
+
               // Base64 문자열 패딩 확인 및 수정
               let paddedAudioData = audioData;
               while (paddedAudioData.length % 4 !== 0) {
                 paddedAudioData += '=';
               }
               console.log('[음성채팅] 디버그 모드 - Base64 패딩 완료, 길이:', paddedAudioData.length);
-              
+
               // Base64 오디오 데이터를 Uint8Array로 변환
               const decodedData = atob(paddedAudioData);
               console.log('[음성채팅] 디버그 모드 - Base64 디코딩 완료, 길이:', decodedData.length);
-              
+
               const uint8Array = Uint8Array.from(decodedData, c => c.charCodeAt(0));
               console.log('[음성채팅] 디버그 모드 - Uint8Array 생성 완료, 길이:', uint8Array.length);
-              
+
               // 음성 재생이 실제로 시작될 때만 상태 변경
               console.log('[음성채팅] 디버그 모드 - 음성 재생 시작, 상태 변경');
               setCurrentState('speaking');
               setDisplayedText(aiResponseText);
-              
+
               // Base64 데이터를 직접 data URI로 사용하여 음성 재생
               const dataUri = `data:audio/wav;base64,${audioData}`;
               console.log('[음성채팅] 디버그 모드 - Data URI 생성 완료, 길이:', dataUri.length);
-              
+
               const { sound: newSound } = await Audio.Sound.createAsync(
                 { uri: dataUri },
                 { shouldPlay: true }
               );
-              
               setSound(newSound);
               newSound.setOnPlaybackStatusUpdate((status) => {
                 if (status.isLoaded && status.didJustFinish) {
@@ -358,7 +386,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
                   setAiResponseText('');
                 }
               });
-              
+
             } catch (audioError) {
               console.error('[음성채팅] 디버그 모드 - 음성 재생 오류:', audioError);
               setCurrentState('idle');
@@ -375,7 +403,7 @@ const VoiceChatScreen: React.FC<VoiceChatScreenProps> = ({
               setAiResponseText('');
             }, 3000);
           }
-          
+
           return; // 디버그 모드에서는 여기서 종료
         }
         

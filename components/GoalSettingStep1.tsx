@@ -40,7 +40,7 @@ export default function GoalSettingStep1({
   const styles = createStyles(colors);
   const [habitText, setHabitText] = useState(initialValue || collectedGoalInfo?.goal || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(!collectedGoalInfo || Object.keys(collectedGoalInfo).length === 0); // AI 수집 정보가 없으면 음성모드
   const [isLoadingRouty, setIsLoadingRouty] = useState(true);
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
   const {
@@ -61,6 +61,8 @@ export default function GoalSettingStep1({
   // Auto-transition from welcome screen to voice chat
   useEffect(() => {
     if (showWelcome) {
+      console.log('🎉 Welcome screen activated, starting voice chat auto-transition...');
+      
       // Clear any existing conversation history
       useHabitStore.getState().clearConversationHistory();
       
@@ -207,9 +209,29 @@ export default function GoalSettingStep1({
       if (data.collectedGoalInfo) {
         console.log('🎯 Received collectedGoalInfo:', data.collectedGoalInfo);
         
-        // 수집된 목표 정보를 MainApp으로 전달
+        // 수집된 목표 정보를 MainApp으로 전달 (이것이 핵심!)
         if (onUpdateCollectedGoalInfo) {
+          console.log('🎯 MainApp으로 collectedGoalInfo 전달:', data.collectedGoalInfo);
           onUpdateCollectedGoalInfo(data.collectedGoalInfo);
+        }
+        
+        // AI 수집 정보를 habitStore에도 저장 (Step5에서 표시하기 위해)
+        console.log('🏪 AI 수집 정보를 habitStore에 저장:', data.collectedGoalInfo);
+        
+        if (data.collectedGoalInfo.goal) {
+          setHabitName(data.collectedGoalInfo.goal);
+        }
+        if (data.collectedGoalInfo.period) {
+          setGoalPeriod(data.collectedGoalInfo.period);
+        }
+        if (data.collectedGoalInfo.time) {
+          setAvailableTime(data.collectedGoalInfo.time);
+        }
+        if (data.collectedGoalInfo.difficulty) {
+          setDifficultyReason(data.collectedGoalInfo.difficulty);
+        }
+        if (data.collectedGoalInfo.intensity) {
+          setIntensity(data.collectedGoalInfo.intensity);
         }
         
         // 목표 설정이 완료되었으면 GoalSettingStep5로 이동
@@ -598,5 +620,27 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   dot3: {
     opacity: 1,
+  },
+  aiCollectedInfo: {
+    backgroundColor: 'rgba(108, 99, 255, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(108, 99, 255, 0.3)',
+  },
+  aiCollectedTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  aiCollectedSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

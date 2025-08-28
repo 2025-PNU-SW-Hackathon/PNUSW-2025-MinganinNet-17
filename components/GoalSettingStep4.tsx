@@ -142,6 +142,8 @@ export default function GoalSettingStep4({
         <Text style={styles.subtitle}>
           Routy가 당신을 어떻게 도와드릴지 알려주세요.
         </Text>
+        
+
       </View>
 
       <View style={styles.optionsContainer}>
@@ -286,6 +288,28 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textSecondary,
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  aiCollectedInfo: {
+    backgroundColor: 'rgba(108, 99, 255, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(108, 99, 255, 0.3)',
+  },
+  aiCollectedTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
+  },
+  aiCollectedSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
     fontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter',
   },
 }); 

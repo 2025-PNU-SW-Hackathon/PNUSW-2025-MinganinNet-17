@@ -405,14 +405,7 @@ export default function GoalSettingStep2({
             <Text style={styles.sectionSubtitle}>목표 달성까지 얼마나 걸릴까요?</Text>
           </View>
           
-          {/* AI가 수집한 기간 정보 표시 */}
-          {collectedGoalInfo?.period && (
-            <View style={styles.timeWindowSummary}>
-              <Text style={styles.timeWindowSummaryText}>
-                🎯 AI가 수집한 기간: {collectedGoalInfo.period}
-              </Text>
-            </View>
-          )}
+
 
           <View style={styles.durationContainer}>
             {durationButtons.map((duration) => (
@@ -446,14 +439,7 @@ export default function GoalSettingStep2({
             <Text style={styles.sectionSubtitle}>매일 언제 시간을 내실 수 있나요?</Text>
           </View>
           
-          {/* AI가 수집한 시간 정보 표시 */}
-          {collectedGoalInfo?.time && (
-            <View style={styles.timeWindowSummary}>
-              <Text style={styles.timeWindowSummaryText}>
-                🎯 AI가 수집한 정보: {collectedGoalInfo.time}
-              </Text>
-            </View>
-          )}
+
 
           <View style={styles.timeWindowContainer}>
             {/* From Time */}

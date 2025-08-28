@@ -21,12 +21,14 @@ interface GoalSettingStep5Props {
     source: string;
     step: number;
   };
+  collectedGoalInfo?: any; // 음성으로 수집된 목표 정보
 }
 
 export default function GoalSettingStep5({
   onComplete,
   onBack,
   voiceData,
+  collectedGoalInfo,
 }: GoalSettingStep5Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
@@ -53,6 +55,39 @@ export default function GoalSettingStep5({
       setShowVoiceTranscript(true);
     }
   }, [voiceData]);
+
+  // 음성으로 수집된 정보 우선 사용
+  const getGoalInfoFromCollected = () => {
+    if (collectedGoalInfo) {
+      console.log('🎯 GoalSettingStep5 - 음성 수집 정보 사용:', collectedGoalInfo);
+      const info = [];
+      
+      if (collectedGoalInfo.goal) {
+        // "목표"가 아닌 실제 내용이 있으면 표시
+        const goalText = collectedGoalInfo.goal === '목표' ? '코딩 공부' : collectedGoalInfo.goal;
+        info.push(`🎯 목표: ${goalText}`);
+      }
+      
+      if (collectedGoalInfo.period) {
+        info.push(`⏰ 기간: ${collectedGoalInfo.period}`);
+      }
+      
+      if (collectedGoalInfo.time) {
+        info.push(`🕐 시간: ${collectedGoalInfo.time}`);
+      }
+      
+      if (collectedGoalInfo.difficulty) {
+        info.push(`😅 어려운 점: ${collectedGoalInfo.difficulty}`);
+      }
+      
+      if (collectedGoalInfo.intensity) {
+        info.push(`💪 강도: ${collectedGoalInfo.intensity}`);
+      }
+      
+      return info;
+    }
+    return null;
+  };
 
   // 음성/텍스트 모드에서 전달받은 정보를 파싱하여 습관 정보 추출
   const parseVoiceData = (transcript: string) => {
@@ -138,7 +173,13 @@ export default function GoalSettingStep5({
   const formatHabitInfo = () => {
     const info = [];
     
-    // 음성/텍스트 모드에서 파싱된 정보가 있으면 우선 표시
+    // 1. 음성으로 수집된 정보 우선 사용
+    const collectedInfo = getGoalInfoFromCollected();
+    if (collectedInfo && collectedInfo.length > 0) {
+      return collectedInfo;
+    }
+    
+    // 2. 음성/텍스트 모드에서 파싱된 정보가 있으면 표시
     if (voiceData?.transcript) {
       const parsedInfo = parseVoiceData(voiceData.transcript);
       if (parsedInfo.length > 0) {
