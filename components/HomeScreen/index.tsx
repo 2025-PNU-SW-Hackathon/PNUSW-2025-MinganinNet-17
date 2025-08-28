@@ -98,6 +98,29 @@ const getStatusIcon = (status: StreakStatus): string => {
   return icons[status];
 };
 
+const getHarvestCountdownText = (currentStreak: number): string => {
+  if (currentStreak >= 7) return ""; // No countdown if already harvested
+  const daysLeft = 7 - (currentStreak % 7);
+  return `열매 맺기까지 ${daysLeft} 일!`;
+};
+
+// GitHub-style heat map color mapping
+const getHeatMapColor = (completionRate: number, colors: typeof Colors.light): string => {
+  if (completionRate === 0) return colors.heatMap.none;
+  if (completionRate <= 25) return colors.heatMap.low;
+  if (completionRate <= 50) return colors.heatMap.medium;
+  if (completionRate <= 75) return colors.heatMap.high;
+  return colors.heatMap.highest;
+};
+
+// Calculate daily todo completion rate
+const getDailyCompletionRate = (dateString: string, dailyTodosByDate: DailyTodosByDate): number => {
+  const todos = dailyTodosByDate[dateString] || [];
+  if (todos.length === 0) return 0;
+  const completed = todos.filter(todo => todo.is_completed).length;
+  return Math.round((completed / todos.length) * 100);
+};
+
 // StreakBadge component for showing streak information
 interface StreakBadgeProps {
   streak: number;
@@ -797,28 +820,38 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
         <View style={styles.headerArea}>
           <View style={styles.profileHeader}>
             <View style={styles.logoContainer}>
-              <Animated.Text 
-                style={[
-                  styles.logoText, 
-                  { 
-                    transform: [
-                      { scale: plantGrowAnimation },
-                      { scale: streakCelebrationAnimation }
-                    ] 
-                  }
-                ]}
-              >
-                {getPlantEmoji(streakData.plantStage)}
-              </Animated.Text>
-              
-              {/* Streak Badge - Only show if streak > 0 */}
-              {streakData.currentStreak > 0 && (
-                <StreakBadge 
-                  streak={streakData.currentStreak}
-                  status={streakData.status}
-                  pulseAnimation={streakData.status === 'at-risk' ? streakPulseAnimation : undefined}
-                  onPress={handleStreakPress}
-                />
+              {/* Plant and Streak Row */}
+              <View style={styles.plantStreakRow}>
+                <Animated.Text 
+                  style={[
+                    styles.logoText, 
+                    { 
+                      transform: [
+                        { scale: plantGrowAnimation },
+                        { scale: streakCelebrationAnimation }
+                      ] 
+                    }
+                  ]}
+                >
+                  {getPlantEmoji(streakData.plantStage)}
+                </Animated.Text>
+                
+                {/* Streak Badge - Only show if streak > 0 */}
+                {streakData.currentStreak > 0 && (
+                  <StreakBadge 
+                    streak={streakData.currentStreak}
+                    status={streakData.status}
+                    pulseAnimation={streakData.status === 'at-risk' ? streakPulseAnimation : undefined}
+                    onPress={handleStreakPress}
+                  />
+                )}
+              </View>
+
+              {/* Fruit Harvest Countdown */}
+              {streakData.currentStreak < 7 && streakData.currentStreak > 0 && (
+                <Text style={styles.harvestCountdown}>
+                  {getHarvestCountdownText(streakData.currentStreak)}
+                </Text>
               )}
               
               {/* Debug Mode Status Indicator */}
@@ -885,35 +918,38 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
               {calendarDates.map((date, index) => {
                 const dateInfo = formatCalendarDate(date);
                 const isSelected = targetDate === dateInfo.dateString;
-                const hasAchievement = Math.random() > 0.6;
-                const hasStreak = Math.random() > 0.7;
+                const completionRate = getDailyCompletionRate(dateInfo.dateString, dailyTodosByDate);
+                const heatMapColor = getHeatMapColor(completionRate, colors);
                 
                 return (
                   <TouchableOpacity
                     key={index}
                     style={[
                       styles.calendarDate, 
+                      { backgroundColor: heatMapColor }, // Heat map background
                       dateInfo.isToday && styles.calendarDateToday, 
                       isSelected && styles.calendarDateSelected,
-                      hasAchievement && styles.calendarDateWithAchievement
                     ]}
                     onPress={() => handleCalendarDatePress(dateInfo.dateString)}
                     activeOpacity={0.7}
+                    accessibilityLabel={`${dateInfo.dayName} ${dateInfo.dayNumber}, ${completionRate}% completed`}
+                    accessibilityHint={`Todo completion rate: ${completionRate}%`}
                   >
-                    <Text style={styles.calendarDayName}>{dateInfo.dayName}</Text>
-                    <Text style={[styles.calendarDayNumber, (dateInfo.isToday || isSelected) && styles.calendarTextActive]}>
+                    <Text style={[
+                      styles.calendarDayName,
+                      // Adjust text color for better contrast on dark backgrounds
+                      completionRate > 50 && { color: colors.card }
+                    ]}>
+                      {dateInfo.dayName}
+                    </Text>
+                    <Text style={[
+                      styles.calendarDayNumber, 
+                      (dateInfo.isToday || isSelected) && styles.calendarTextActive,
+                      // Adjust text color for better contrast on dark backgrounds
+                      completionRate > 50 && !dateInfo.isToday && !isSelected && { color: colors.card }
+                    ]}>
                       {dateInfo.dayNumber}
                     </Text>
-                    
-                    {/* Achievement indicator dot */}
-                    {hasAchievement && !dateInfo.isToday && (
-                      <View style={styles.achievementIndicator} />
-                    )}
-                    
-                    {/* Streak indicator bar */}
-                    {hasStreak && !dateInfo.isToday && (
-                      <View style={styles.streakIndicator} />
-                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -1092,11 +1128,12 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: Spacing.md,
   },
   logoContainer: { 
-    flexDirection: 'row', 
+    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     // Enhanced visual container
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     borderRadius: Spacing.layout.borderRadius.lg,
     backgroundColor: colors.primaryOpacity[10],
   },
@@ -1197,29 +1234,29 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     overflow: 'visible',
   },
   calendarDateToday: { 
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryLight,
-    borderWidth: 2,
-    // Enhanced today styling
+    // Today uses heat map background but with enhanced border
+    borderColor: colors.primary,
+    borderWidth: 3,
+    // Enhanced today styling with stronger shadow
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 }, // Scaled down proportionally
-    shadowOpacity: 0.3,
-    shadowRadius: Spacing.md, // Reduced shadow radius for smaller height
-    elevation: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: Spacing.md,
+    elevation: 8,
     // Add subtle pulse effect preparation
-    transform: [{ scale: 1.05 }],
+    transform: [{ scale: 1.08 }],
   },
   calendarDateSelected: { 
+    // Selected uses heat map background but with distinct border
     borderWidth: 2.5, 
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryOpacity[10],
+    borderColor: colors.info,
     // Enhanced selection styling
-    shadowColor: colors.primary,
+    shadowColor: colors.info,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: Spacing.md,
-    elevation: 3,
-    transform: [{ scale: 1.02 }],
+    elevation: 4,
+    transform: [{ scale: 1.04 }],
   },
   calendarDayName: { 
     fontSize: colors.typography.fontSize.xs * 0.9, // Slightly smaller for compact height
@@ -1241,42 +1278,19 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: '#ffffff', // White text for active states
   },
   
-  // Achievement indicators for calendar dates
-  calendarDateWithAchievement: {
-    borderTopRightRadius: Spacing.layout.borderRadius.lg,
-    // Add achievement indicator dot
-    position: 'relative',
-  },
-  achievementIndicator: {
-    position: 'absolute',
-    top: -1,
-    right: -1,
-    width: 10, // Scaled down from 12px for smaller calendar height
-    height: 10, // Scaled down from 12px
-    borderRadius: 5, // Scaled down from 6px
-    backgroundColor: colors.success,
-    borderWidth: 1.5, // Slightly thinner border for smaller indicator
-    borderColor: colors.card,
-    // Achievement glow effect
-    shadowColor: colors.success,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 3, // Reduced shadow radius
-  },
-  streakIndicator: {
-    position: 'absolute',
-    bottom: -1,
-    left: '50%',
-    marginLeft: -6, // Adjusted for smaller width
-    width: 12, // Scaled down from 16px for compact height
-    height: 2.5, // Slightly reduced height
-    borderRadius: 1.5, // Adjusted border radius
-    backgroundColor: colors.warning,
-    // Streak glow effect
-    shadowColor: colors.warning,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 2.5, // Slightly reduced shadow radius
+  // Heat map specific styles - optimized for GitHub-style visualization
+  calendarDateHeatMap: {
+    // Enhanced border radius for better heat map appearance
+    borderRadius: Spacing.layout.borderRadius.md,
+    // Subtle border for definition
+    borderWidth: 1,
+    borderColor: colors.neutral[100] + '30', // Semi-transparent border
+    // Better shadow for depth
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   
   // Enhanced calendar hover states (for future interactivity)
@@ -1769,6 +1783,29 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   streakBadgeInner: {
     flexDirection: 'row', 
     alignItems: 'center',
+  },
+
+  // Plant and streak row styles
+  plantStreakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.xs,
+  },
+
+  // Harvest countdown styles
+  harvestCountdown: {
+    fontSize: colors.typography.fontSize.sm * 0.7,
+    color: colors.success,
+    fontWeight: colors.typography.fontWeight.medium,
+    fontFamily: 'Inter',
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    // Subtle glow effect
+    textShadowColor: colors.success + '30',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 }); 
 
