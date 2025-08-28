@@ -1118,7 +1118,7 @@ export default function HomeScreen({ selectedDate }: HomeScreenProps) {
                 accessibilityHint="Shows your current progress status with motivational message"
               >
                 <View style={styles.coachHeader}>
-                  <Text style={styles.cardTitle}>Coach's Status</Text>
+                  <Text style={styles.cardTitle}>Routy의 브리핑</Text>
                   <View style={[styles.statusBadge, { backgroundColor: coachStatus.color }]}>
                     <Text style={styles.statusBadgeText}>Live</Text>
                   </View>

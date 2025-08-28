@@ -45,7 +45,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: '홈',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={focused ? 28 : 24} 
@@ -58,7 +58,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="plan"
         options={{
-          title: 'Plan',
+          title: '일정',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={focused ? 28 : 24} 
@@ -71,7 +71,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="report"
         options={{
-          title: 'Report',
+          title: '리포트',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={focused ? 28 : 24} 

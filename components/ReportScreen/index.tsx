@@ -16,15 +16,27 @@ export default function ReportScreen() {
   const [historicalReports, setHistoricalReports] = useState<ReportFromSupabase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const loadReports = async () => {
-      setIsLoading(true);
+  // Load reports function - can be called on mount and after saves
+  const loadReports = async () => {
+    setIsLoading(true);
+    try {
       const { todayReport, historicalReports } = await fetchReports();
       setTodayReport(todayReport);
       setHistoricalReports(historicalReports);
+    } catch (error) {
+      console.error('Error loading reports:', error);
+    } finally {
       setIsLoading(false);
-    };
+    }
+  };
 
+  // Refresh function to be called after report save
+  const refreshReports = async () => {
+    console.log('🔄 Refreshing reports after save...');
+    await loadReports();
+  };
+
+  useEffect(() => {
     loadReports();
   }, []);
 
@@ -40,6 +52,7 @@ export default function ReportScreen() {
           todayReport={todayReport}
           historicalReports={historicalReports}
           isLoading={isLoading}
+          onReportSaved={refreshReports}
         />
       ) : (
         <WeeklyReportSection />

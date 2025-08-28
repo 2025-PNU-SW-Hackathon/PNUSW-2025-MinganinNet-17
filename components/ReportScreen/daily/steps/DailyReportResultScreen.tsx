@@ -14,6 +14,7 @@ import { createReport } from '../../../../backend/supabase/reports';
 import { Colors } from '../../../../constants/Colors';
 import { useColorScheme } from '../../../../hooks/useColorScheme';
 import { DailyTodo } from '../../../../types/habit';
+import MarkdownText from '../../../MarkdownText';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,6 +23,7 @@ interface DailyReportResultScreenProps {
   onBack: () => void;
   aiReportText: string;
   todos: DailyTodo[]; // 할일 목록 데이터 추가
+  onReportSaved: () => Promise<void>;
 }
 
 // Coach status based on achievement rate (copied from HomeScreen)
@@ -35,7 +37,8 @@ export default function DailyReportResultScreen({
   achievementScore, 
   onBack,
   aiReportText,
-  todos
+  todos,
+  onReportSaved
 }: DailyReportResultScreenProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -88,6 +91,11 @@ export default function DailyReportResultScreen({
       }
 
       console.log("리포트가 성공적으로 저장되었습니다:", newReport);
+      
+      // Refresh the reports list to show the newly saved report
+      console.log("🔄 Calling onReportSaved to refresh reports...");
+      await onReportSaved();
+      
       // Navigate back to the main report screen
       onBack();
     } catch (error) {
@@ -132,7 +140,7 @@ export default function DailyReportResultScreen({
         <TouchableOpacity onPress={onBack} style={[styles.backButton, { backgroundColor: colors.card }]}>
           <Text style={[styles.backButtonText, { color: colors.text }]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Today&apos;s Daily Report</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>일간 리포트 작성결과</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -144,7 +152,7 @@ export default function DailyReportResultScreen({
             {/* Left Half - Coach's Status */}
             <View style={styles.leftHalf}>
               <View style={[styles.coachCard, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Coach&apos;s Status</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Routy의 감상</Text>
                 <View style={styles.coachContent}>
                   <Text style={styles.coachEmoji}>{coachStatus.emoji}</Text>
                   <Text style={[styles.coachMessage, { color: colors.textSecondary }]}>{coachStatus.message}</Text>
@@ -156,7 +164,7 @@ export default function DailyReportResultScreen({
             {/* Right Half - Achievement Score */}
             <View style={styles.rightHalf}>
               <View style={[styles.achievementCard, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Achievement Score</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>오늘의 달성점수</Text>
                 <View style={styles.achievementContent}>
                   <Text style={styles.achievementScore}>
                     {displayScore}
@@ -184,7 +192,7 @@ export default function DailyReportResultScreen({
           {/* Todo List Section */}
           <View style={styles.todoSection}>
             <View style={[styles.todoCard, { backgroundColor: colors.surface }]}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Today&apos;s Tasks</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>오늘 해낸 To-do</Text>
               {todos.length > 0 ? (
                 <ScrollView 
                   style={styles.todoListScroll}
@@ -223,12 +231,12 @@ export default function DailyReportResultScreen({
           {/* Bottom Section - 50% of main content */}
           <View style={styles.bottomSection}>
             <View style={[styles.reportCard, { backgroundColor: colors.surface }]}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>AI Generated Report</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Routy가 평가한 오늘 하루</Text>
               <ScrollView 
                 style={styles.reportScrollView}
                 showsVerticalScrollIndicator={false}
               >
-                <Text style={[styles.reportText, { color: colors.text }]}>{aiReportText}</Text>
+                <MarkdownText>{aiReportText}</MarkdownText>
               </ScrollView>
             </View>
           </View>
@@ -373,11 +381,6 @@ const styles = StyleSheet.create({
   },
   reportScrollView: {
     flex: 1,
-  },
-  reportText: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontFamily: 'Inter',
   },
   footer: {
     paddingHorizontal: 24,
